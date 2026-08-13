@@ -9,6 +9,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Shared Protovia and official protobuf fixtures for JMH and parity tests.
+ *
+ * @author Rawvoid
+ */
 final class Samples {
 
     static final String CJK_BIO = "你好世界".repeat(32);
@@ -53,18 +58,18 @@ final class Samples {
     }
 
     private static io.github.rawvoid.protovia.bench.official.User officialUser(
-            String name, String bio, boolean packed) {
+        String name, String bio, boolean packed) {
         return io.github.rawvoid.protovia.bench.official.User.newBuilder()
-                .setName(name)
-                .setAge(36)
-                .addAllTags(List.of("dev", "java", "protobuf"))
-                .setAddress(io.github.rawvoid.protovia.bench.official.Address.newBuilder()
-                        .setCity("Paris")
-                        .setStreet("Rue"))
-                .putAllScores(scores())
-                .addAllRanks(packed ? packedRanks() : List.of(1, 2, 3))
-                .setBio(bio)
-                .build();
+            .setName(name)
+            .setAge(36)
+            .addAllTags(List.of("dev", "java", "protobuf"))
+            .setAddress(io.github.rawvoid.protovia.bench.official.Address.newBuilder()
+                .setCity("Paris")
+                .setStreet("Rue"))
+            .putAllScores(scores())
+            .addAllRanks(packed ? packedRanks() : List.of(1, 2, 3))
+            .setBio(bio)
+            .build();
     }
 
     private static Map<String, Integer> scores() {
@@ -82,7 +87,9 @@ final class Samples {
         return ranks;
     }
 
-    /** Same numbers as {@link #packedRanks()}, stored unboxed like official {@code IntList}. */
+    /**
+     * Same numbers as {@link #packedRanks()}, stored unboxed like official {@code IntList}.
+     */
     private static IntArrayList packedRanksUnboxed() {
         IntArrayList ranks = new IntArrayList(256);
         for (int i = 0; i < 256; i++) {

@@ -3,18 +3,7 @@ package io.github.rawvoid.protovia.runtime;
 import io.github.rawvoid.protovia.ProtoAny;
 import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
-import io.github.rawvoid.protovia.wkt.AnyCodec;
-import io.github.rawvoid.protovia.wkt.BoolValue;
-import io.github.rawvoid.protovia.wkt.BytesValue;
-import io.github.rawvoid.protovia.wkt.DoubleValue;
-import io.github.rawvoid.protovia.wkt.DurationCodec;
-import io.github.rawvoid.protovia.wkt.FloatValue;
-import io.github.rawvoid.protovia.wkt.Int32Value;
-import io.github.rawvoid.protovia.wkt.Int64Value;
-import io.github.rawvoid.protovia.wkt.StringValue;
-import io.github.rawvoid.protovia.wkt.TimestampCodec;
-import io.github.rawvoid.protovia.wkt.UInt32Value;
-import io.github.rawvoid.protovia.wkt.UInt64Value;
+import io.github.rawvoid.protovia.wkt.*;
 
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -27,6 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * with an optional manual {@link #register(Class, ProtoCodec) override}.
  * Well-known types ({@code Instant}, {@code Duration}, {@link ProtoAny}, wrappers)
  * are registered up front.
+ *
+ * @author Rawvoid
  */
 public final class CodecLookup {
 
@@ -39,6 +30,10 @@ public final class CodecLookup {
     private CodecLookup() {
     }
 
+    /**
+     * @param type entity class
+     * @return cached or newly loaded codec
+     */
     @SuppressWarnings("unchecked")
     public static <T> ProtoCodec<T> get(Class<T> type) {
         Objects.requireNonNull(type, "type");
@@ -51,12 +46,21 @@ public final class CodecLookup {
         return (ProtoCodec<T>) (existing != null ? existing : loaded);
     }
 
+    /**
+     * Replaces any previous mapping for {@code type}.
+     *
+     * @param type  entity class
+     * @param codec codec to use
+     */
     public static <T> void register(Class<T> type, ProtoCodec<T> codec) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(codec, "codec");
         CACHE.put(type, codec);
     }
 
+    /**
+     * Drops manual registrations and reloads well-known builtins.
+     */
     public static void clear() {
         CACHE.clear();
         registerBuiltins();
@@ -90,9 +94,9 @@ public final class CodecLookup {
             return (ProtoCodec<T>) codec;
         } catch (ClassNotFoundException e) {
             throw new ProtoException(
-                    "No ProtoCodec for " + type.getName()
-                            + ". Annotate the type with @ProtoMessage and enable protovia-processor.",
-                    e);
+                "No ProtoCodec for " + type.getName()
+                    + ". Annotate the type with @ProtoMessage and enable protovia-processor.",
+                e);
         } catch (ReflectiveOperationException e) {
             throw new ProtoException("Failed to load " + codecName, e);
         }

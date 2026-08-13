@@ -4,7 +4,12 @@ import io.github.rawvoid.protovia.codec.ProtoCodec;
 
 import java.util.Arrays;
 
-/** {@code google.protobuf.BytesValue}. */
+/**
+ * {@code google.protobuf.BytesValue}.
+ *
+ * @param value wrapped bytes; {@code null} is stored as an empty array
+ * @author Rawvoid
+ */
 public record BytesValue(byte[] value) {
     public static final ProtoCodec<BytesValue> INSTANCE = WrapperCodec.bytes();
 

@@ -1,10 +1,6 @@
 package io.github.rawvoid.protovia.support;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public class User {
 
@@ -64,6 +60,11 @@ public class User {
     }
 
     @Override
+    public int hashCode() {
+        return Objects.hash(name, age, tags, address, scores, level);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -72,16 +73,11 @@ public class User {
             return false;
         }
         return age == user.age
-                && Objects.equals(name, user.name)
-                && Objects.equals(tags, user.tags)
-                && Objects.equals(address, user.address)
-                && Objects.equals(scores, user.scores)
-                && Objects.equals(level, user.level);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(name, age, tags, address, scores, level);
+            && Objects.equals(name, user.name)
+            && Objects.equals(tags, user.tags)
+            && Objects.equals(address, user.address)
+            && Objects.equals(scores, user.scores)
+            && Objects.equals(level, user.level);
     }
 
     public static final class Address {
@@ -105,6 +101,11 @@ public class User {
         }
 
         @Override
+        public int hashCode() {
+            return Objects.hash(city, street);
+        }
+
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -113,11 +114,6 @@ public class User {
                 return false;
             }
             return Objects.equals(city, address.city) && Objects.equals(street, address.street);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(city, street);
         }
     }
 }

@@ -6,16 +6,16 @@ option java_package = "io.github.rawvoid.protovia.bench.official";
 option java_multiple_files = true;
 
 message Address {
-  string city = 1;
-  string street = 2;
+    string city = 1;
+    string street = 2;
 }
 
 message User {
-  string name = 1;
-  int32 age = 2;
-  repeated string tags = 3;
-  Address address = 4;
-  map<string, int32> scores = 5;
-  repeated int32 ranks = 6;
-  string bio = 7;
+    string name = 1;
+    int32 age = 2;
+    repeated string tags = 3;
+    Address address = 4;
+    map<string, int32> scores = 5;
+    repeated int32 ranks = 6;
+    string bio = 7;
 }

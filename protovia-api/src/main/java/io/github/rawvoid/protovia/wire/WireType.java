@@ -1,7 +1,9 @@
 package io.github.rawvoid.protovia.wire;
 
 /**
- * Official protobuf wire types.
+ * Official protobuf wire types and field-number checks.
+ *
+ * @author Rawvoid
  */
 public final class WireType {
 
@@ -19,6 +21,11 @@ public final class WireType {
     private WireType() {
     }
 
+    /**
+     * @param fieldNumber protobuf field number
+     * @param wireType    one of {@link #VARINT}, {@link #I64}, {@link #LEN}, {@link #I32}, …
+     * @return encoded tag
+     */
     public static int tag(int fieldNumber, int wireType) {
         return (fieldNumber << 3) | wireType;
     }
@@ -33,7 +40,7 @@ public final class WireType {
 
     public static boolean isValidFieldNumber(int number) {
         return number >= 1
-                && number <= MAX_FIELD_NUMBER
-                && (number < RESERVED_NUMBER_MIN || number > RESERVED_NUMBER_MAX);
+            && number <= MAX_FIELD_NUMBER
+            && (number < RESERVED_NUMBER_MIN || number > RESERVED_NUMBER_MAX);
     }
 }

@@ -5,6 +5,11 @@ import io.github.rawvoid.protovia.ProtoType;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 
+/**
+ * One {@code @ProtoField} or {@code @ProtoOneof} member of a message.
+ *
+ * @author Rawvoid
+ */
 public final class FieldModel {
 
     public final int number;
@@ -82,10 +87,8 @@ public final class FieldModel {
             return null;
         }
         return switch (el.protoType) {
-            case INT32, UINT32, SINT32, FIXED32, SFIXED32 ->
-                    "io.github.rawvoid.protovia.collect.IntArrayList";
-            case INT64, UINT64, SINT64, FIXED64, SFIXED64 ->
-                    "io.github.rawvoid.protovia.collect.LongArrayList";
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> "io.github.rawvoid.protovia.collect.IntArrayList";
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> "io.github.rawvoid.protovia.collect.LongArrayList";
             case FLOAT -> "io.github.rawvoid.protovia.collect.FloatArrayList";
             case DOUBLE -> "io.github.rawvoid.protovia.collect.DoubleArrayList";
             case BOOL -> "io.github.rawvoid.protovia.collect.BooleanArrayList";

@@ -7,6 +7,8 @@ import java.nio.ByteBuffer;
 
 /**
  * proto3 decoder over a byte slice. Not thread-safe.
+ *
+ * @author Rawvoid
  */
 public final class ProtoReader {
 
@@ -16,12 +18,12 @@ public final class ProtoReader {
 
     private final byte[] buffer;
     private final int end;
+    private final int maxMessageSize;
+    private final int maxDepth;
     private int pos;
     private int currentLimit;
     private int lastTag;
     private int depth;
-    private final int maxMessageSize;
-    private final int maxDepth;
 
     public ProtoReader(byte[] data) {
         this(data, 0, data.length, DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_DEPTH);
@@ -31,6 +33,13 @@ public final class ProtoReader {
         this(data, offset, length, DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_DEPTH);
     }
 
+    /**
+     * @param data           backing buffer
+     * @param offset         start index
+     * @param length         number of bytes that belong to this message
+     * @param maxMessageSize cap on this slice and on nested length-delimited fields
+     * @param maxDepth       cap on nested message / group depth
+     */
     public ProtoReader(byte[] data, int offset, int length, int maxMessageSize, int maxDepth) {
         if (data == null) {
             throw new ProtoException("data is null");
@@ -56,6 +65,8 @@ public final class ProtoReader {
     /**
      * Reads the next tag. Returns {@code 0} at the current limit / end of input.
      * Field number 0 is never valid (protobuf {@code ArrayDecoder.readTag}).
+     *
+     * @return tag, or {@code 0} at end
      */
     public int readTag() {
         if (pos >= currentLimit) {
@@ -104,6 +115,8 @@ public final class ProtoReader {
 
     /**
      * Copies the field at {@link #lastTag()} (tag varint + payload) and advances past it.
+     *
+     * @return raw tag+payload bytes
      */
     public byte[] captureField() {
         int tag = lastTag;
@@ -117,15 +130,6 @@ public final class ProtoReader {
             System.arraycopy(buffer, payloadStart, out, tagSize, payloadLen);
         }
         return out;
-    }
-
-    private static void writeRawVarint32(byte[] out, int value) {
-        int i = 0;
-        while ((value & ~0x7F) != 0) {
-            out[i++] = (byte) (value | 0x80);
-            value >>>= 7;
-        }
-        out[i] = (byte) value;
     }
 
     public int readInt32() {
@@ -217,6 +221,12 @@ public final class ProtoReader {
         return ByteBuffer.wrap(readBytes());
     }
 
+    /**
+     * Restricts subsequent reads to the next {@code byteLength} bytes.
+     *
+     * @param byteLength nested length
+     * @return previous limit, to pass to {@link #popLimit(int)}
+     */
     public int pushLimit(int byteLength) {
         checkLength(byteLength);
         int next = pos + byteLength;
@@ -228,6 +238,11 @@ public final class ProtoReader {
         return old;
     }
 
+    /**
+     * Restores {@code oldLimit} after a nested read. Requires the nested range to be fully consumed.
+     *
+     * @param oldLimit value returned by {@link #pushLimit(int)}
+     */
     public void popLimit(int oldLimit) {
         if (pos != currentLimit) {
             throw new ProtoException("nested message was not fully consumed");
@@ -239,14 +254,33 @@ public final class ProtoReader {
         return currentLimit - pos;
     }
 
+    /**
+     * Reads a length-delimited nested message.
+     *
+     * @param codec codec for the nested type
+     * @return decoded instance
+     */
     public <T> T readMessage(ProtoCodec<T> codec) {
         return readMessage(codec, null);
     }
 
+    /**
+     * Same as {@link #readMessage(ProtoCodec, Object)}.
+     *
+     * @param codec    nested codec
+     * @param existing value to merge into; {@code null} means {@link ProtoCodec#readFrom}
+     */
     public <T> T readMessageMerging(ProtoCodec<T> codec, T existing) {
         return readMessage(codec, existing);
     }
 
+    /**
+     * Reads a length-delimited nested message, merging into {@code existing} when non-null.
+     *
+     * @param codec    nested codec
+     * @param existing value to merge into; {@code null} means {@link ProtoCodec#readFrom}
+     * @return decoded or merged instance
+     */
     public <T> T readMessage(ProtoCodec<T> codec, T existing) {
         int length = readRawVarint32();
         if (depth >= maxDepth) {
@@ -299,11 +333,11 @@ public final class ProtoReader {
             x ^= y << 28;
             x ^= (~0 << 7) ^ (~0 << 14) ^ (~0 << 21) ^ (~0 << 28);
             if (y < 0
-                    && buf[tempPos++] < 0
-                    && buf[tempPos++] < 0
-                    && buf[tempPos++] < 0
-                    && buf[tempPos++] < 0
-                    && buf[tempPos++] < 0) {
+                && buf[tempPos++] < 0
+                && buf[tempPos++] < 0
+                && buf[tempPos++] < 0
+                && buf[tempPos++] < 0
+                && buf[tempPos++] < 0) {
                 throw ProtoException.malformedVarint();
             }
         }
@@ -341,31 +375,31 @@ public final class ProtoReader {
             x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35) ^ (~0L << 42);
         } else if ((x ^= (long) buf[tempPos++] << 49) < 0L) {
             x ^= (~0L << 7)
-                    ^ (~0L << 14)
-                    ^ (~0L << 21)
-                    ^ (~0L << 28)
-                    ^ (~0L << 35)
-                    ^ (~0L << 42)
-                    ^ (~0L << 49);
+                ^ (~0L << 14)
+                ^ (~0L << 21)
+                ^ (~0L << 28)
+                ^ (~0L << 35)
+                ^ (~0L << 42)
+                ^ (~0L << 49);
         } else if ((x ^= (long) buf[tempPos++] << 56) >= 0L) {
             x ^= (~0L << 7)
-                    ^ (~0L << 14)
-                    ^ (~0L << 21)
-                    ^ (~0L << 28)
-                    ^ (~0L << 35)
-                    ^ (~0L << 42)
-                    ^ (~0L << 49)
-                    ^ (~0L << 56);
+                ^ (~0L << 14)
+                ^ (~0L << 21)
+                ^ (~0L << 28)
+                ^ (~0L << 35)
+                ^ (~0L << 42)
+                ^ (~0L << 49)
+                ^ (~0L << 56);
         } else if ((x ^= (long) buf[tempPos++] << 63) >= 0L) {
             x ^= (~0L << 7)
-                    ^ (~0L << 14)
-                    ^ (~0L << 21)
-                    ^ (~0L << 28)
-                    ^ (~0L << 35)
-                    ^ (~0L << 42)
-                    ^ (~0L << 49)
-                    ^ (~0L << 56)
-                    ^ (~0L << 63);
+                ^ (~0L << 14)
+                ^ (~0L << 21)
+                ^ (~0L << 28)
+                ^ (~0L << 35)
+                ^ (~0L << 42)
+                ^ (~0L << 49)
+                ^ (~0L << 56)
+                ^ (~0L << 63);
         } else {
             throw ProtoException.malformedVarint();
         }
@@ -381,9 +415,9 @@ public final class ProtoReader {
         byte[] buf = buffer;
         pos = tempPos + 4;
         return (buf[tempPos] & 0xFF)
-                | ((buf[tempPos + 1] & 0xFF) << 8)
-                | ((buf[tempPos + 2] & 0xFF) << 16)
-                | ((buf[tempPos + 3] & 0xFF) << 24);
+            | ((buf[tempPos + 1] & 0xFF) << 8)
+            | ((buf[tempPos + 2] & 0xFF) << 16)
+            | ((buf[tempPos + 3] & 0xFF) << 24);
     }
 
     public long readRawLittleEndian64() {
@@ -394,13 +428,13 @@ public final class ProtoReader {
         byte[] buf = buffer;
         pos = tempPos + 8;
         return (buf[tempPos] & 0xFFL)
-                | ((buf[tempPos + 1] & 0xFFL) << 8)
-                | ((buf[tempPos + 2] & 0xFFL) << 16)
-                | ((buf[tempPos + 3] & 0xFFL) << 24)
-                | ((buf[tempPos + 4] & 0xFFL) << 32)
-                | ((buf[tempPos + 5] & 0xFFL) << 40)
-                | ((buf[tempPos + 6] & 0xFFL) << 48)
-                | ((buf[tempPos + 7] & 0xFFL) << 56);
+            | ((buf[tempPos + 1] & 0xFFL) << 8)
+            | ((buf[tempPos + 2] & 0xFFL) << 16)
+            | ((buf[tempPos + 3] & 0xFFL) << 24)
+            | ((buf[tempPos + 4] & 0xFFL) << 32)
+            | ((buf[tempPos + 5] & 0xFFL) << 40)
+            | ((buf[tempPos + 6] & 0xFFL) << 48)
+            | ((buf[tempPos + 7] & 0xFFL) << 56);
     }
 
     private void skipRawVarint() {
@@ -473,5 +507,14 @@ public final class ProtoReader {
         if (length > maxMessageSize) {
             throw new ProtoException("length-delimited field exceeds max size " + maxMessageSize);
         }
+    }
+
+    private static void writeRawVarint32(byte[] out, int value) {
+        int i = 0;
+        while ((value & ~0x7F) != 0) {
+            out[i++] = (byte) (value | 0x80);
+            value >>>= 7;
+        }
+        out[i] = (byte) value;
     }
 }

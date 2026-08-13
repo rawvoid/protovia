@@ -8,9 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class WellKnownCodecTest {
 
@@ -50,7 +48,7 @@ class WellKnownCodecTest {
         Instant existing = Instant.ofEpochSecond(10, 250);
         byte[] onlySeconds = encode(TimestampCodec.INSTANCE, Instant.ofEpochSecond(20, 0));
         Instant merged = TimestampCodec.INSTANCE.mergeFrom(
-                new ProtoReader(onlySeconds), existing);
+            new ProtoReader(onlySeconds), existing);
         assertEquals(Instant.ofEpochSecond(20, 250), merged);
     }
 

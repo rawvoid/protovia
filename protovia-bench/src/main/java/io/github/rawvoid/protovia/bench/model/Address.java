@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.bench.model;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
+/**
+ * Nested address used by the bench {@link User}.
+ *
+ * @author Rawvoid
+ */
 @ProtoMessage
 public class Address {
 

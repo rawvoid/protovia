@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.collect;
 import java.util.Arrays;
 import java.util.Collection;
 
+/**
+ * {@code List<Double>} backed by {@code double[]}.
+ *
+ * @author Rawvoid
+ */
 public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
 
     private double[] values;
@@ -44,14 +49,22 @@ public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
     }
 
     @Override
+    public boolean add(Double value) {
+        addDouble(value);
+        return true;
+    }
+
+    @Override
     public Double get(int index) {
         return getDouble(index);
     }
 
     @Override
-    public boolean add(Double value) {
-        addDouble(value);
-        return true;
+    public Double set(int index, Double value) {
+        checkElementIndex(index);
+        double old = values[index];
+        values[index] = value;
+        return old;
     }
 
     @Override
@@ -62,14 +75,6 @@ public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
         values[index] = value;
         size++;
         modCount++;
-    }
-
-    @Override
-    public Double set(int index, Double value) {
-        checkElementIndex(index);
-        double old = values[index];
-        values[index] = value;
-        return old;
     }
 
     @Override

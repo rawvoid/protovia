@@ -8,6 +8,8 @@ import java.util.Arrays;
 /**
  * Opaque, ordered capture of unrecognized protobuf fields (tag + payload).
  * Immutable. {@link #EMPTY} is the unset slot.
+ *
+ * @author Rawvoid
  */
 public final class UnknownFields {
 
@@ -33,8 +35,34 @@ public final class UnknownFields {
         }
     }
 
+    UnknownFields append(byte[] chunk) {
+        if (chunk.length == 0) {
+            return this;
+        }
+        if (bytes.length == 0) {
+            return new UnknownFields(chunk);
+        }
+        byte[] next = Arrays.copyOf(bytes, bytes.length + chunk.length);
+        System.arraycopy(chunk, 0, next, bytes.length, chunk.length);
+        return new UnknownFields(next);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(bytes);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof UnknownFields other && Arrays.equals(bytes, other.bytes);
+    }
+
     /**
      * Captures the field at the reader's current tag and appends it.
+     *
+     * @param existing previous capture; {@code null} is treated as {@link #EMPTY}
+     * @param reader   positioned on the unknown tag
+     * @return a new instance if anything was appended
      */
     public static UnknownFields merge(UnknownFields existing, ProtoReader reader) {
         UnknownFields base = existing == null ? EMPTY : existing;
@@ -43,6 +71,12 @@ public final class UnknownFields {
 
     /**
      * Appends an already-consumed varint field (used when an enum number is unrecognized).
+     * {@code number} is encoded as proto {@code int32} (10 bytes when negative).
+     *
+     * @param existing previous capture; {@code null} is treated as {@link #EMPTY}
+     * @param tag      wire tag (unpacked varint)
+     * @param number   enum number
+     * @return a new instance if anything was appended
      */
     public static UnknownFields mergeVarint(UnknownFields existing, int tag, int number) {
         UnknownFields base = existing == null ? EMPTY : existing;
@@ -78,27 +112,5 @@ public final class UnknownFields {
         }
         out[i++] = (byte) value;
         return i;
-    }
-
-    UnknownFields append(byte[] chunk) {
-        if (chunk.length == 0) {
-            return this;
-        }
-        if (bytes.length == 0) {
-            return new UnknownFields(chunk);
-        }
-        byte[] next = Arrays.copyOf(bytes, bytes.length + chunk.length);
-        System.arraycopy(chunk, 0, next, bytes.length, chunk.length);
-        return new UnknownFields(next);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return o instanceof UnknownFields other && Arrays.equals(bytes, other.bytes);
-    }
-
-    @Override
-    public int hashCode() {
-        return Arrays.hashCode(bytes);
     }
 }

@@ -2,6 +2,8 @@ package io.github.rawvoid.protovia;
 
 /**
  * Protobuf scalar / composite type. {@link #AUTO} lets the processor infer from the Java type.
+ *
+ * @author Rawvoid
  */
 public enum ProtoType {
     AUTO,

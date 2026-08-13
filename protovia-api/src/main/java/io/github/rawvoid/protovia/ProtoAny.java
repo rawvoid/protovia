@@ -15,6 +15,8 @@ import java.util.Arrays;
  * full name comes from {@code @ProtoMessage(packageName, name)}, not the Java
  * FQCN. A missing package yields a short name that will not match an official
  * type that lives under {@code package foo.bar}.
+ *
+ * @author Rawvoid
  */
 public final class ProtoAny {
 
@@ -25,6 +27,10 @@ public final class ProtoAny {
     private final String typeUrl;
     private final byte[] value;
 
+    /**
+     * @param typeUrl {@code type.googleapis.com/<fullName>}; {@code null} becomes empty
+     * @param value   serialized payload; {@code null} or empty is stored as a shared empty array
+     */
     public ProtoAny(String typeUrl, byte[] value) {
         this.typeUrl = typeUrl == null ? "" : typeUrl;
         this.value = value == null || value.length == 0 ? EMPTY : value;
@@ -38,6 +44,10 @@ public final class ProtoAny {
         return value;
     }
 
+    /**
+     * @param protoFullName protobuf full name, e.g. {@code example.v1.User}
+     * @return {@code true} if this Any names that type
+     */
     public boolean is(String protoFullName) {
         return typeName(typeUrl).equals(protoFullName);
     }
@@ -46,6 +56,10 @@ public final class ProtoAny {
         return is(codec.protoFullName());
     }
 
+    /**
+     * @param codec codec whose {@link ProtoCodec#protoFullName()} must match this Any
+     * @return decoded payload
+     */
     public <T> T unpack(ProtoCodec<T> codec) {
         if (!is(codec)) {
             throw new ProtoException("Any type mismatch: " + typeUrl + " is not " + codec.protoFullName());
@@ -53,9 +67,29 @@ public final class ProtoAny {
         return codec.readFrom(new ProtoReader(value));
     }
 
+    @Override
+    public int hashCode() {
+        return 31 * typeUrl.hashCode() + Arrays.hashCode(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof ProtoAny other
+            && typeUrl.equals(other.typeUrl)
+            && Arrays.equals(value, other.value);
+    }
+
+    @Override
+    public String toString() {
+        return "ProtoAny{" + typeUrl + ", " + value.length + " bytes}";
+    }
+
     /**
-     * The type name after the last {@code /}, matching official {@code Any}.
+     * Type name after the last {@code /}, matching official {@code Any}.
      * No slash means the name is empty.
+     *
+     * @param typeUrl full type URL
+     * @return proto full name, or {@code ""}
      */
     public static String typeName(String typeUrl) {
         if (typeUrl == null) {
@@ -65,28 +99,20 @@ public final class ProtoAny {
         return slash < 0 ? "" : typeUrl.substring(slash + 1);
     }
 
+    /**
+     * @param protoFullName protobuf full name
+     * @return {@code type.googleapis.com/<protoFullName>}
+     */
     public static String typeUrl(String protoFullName) {
         return typeUrl(TYPE_URL_PREFIX, protoFullName);
     }
 
+    /**
+     * @param prefix        host prefix; a trailing {@code /} is optional
+     * @param protoFullName protobuf full name
+     * @return {@code prefix/protoFullName}
+     */
     public static String typeUrl(String prefix, String protoFullName) {
         return prefix.endsWith("/") ? prefix + protoFullName : prefix + "/" + protoFullName;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj instanceof ProtoAny other
-                && typeUrl.equals(other.typeUrl)
-                && Arrays.equals(value, other.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return 31 * typeUrl.hashCode() + Arrays.hashCode(value);
-    }
-
-    @Override
-    public String toString() {
-        return "ProtoAny{" + typeUrl + ", " + value.length + " bytes}";
     }
 }

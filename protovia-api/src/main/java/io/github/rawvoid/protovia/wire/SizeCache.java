@@ -9,6 +9,8 @@ import java.util.function.IntSupplier;
  * consume the same slots in pre-order, so a nested {@code computeSize} never runs twice.
  *
  * <p>{@link #NOOP} discards reservations; {@link #take(IntSupplier)} then runs the fallback.
+ *
+ * @author Rawvoid
  */
 public final class SizeCache {
 

@@ -3,7 +3,12 @@ package io.github.rawvoid.protovia.collect;
 import java.util.Arrays;
 import java.util.Collection;
 
-/** {@code List<Integer>} backed by {@code int[]} so packed decode can avoid boxing. */
+/**
+ * {@code List<Integer>} backed by {@code int[]} so packed decode and encode can avoid boxing.
+ * Prefer {@link #addInt(int)} / {@link #getInt(int)} on the hot path.
+ *
+ * @author Rawvoid
+ */
 public final class IntArrayList extends AbstractPrimitiveList<Integer> {
 
     private int[] values;
@@ -23,12 +28,21 @@ public final class IntArrayList extends AbstractPrimitiveList<Integer> {
         }
     }
 
+    /**
+     * Appends {@code value} without boxing.
+     *
+     * @param value primitive element
+     */
     public void addInt(int value) {
         ensureCapacity(size + 1);
         values[size++] = value;
         modCount++;
     }
 
+    /**
+     * @param index element index
+     * @return primitive element at {@code index}
+     */
     public int getInt(int index) {
         checkElementIndex(index);
         return values[index];
@@ -45,14 +59,22 @@ public final class IntArrayList extends AbstractPrimitiveList<Integer> {
     }
 
     @Override
+    public boolean add(Integer value) {
+        addInt(value);
+        return true;
+    }
+
+    @Override
     public Integer get(int index) {
         return getInt(index);
     }
 
     @Override
-    public boolean add(Integer value) {
-        addInt(value);
-        return true;
+    public Integer set(int index, Integer value) {
+        checkElementIndex(index);
+        int old = values[index];
+        values[index] = value;
+        return old;
     }
 
     @Override
@@ -63,14 +85,6 @@ public final class IntArrayList extends AbstractPrimitiveList<Integer> {
         values[index] = value;
         size++;
         modCount++;
-    }
-
-    @Override
-    public Integer set(int index, Integer value) {
-        checkElementIndex(index);
-        int old = values[index];
-        values[index] = value;
-        return old;
     }
 
     @Override

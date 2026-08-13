@@ -20,9 +20,15 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Set;
 
+/**
+ * Isolating annotation processor that writes {@code XxxProtoCodec} next to each
+ * {@code @ProtoMessage} type.
+ *
+ * @author Rawvoid
+ */
 @SupportedAnnotationTypes({
-        "io.github.rawvoid.protovia.annotation.ProtoMessage",
-        "io.github.rawvoid.protovia.annotation.ProtoEnum"
+    "io.github.rawvoid.protovia.annotation.ProtoMessage",
+    "io.github.rawvoid.protovia.annotation.ProtoEnum"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public final class ProtoviaProcessor extends AbstractProcessor {
@@ -35,9 +41,9 @@ public final class ProtoviaProcessor extends AbstractProcessor {
             return false;
         }
         SchemaParser parser = new SchemaParser(
-                processingEnv.getTypeUtils(),
-                processingEnv.getElementUtils(),
-                processingEnv.getMessager());
+            processingEnv.getTypeUtils(),
+            processingEnv.getElementUtils(),
+            processingEnv.getMessager());
 
         for (Element element : roundEnv.getElementsAnnotatedWith(ProtoEnum.class)) {
             if (element instanceof TypeElement type) {
@@ -67,9 +73,9 @@ public final class ProtoviaProcessor extends AbstractProcessor {
             }
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(
-                    Diagnostic.Kind.ERROR,
-                    "failed to write " + fqcn + ": " + e.getMessage(),
-                    type);
+                Diagnostic.Kind.ERROR,
+                "failed to write " + fqcn + ": " + e.getMessage(),
+                type);
         }
     }
 }

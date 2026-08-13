@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.collect;
 import java.util.Arrays;
 import java.util.Collection;
 
+/**
+ * {@code List<Boolean>} backed by {@code boolean[]}.
+ *
+ * @author Rawvoid
+ */
 public final class BooleanArrayList extends AbstractPrimitiveList<Boolean> {
 
     private boolean[] values;
@@ -44,14 +49,22 @@ public final class BooleanArrayList extends AbstractPrimitiveList<Boolean> {
     }
 
     @Override
+    public boolean add(Boolean value) {
+        addBoolean(value);
+        return true;
+    }
+
+    @Override
     public Boolean get(int index) {
         return getBoolean(index);
     }
 
     @Override
-    public boolean add(Boolean value) {
-        addBoolean(value);
-        return true;
+    public Boolean set(int index, Boolean value) {
+        checkElementIndex(index);
+        boolean old = values[index];
+        values[index] = value;
+        return old;
     }
 
     @Override
@@ -62,14 +75,6 @@ public final class BooleanArrayList extends AbstractPrimitiveList<Boolean> {
         values[index] = value;
         size++;
         modCount++;
-    }
-
-    @Override
-    public Boolean set(int index, Boolean value) {
-        checkElementIndex(index);
-        boolean old = values[index];
-        values[index] = value;
-        return old;
     }
 
     @Override

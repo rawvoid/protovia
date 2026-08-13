@@ -1,5 +1,10 @@
 package io.github.rawvoid.protovia.wire;
 
+/**
+ * ZigZag encoding used by proto {@code sint32} / {@code sint64}.
+ *
+ * @author Rawvoid
+ */
 public final class ZigZag {
 
     private ZigZag() {

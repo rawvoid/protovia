@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.collect;
 import java.util.Arrays;
 import java.util.Collection;
 
+/**
+ * {@code List<Long>} backed by {@code long[]}.
+ *
+ * @author Rawvoid
+ */
 public final class LongArrayList extends AbstractPrimitiveList<Long> {
 
     private long[] values;
@@ -44,14 +49,22 @@ public final class LongArrayList extends AbstractPrimitiveList<Long> {
     }
 
     @Override
+    public boolean add(Long value) {
+        addLong(value);
+        return true;
+    }
+
+    @Override
     public Long get(int index) {
         return getLong(index);
     }
 
     @Override
-    public boolean add(Long value) {
-        addLong(value);
-        return true;
+    public Long set(int index, Long value) {
+        checkElementIndex(index);
+        long old = values[index];
+        values[index] = value;
+        return old;
     }
 
     @Override
@@ -62,14 +75,6 @@ public final class LongArrayList extends AbstractPrimitiveList<Long> {
         values[index] = value;
         size++;
         modCount++;
-    }
-
-    @Override
-    public Long set(int index, Long value) {
-        checkElementIndex(index);
-        long old = values[index];
-        values[index] = value;
-        return old;
     }
 
     @Override

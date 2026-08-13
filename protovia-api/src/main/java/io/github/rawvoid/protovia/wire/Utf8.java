@@ -8,10 +8,14 @@ import java.nio.charset.StandardCharsets;
  * UTF-8 encode/decode matching protobuf-java 4.35.1 {@code Utf8.SafeProcessor}:
  * ASCII fast paths, direct writes into the output buffer, and unpaired surrogates
  * replaced the same way as {@link String#getBytes(java.nio.charset.Charset)}.
+ *
+ * @author Rawvoid
  */
 public final class Utf8 {
 
-    /** Maximum UTF-8 bytes produced by one UTF-16 {@code char} (supplementary planes use two chars). */
+    /**
+     * Maximum UTF-8 bytes produced by one UTF-16 {@code char} (supplementary planes use two chars).
+     */
     public static final int MAX_BYTES_PER_CHAR = 3;
 
     private Utf8() {
@@ -98,7 +102,7 @@ public final class Utf8 {
     public static String decode(byte[] bytes, int offset, int length) {
         if ((offset | length | bytes.length - offset - length) < 0) {
             throw new ProtoException(
-                    "invalid UTF-8 slice offset=" + offset + " length=" + length + " buffer=" + bytes.length);
+                "invalid UTF-8 slice offset=" + offset + " length=" + length + " buffer=" + bytes.length);
         }
         if (length == 0) {
             return "";
@@ -190,26 +194,26 @@ public final class Utf8 {
 
     private static void handleThreeBytes(byte byte1, byte byte2, byte byte3, char[] result, int resultPos) {
         if (isNotTrailingByte(byte2)
-                || (byte1 == (byte) 0xE0 && byte2 < (byte) 0xA0)
-                || (byte1 == (byte) 0xED && byte2 >= (byte) 0xA0)
-                || isNotTrailingByte(byte3)) {
+            || (byte1 == (byte) 0xE0 && byte2 < (byte) 0xA0)
+            || (byte1 == (byte) 0xED && byte2 >= (byte) 0xA0)
+            || isNotTrailingByte(byte3)) {
             throw invalidUtf8();
         }
         result[resultPos] = (char) (((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F));
     }
 
     private static void handleFourBytes(
-            byte byte1, byte byte2, byte byte3, byte byte4, char[] result, int resultPos) {
+        byte byte1, byte byte2, byte byte3, byte byte4, char[] result, int resultPos) {
         if (isNotTrailingByte(byte2)
-                || (((byte1 << 28) + (byte2 - (byte) 0x90)) >> 30) != 0
-                || isNotTrailingByte(byte3)
-                || isNotTrailingByte(byte4)) {
+            || (((byte1 << 28) + (byte2 - (byte) 0x90)) >> 30) != 0
+            || isNotTrailingByte(byte3)
+            || isNotTrailingByte(byte4)) {
             throw invalidUtf8();
         }
         int codePoint = ((byte1 & 0x07) << 18)
-                | ((byte2 & 0x3F) << 12)
-                | ((byte3 & 0x3F) << 6)
-                | (byte4 & 0x3F);
+            | ((byte2 & 0x3F) << 12)
+            | ((byte3 & 0x3F) << 6)
+            | (byte4 & 0x3F);
         result[resultPos] = Character.highSurrogate(codePoint);
         result[resultPos + 1] = Character.lowSurrogate(codePoint);
     }

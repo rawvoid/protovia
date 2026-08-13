@@ -3,6 +3,12 @@ package io.github.rawvoid.protovia.collect;
 import java.util.AbstractList;
 import java.util.RandomAccess;
 
+/**
+ * Shared {@link java.util.List} scaffolding for packed scalar storage backed by a primitive array.
+ *
+ * @param <E> boxed element type
+ * @author Rawvoid
+ */
 abstract class AbstractPrimitiveList<E> extends AbstractList<E> implements RandomAccess {
 
     int size;

@@ -1,5 +1,10 @@
 package io.github.rawvoid.protovia.processor.gen;
 
+/**
+ * Indent-aware source buffer used by {@link CodecGenerator}.
+ *
+ * @author Rawvoid
+ */
 final class JavaWriter {
 
     private final StringBuilder sb = new StringBuilder();

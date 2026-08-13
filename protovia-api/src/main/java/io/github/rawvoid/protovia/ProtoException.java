@@ -2,6 +2,8 @@ package io.github.rawvoid.protovia;
 
 /**
  * Unchecked failure while encoding, decoding, looking up a codec, or validating a schema.
+ *
+ * @author Rawvoid
  */
 public class ProtoException extends RuntimeException {
 

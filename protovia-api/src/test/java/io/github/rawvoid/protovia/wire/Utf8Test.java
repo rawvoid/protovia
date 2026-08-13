@@ -5,23 +5,21 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class Utf8Test {
 
     @Test
     void encodedLengthMatchesGetBytes() {
         String[] samples = {
-                "",
-                "ascii",
-                "héllo 世界",
-                "𝄞",
-                "a\uD800b",
-                "\uD800",
-                "\uDFFF",
-                "\uD800\uDFFF"
+            "",
+            "ascii",
+            "héllo 世界",
+            "𝄞",
+            "a\uD800b",
+            "\uD800",
+            "\uDFFF",
+            "\uD800\uDFFF"
         };
         for (String s : samples) {
             assertEquals(s.getBytes(StandardCharsets.UTF_8).length, Utf8.encodedLength(s), s);
@@ -31,12 +29,12 @@ class Utf8Test {
     @Test
     void encodeMatchesGetBytes() {
         String[] samples = {
-                "",
-                "ascii only",
-                "héllo 世界 café",
-                "𝄞 music",
-                "unpaired \uD800 surrogate",
-                "trailing \uDFFF"
+            "",
+            "ascii only",
+            "héllo 世界 café",
+            "𝄞 music",
+            "unpaired \uD800 surrogate",
+            "trailing \uDFFF"
         };
         for (String s : samples) {
             byte[] expected = s.getBytes(StandardCharsets.UTF_8);

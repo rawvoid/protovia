@@ -1,17 +1,12 @@
 package io.github.rawvoid.protovia.collect;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
  * Decode helpers that keep packed / repeated scalars on primitive arrays when possible.
+ *
+ * @author Rawvoid
  */
 public final class ProtoLists {
 
@@ -60,11 +55,11 @@ public final class ProtoLists {
 
     public static boolean isMutableList(List<?> list) {
         return list instanceof ArrayList
-                || list instanceof IntArrayList
-                || list instanceof LongArrayList
-                || list instanceof FloatArrayList
-                || list instanceof DoubleArrayList
-                || list instanceof BooleanArrayList;
+            || list instanceof IntArrayList
+            || list instanceof LongArrayList
+            || list instanceof FloatArrayList
+            || list instanceof DoubleArrayList
+            || list instanceof BooleanArrayList;
     }
 
     public static void addInt(List<Integer> list, int value) {

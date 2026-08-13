@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.processor.model;
 import javax.lang.model.element.TypeElement;
 import java.util.List;
 
+/**
+ * Parsed {@code @ProtoMessage} used by the codec generator.
+ *
+ * @author Rawvoid
+ */
 public final class MessageModel {
 
     public final TypeElement type;
@@ -17,16 +22,16 @@ public final class MessageModel {
     public final UnknownField unknown;
 
     public MessageModel(
-            TypeElement type,
-            String packageName,
-            String protoPackage,
-            String protoMessageName,
-            String typeName,
-            String codecSimpleName,
-            boolean record,
-            List<FieldModel> fields,
-            List<RecordComponentModel> recordComponents,
-            UnknownField unknown) {
+        TypeElement type,
+        String packageName,
+        String protoPackage,
+        String protoMessageName,
+        String typeName,
+        String codecSimpleName,
+        boolean record,
+        List<FieldModel> fields,
+        List<RecordComponentModel> recordComponents,
+        UnknownField unknown) {
         this.type = type;
         this.packageName = packageName;
         this.protoPackage = protoPackage;
@@ -39,6 +44,9 @@ public final class MessageModel {
         this.unknown = unknown;
     }
 
+    /**
+     * @return {@code package.name} or just {@code name} when the proto package is empty
+     */
     public String protoFullName() {
         return protoPackage.isEmpty() ? protoMessageName : protoPackage + "." + protoMessageName;
     }
@@ -47,11 +55,11 @@ public final class MessageModel {
     }
 
     public record UnknownField(
-            AccessKind accessKind,
-            String name,
-            String localName,
-            String readExpr,
-            String setterName,
-            String fieldName) {
+        AccessKind accessKind,
+        String name,
+        String localName,
+        String readExpr,
+        String setterName,
+        String fieldName) {
     }
 }

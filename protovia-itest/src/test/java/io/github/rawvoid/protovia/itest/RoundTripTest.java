@@ -1,39 +1,17 @@
 package io.github.rawvoid.protovia.itest;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
+import io.github.rawvoid.protovia.itest.model.*;
 import io.github.rawvoid.protovia.wire.ProtoReader;
-import io.github.rawvoid.protovia.itest.model.Address;
-import io.github.rawvoid.protovia.itest.model.Contact;
-import io.github.rawvoid.protovia.itest.model.Email;
-import io.github.rawvoid.protovia.itest.model.Home;
-import io.github.rawvoid.protovia.itest.model.Envelope;
-import io.github.rawvoid.protovia.itest.model.Flags;
-import io.github.rawvoid.protovia.itest.model.NodeA;
-import io.github.rawvoid.protovia.itest.model.NodeB;
-import io.github.rawvoid.protovia.itest.model.Status;
-import io.github.rawvoid.protovia.itest.model.User;
-import io.github.rawvoid.protovia.itest.model.UserProtoCodec;
-import io.github.rawvoid.protovia.itest.model.UserRecord;
-import io.github.rawvoid.protovia.itest.model.Carrier;
+import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wkt.Int32Value;
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
-import io.github.rawvoid.protovia.ProtoException;
-import io.github.rawvoid.protovia.wire.ProtoWriter;
-
-import java.util.Arrays;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class RoundTripTest {
 
@@ -48,13 +26,13 @@ class RoundTripTest {
     @Test
     void recordRoundTrip() {
         UserRecord record = new UserRecord(
-                "Ada",
-                36,
-                new Address("Paris", "Rue"),
-                List.of("dev", "java"),
-                map("math", 99),
-                Status.ACTIVE,
-                Optional.of(0));
+            "Ada",
+            36,
+            new Address("Paris", "Rue"),
+            List.of("dev", "java"),
+            map("math", 99),
+            Status.ACTIVE,
+            Optional.of(0));
         byte[] bytes = ProtoVia.toBytes(record);
         UserRecord back = ProtoVia.fromBytes(UserRecord.class, bytes);
         assertEquals(record, back);

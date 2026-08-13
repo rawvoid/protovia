@@ -1,18 +1,17 @@
 package io.github.rawvoid.protovia.processor.gen;
 
 import io.github.rawvoid.protovia.ProtoType;
-import io.github.rawvoid.protovia.processor.model.AccessKind;
-import io.github.rawvoid.protovia.processor.model.EnumModel;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.MessageModel;
-import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * Emits a {@code XxxProtoCodec} source file from a {@link MessageModel}.
+ *
+ * @author Rawvoid
+ */
 public final class CodecGenerator {
 
     public String generate(MessageModel model) {
@@ -69,7 +68,7 @@ public final class CodecGenerator {
             if (field.kind == FieldKind.ONEOF) {
                 for (OneofCaseModel c : field.oneofCases) {
                     w.line("private static final int " + c.tagConstant + " = "
-                            + WireType.tag(c.number, oneofWire(c)) + ";");
+                        + WireType.tag(c.number, oneofWire(c)) + ";");
                 }
                 continue;
             }
@@ -78,7 +77,7 @@ public final class CodecGenerator {
             w.line("private static final int " + tag + " = " + WireType.tag(field.number, unpacked) + ";");
             if (field.kind == FieldKind.REPEATED && field.packable()) {
                 w.line("private static final int " + tag + "_PACKED = "
-                        + WireType.tag(field.number, WireType.LEN) + ";");
+                    + WireType.tag(field.number, WireType.LEN) + ";");
             }
         }
         if (!model.fields.isEmpty()) {
@@ -111,13 +110,14 @@ public final class CodecGenerator {
     private void emitComputeField(JavaWriter w, FieldModel field) {
         w.line(field.javaTypeName + " " + field.localName + " = " + field.readExpr + ";");
         switch (field.kind) {
-            case SCALAR -> emitComputeScalar(w, field, field.localName, field.number, field.optional, field.javaOptional);
+            case SCALAR ->
+                emitComputeScalar(w, field, field.localName, field.number, field.optional, field.javaOptional);
             case ENUM -> emitComputeEnum(w, field, field.localName, field.number, field.optional);
             case MESSAGE -> {
                 w.open("if (" + field.localName + " != null)");
                 w.line("int " + field.localName + "Slot = cache.reserve();");
                 w.line("int " + field.localName + "Size = " + field.codecName + ".INSTANCE.computeSize("
-                        + field.localName + ", cache);");
+                    + field.localName + ", cache);");
                 w.line("cache.set(" + field.localName + "Slot, " + field.localName + "Size);");
                 w.line("size += CodedSize.message(" + field.number + ", " + field.localName + "Size);");
                 w.close();
@@ -129,7 +129,7 @@ public final class CodecGenerator {
     }
 
     private void emitComputeScalar(
-            JavaWriter w, FieldModel field, String var, int number, boolean optional, boolean javaOptional) {
+        JavaWriter w, FieldModel field, String var, int number, boolean optional, boolean javaOptional) {
         String valueExpr = javaOptional ? var + ".get()" : var;
         w.open("if (" + presentCondition(field, var, optional, javaOptional) + ")");
         w.line("size += " + sizeCall(field, number, valueExpr) + ";");
@@ -139,8 +139,8 @@ public final class CodecGenerator {
     private void emitComputeEnum(JavaWriter w, FieldModel field, String var, int number, boolean optional) {
         String helper = enumNumberHelper(field.enumModel);
         String present = field.enumModel.unrecognized == null
-                ? var + " != null"
-                : var + " != null && " + var + " != " + field.enumModel.typeName + "." + field.enumModel.unrecognized;
+            ? var + " != null"
+            : var + " != null && " + var + " != " + field.enumModel.typeName + "." + field.enumModel.unrecognized;
         if (optional) {
             w.open("if (" + present + ")");
             w.line("size += CodedSize.enumValue(" + number + ", " + helper + "(" + var + "));");
@@ -166,7 +166,7 @@ public final class CodecGenerator {
             emitNullElementCheck(w, field.element, "item", field.name);
             if (field.element.kind == FieldKind.ENUM) {
                 w.line("size += CodedSize.enumValue(" + field.number + ", "
-                        + enumNumberHelper(field.element.enumModel) + "(item));");
+                    + enumNumberHelper(field.element.enumModel) + "(item));");
             } else if (field.element.kind == FieldKind.MESSAGE) {
                 w.line("int itemSlot = cache.reserve();");
                 w.line("int itemSize = " + field.element.codecName + ".INSTANCE.computeSize(item, cache);");
@@ -183,9 +183,9 @@ public final class CodecGenerator {
     private void emitComputeMap(JavaWriter w, FieldModel field) {
         w.open("if (" + field.localName + " != null && !" + field.localName + ".isEmpty())");
         w.open("for (java.util.Map.Entry<" + boxed(field.mapKey) + ", " + boxed(field.mapValue) + "> e : "
-                + field.localName + ".entrySet())");
+            + field.localName + ".entrySet())");
         w.line("size += CodedSize.lengthDelimited(" + field.number + ", "
-                + mapEntrySizeHelper(field) + "(e.getKey(), e.getValue(), cache));");
+            + mapEntrySizeHelper(field) + "(e.getKey(), e.getValue(), cache));");
         w.close();
         w.close();
     }
@@ -239,9 +239,9 @@ public final class CodecGenerator {
             case ENUM -> {
                 String helper = enumNumberHelper(field.enumModel);
                 String notSentinel = field.enumModel.unrecognized == null
-                        ? field.localName + " != null"
-                        : field.localName + " != null && " + field.localName + " != "
-                                + field.enumModel.typeName + "." + field.enumModel.unrecognized;
+                    ? field.localName + " != null"
+                    : field.localName + " != null && " + field.localName + " != "
+                    + field.enumModel.typeName + "." + field.enumModel.unrecognized;
                 if (field.optional) {
                     w.open("if (" + notSentinel + ")");
                     w.line("writer.writeUInt32NoTag(" + tag + ");");
@@ -274,7 +274,7 @@ public final class CodecGenerator {
         String tag = Names.tagConstant(field.number);
         if (field.packed && field.packable()) {
             w.line("int " + field.localName + "Packed = writer.hasCachedSize() ? writer.takeSize() : "
-                    + packedSizeHelper(field) + "(" + field.localName + ");");
+                + packedSizeHelper(field) + "(" + field.localName + ");");
             w.line("writer.writeUInt32NoTag(" + tag + "_PACKED);");
             w.line("writer.writeUInt32NoTag(" + field.localName + "Packed);");
             emitPackedElements(w, field, true);
@@ -318,7 +318,7 @@ public final class CodecGenerator {
     }
 
     private void emitPrimitivePackedLoop(
-            JavaWriter w, FieldModel field, PrimitiveListSpec spec, String prim, boolean write) {
+        JavaWriter w, FieldModel field, PrimitiveListSpec spec, String prim, boolean write) {
         w.open("for (int _i = 0, _n = " + prim + ".size(); _i < _n; _i++)");
         String access = prim + "." + spec.get() + "(_i)";
         if (write) {
@@ -371,7 +371,7 @@ public final class CodecGenerator {
                 w.close();
             } else if (c.payload.kind == FieldKind.ENUM) {
                 w.line("size += CodedSize.enumValue(" + c.number + ", "
-                        + enumNumberHelper(c.payload.enumModel) + "(_c." + c.accessor + "));");
+                    + enumNumberHelper(c.payload.enumModel) + "(_c." + c.accessor + "));");
             } else {
                 w.line("size += " + sizeCall(c.payload, c.number, "_c." + c.accessor) + ";");
             }
@@ -438,7 +438,7 @@ public final class CodecGenerator {
     private void emitWriteMap(JavaWriter w, FieldModel field) {
         w.open("if (" + field.localName + " != null && !" + field.localName + ".isEmpty())");
         w.open("for (java.util.Map.Entry<" + boxed(field.mapKey) + ", " + boxed(field.mapValue) + "> e : "
-                + field.localName + ".entrySet())");
+            + field.localName + ".entrySet())");
         w.line("write" + Names.capitalize(field.name) + "Entry(writer, e.getKey(), e.getValue());");
         w.close();
         w.close();
@@ -548,7 +548,7 @@ public final class CodecGenerator {
                     w.open("if (_e == " + field.enumModel.typeName + "." + field.enumModel.unrecognized + ")");
                     if (model.unknown != null) {
                         w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
-                                + model.unknown.localName() + ", " + tag + ", _n);");
+                            + model.unknown.localName() + ", " + tag + ", _n);");
                     }
                     emitStore(w, field, record, wrapOptional(field, "_e"));
                     w.close();
@@ -559,7 +559,7 @@ public final class CodecGenerator {
                     if (model.unknown != null) {
                         w.open("if (_e == null)");
                         w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
-                                + model.unknown.localName() + ", tag, _n);");
+                            + model.unknown.localName() + ", tag, _n);");
                         w.close();
                     }
                     w.open("if (_e != null)");
@@ -637,13 +637,13 @@ public final class CodecGenerator {
         MessageModel.UnknownField u = model.unknown;
         String current = u.readExpr().replace("value.", "msg.");
         w.line("UnknownFields " + u.localName() + " = " + current + " != null ? "
-                + current + " : UnknownFields.EMPTY;");
+            + current + " : UnknownFields.EMPTY;");
     }
 
     private void emitUnknownDefault(JavaWriter w, MessageModel model) {
         if (model.unknown != null) {
             w.line("default -> " + model.unknown.localName() + " = UnknownFields.merge("
-                    + model.unknown.localName() + ", reader);");
+                + model.unknown.localName() + ", reader);");
         } else {
             w.line("default -> reader.skipField();");
         }
@@ -659,7 +659,7 @@ public final class CodecGenerator {
     }
 
     private void emitRecordComponentInit(
-            JavaWriter w, MessageModel model, MessageModel.RecordComponentModel component) {
+        JavaWriter w, MessageModel model, MessageModel.RecordComponentModel component) {
         String local = Names.safeLocal(component.name());
         String fromExisting = "existing." + component.name() + "()";
         if (model.unknown != null && component.name().equals(model.unknown.name())) {
@@ -674,7 +674,7 @@ public final class CodecGenerator {
             return;
         }
         w.line(component.typeName() + " " + local + " = existing != null ? " + fromExisting
-                + " : " + component.defaultExpr() + ";");
+            + " : " + component.defaultExpr() + ";");
     }
 
     private void emitReadMessage(JavaWriter w, FieldModel field, boolean record) {
@@ -683,7 +683,7 @@ public final class CodecGenerator {
             String current = storeTarget(field);
             if (field.javaOptional) {
                 w.line(current + " = " + wrapOptional(field, "reader.readMessage(" + codec + ", "
-                        + current + " != null && " + current + ".isPresent() ? " + current + ".get() : null)") + ";");
+                    + current + " != null && " + current + ".isPresent() ? " + current + ".get() : null)") + ";");
                 return;
             }
             w.line(current + " = reader.readMessage(" + codec + ", " + current + ");");
@@ -691,16 +691,16 @@ public final class CodecGenerator {
         }
         if (field.javaOptional) {
             String getter = field.accessKind == AccessKind.FIELD
-                    ? "msg." + field.fieldName
-                    : field.readExpr.replace("value.", "msg.");
+                ? "msg." + field.fieldName
+                : field.readExpr.replace("value.", "msg.");
             w.line(field.javaTypeName + " _cur = " + getter + ";");
             emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessage(" + codec + ", "
-                    + "_cur != null && _cur.isPresent() ? _cur.get() : null)"));
+                + "_cur != null && _cur.isPresent() ? _cur.get() : null)"));
             return;
         }
         String current = field.accessKind == AccessKind.FIELD
-                ? "msg." + field.fieldName
-                : field.readExpr.replace("value.", "msg.");
+            ? "msg." + field.fieldName
+            : field.readExpr.replace("value.", "msg.");
         emitAssign(w, field, "msg", "reader.readMessage(" + codec + ", " + current + ")");
     }
 
@@ -742,7 +742,7 @@ public final class CodecGenerator {
                 w.open("if (_item == " + enums.typeName + "." + enums.unrecognized + ")");
                 if (model.unknown != null) {
                     w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
-                            + model.unknown.localName() + ", " + Names.tagConstant(field.number) + ", _n);");
+                        + model.unknown.localName() + ", " + Names.tagConstant(field.number) + ", _n);");
                 }
                 w.close();
                 w.open("else if (_item != null)");
@@ -750,7 +750,7 @@ public final class CodecGenerator {
                 if (model.unknown != null) {
                     w.open("if (_item == null)");
                     w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
-                            + model.unknown.localName() + ", " + Names.tagConstant(field.number) + ", _n);");
+                        + model.unknown.localName() + ", " + Names.tagConstant(field.number) + ", _n);");
                     w.close();
                 }
                 w.open("if (_item != null)");
@@ -795,7 +795,7 @@ public final class CodecGenerator {
             return;
         }
         String ensure = "io.github.rawvoid.protovia.collect.ProtoLists.ensureMutableMap($C, "
-                + implConstructorRef(field) + ")";
+            + implConstructorRef(field) + ")";
         if (field.accessKind == AccessKind.FIELD) {
             w.line("msg." + field.fieldName + " = " + ensure.replace("$C", "msg." + field.fieldName) + ";");
         } else {
@@ -877,8 +877,8 @@ public final class CodecGenerator {
         }
         if (model.unrecognized != null) {
             w.line("case " + model.unrecognized
-                    + " -> throw new ProtoException(\"" + model.typeName + "." + model.unrecognized
-                    + " has no wire number\");");
+                + " -> throw new ProtoException(\"" + model.typeName + "." + model.unrecognized
+                + " has no wire number\");");
         }
         w.close();
         w.line(";");
@@ -929,7 +929,7 @@ public final class CodecGenerator {
             }
             w.line("");
             w.open("private static int " + mapEntrySizeHelper(field) + "("
-                    + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v, SizeCache cache)");
+                + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v, SizeCache cache)");
             w.open("if (k == null || v == null)");
             w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
             w.close();
@@ -942,12 +942,12 @@ public final class CodecGenerator {
             w.close();
             w.line("");
             w.open("private static void write" + Names.capitalize(field.name) + "Entry(ProtoWriter writer, "
-                    + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v)");
+                + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v)");
             w.open("if (k == null || v == null)");
             w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
             w.close();
             w.line("int entrySize = writer.hasCachedSize() ? writer.takeSize() : "
-                    + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP);");
+                + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP);");
             w.line("writer.writeUInt32NoTag(" + Names.tagConstant(field.number) + ");");
             w.line("writer.writeUInt32NoTag(entrySize);");
             emitMapEntryWrite(w, field.mapKey, "k", 1);
@@ -955,7 +955,7 @@ public final class CodecGenerator {
             w.close();
             w.line("");
             w.open("private static void read" + Names.capitalize(field.name) + "Entry(ProtoReader reader, "
-                    + field.javaTypeName + " target)");
+                + field.javaTypeName + " target)");
             w.line(boxed(field.mapKey) + " k = " + mapMissingDefault(field.mapKey) + ";");
             if (field.mapValue.kind == FieldKind.MESSAGE) {
                 w.line(boxed(field.mapValue) + " v = null;");
@@ -1011,10 +1011,10 @@ public final class CodecGenerator {
         if (part.kind == FieldKind.ENUM) {
             w.line("int " + var + "N = reader.readEnum();");
             w.line(part.enumModel.typeName + " " + var + "E = "
-                    + enumFromHelper(part.enumModel) + "(" + var + "N);");
+                + enumFromHelper(part.enumModel) + "(" + var + "N);");
             if (part.enumModel.unrecognized != null) {
                 w.open("if (" + var + "E != null && " + var + "E != "
-                        + part.enumModel.typeName + "." + part.enumModel.unrecognized + ")");
+                    + part.enumModel.typeName + "." + part.enumModel.unrecognized + ")");
             } else {
                 w.open("if (" + var + "E != null)");
             }
@@ -1121,7 +1121,7 @@ public final class CodecGenerator {
 
     private void emitWriteCachedMessage(JavaWriter w, String codec, String value, String sizeLocal) {
         w.line("int " + sizeLocal + " = writer.hasCachedSize() ? writer.takeSize() : "
-                + codec + ".computeSize(" + value + ");");
+            + codec + ".computeSize(" + value + ");");
         w.line("writer.writeUInt32NoTag(" + sizeLocal + ");");
         w.line(codec + ".writeTo(writer, " + value + ");");
     }
@@ -1181,77 +1181,6 @@ public final class CodecGenerator {
         return "io.github.rawvoid.protovia.collect.ProtoLists." + spec.ensure() + "(" + list + ", reader.remaining())";
     }
 
-    private static PrimitiveListSpec primitiveListSpec(FieldModel field) {
-        String type = field.primitiveListType();
-        if (type == null) {
-            return null;
-        }
-        for (PrimitiveListSpec spec : PrimitiveListSpec.values()) {
-            if (type.endsWith(spec.simpleName())) {
-                return spec;
-            }
-        }
-        return null;
-    }
-
-    private enum PrimitiveListSpec {
-        INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray", "getInt"),
-        LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray", "getLong"),
-        FLOAT("FloatArrayList", "addFloat", "ensureFloatCapacity", "toFloatArray", "getFloat"),
-        DOUBLE("DoubleArrayList", "addDouble", "ensureDoubleCapacity", "toDoubleArray", "getDouble"),
-        BOOLEAN("BooleanArrayList", "addBoolean", "ensureBooleanCapacity", "toBooleanArray", "getBoolean");
-
-        private final String simpleName;
-        private final String add;
-        private final String ensure;
-        private final String toArray;
-        private final String get;
-
-        PrimitiveListSpec(String simpleName, String add, String ensure, String toArray, String get) {
-            this.simpleName = simpleName;
-            this.add = add;
-            this.ensure = ensure;
-            this.toArray = toArray;
-            this.get = get;
-        }
-
-        String simpleName() {
-            return simpleName;
-        }
-
-        String listType() {
-            return "io.github.rawvoid.protovia.collect." + simpleName;
-        }
-
-        String add() {
-            return add;
-        }
-
-        String ensure() {
-            return ensure;
-        }
-
-        String toArray() {
-            return toArray;
-        }
-
-        String get() {
-            return get;
-        }
-    }
-
-    private static int packedFixedWidth(FieldModel element) {
-        if (element.kind != FieldKind.SCALAR || element.protoType == null) {
-            return 0;
-        }
-        return switch (element.protoType) {
-            case BOOL -> 1;
-            case FIXED32, SFIXED32, FLOAT -> 4;
-            case FIXED64, SFIXED64, DOUBLE -> 8;
-            default -> 0;
-        };
-    }
-
     private String boxed(FieldModel field) {
         if (field.kind == FieldKind.MESSAGE || field.kind == FieldKind.ENUM) {
             return field.kind == FieldKind.ENUM ? field.enumModel.typeName : field.javaTypeName;
@@ -1285,10 +1214,6 @@ public final class CodecGenerator {
         return "from" + sanitize(model.typeName);
     }
 
-    private static String sanitize(String typeName) {
-        return typeName.replace(".", "_");
-    }
-
     private int oneofWire(OneofCaseModel c) {
         if (c.empty() || c.selfMessage) {
             return WireType.LEN;
@@ -1302,7 +1227,7 @@ public final class CodecGenerator {
         }
         FieldModel target = field.kind == FieldKind.REPEATED ? field.element : field;
         if (target == null || target.kind == FieldKind.MESSAGE || target.protoType == null
-                || target.protoType == ProtoType.STRING || target.protoType == ProtoType.BYTES) {
+            || target.protoType == ProtoType.STRING || target.protoType == ProtoType.BYTES) {
             return WireType.LEN;
         }
         return switch (target.protoType) {
@@ -1389,5 +1314,80 @@ public final class CodecGenerator {
             case ENUM -> "reader.readEnum()";
             default -> "reader.readInt32()";
         };
+    }
+
+    private static PrimitiveListSpec primitiveListSpec(FieldModel field) {
+        String type = field.primitiveListType();
+        if (type == null) {
+            return null;
+        }
+        for (PrimitiveListSpec spec : PrimitiveListSpec.values()) {
+            if (type.endsWith(spec.simpleName())) {
+                return spec;
+            }
+        }
+        return null;
+    }
+
+    private static int packedFixedWidth(FieldModel element) {
+        if (element.kind != FieldKind.SCALAR || element.protoType == null) {
+            return 0;
+        }
+        return switch (element.protoType) {
+            case BOOL -> 1;
+            case FIXED32, SFIXED32, FLOAT -> 4;
+            case FIXED64, SFIXED64, DOUBLE -> 8;
+            default -> 0;
+        };
+    }
+
+    private static String sanitize(String typeName) {
+        return typeName.replace(".", "_");
+    }
+
+    private enum PrimitiveListSpec {
+        INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray", "getInt"),
+        LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray", "getLong"),
+        FLOAT("FloatArrayList", "addFloat", "ensureFloatCapacity", "toFloatArray", "getFloat"),
+        DOUBLE("DoubleArrayList", "addDouble", "ensureDoubleCapacity", "toDoubleArray", "getDouble"),
+        BOOLEAN("BooleanArrayList", "addBoolean", "ensureBooleanCapacity", "toBooleanArray", "getBoolean");
+
+        private final String simpleName;
+        private final String add;
+        private final String ensure;
+        private final String toArray;
+        private final String get;
+
+        PrimitiveListSpec(String simpleName, String add, String ensure, String toArray, String get) {
+            this.simpleName = simpleName;
+            this.add = add;
+            this.ensure = ensure;
+            this.toArray = toArray;
+            this.get = get;
+        }
+
+        String simpleName() {
+            return simpleName;
+        }
+
+        String listType() {
+            return "io.github.rawvoid.protovia.collect." + simpleName;
+        }
+
+        String add() {
+            return add;
+        }
+
+        String ensure() {
+            return ensure;
+        }
+
+        String toArray() {
+            return toArray;
+        }
+
+        String get() {
+            return get;
+        }
     }
 }

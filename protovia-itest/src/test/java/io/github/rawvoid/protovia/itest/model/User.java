@@ -4,11 +4,7 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @ProtoMessage
 public class User {
@@ -135,6 +131,11 @@ public class User {
     }
 
     @Override
+    public int hashCode() {
+        return Objects.hash(name, age, score, tags, address, scores, status, level, ranks, unpacked);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -143,20 +144,15 @@ public class User {
             return false;
         }
         return age == user.age
-                && score == user.score
-                && Objects.equals(name, user.name)
-                && Objects.equals(tags, user.tags)
-                && Objects.equals(address, user.address)
-                && Objects.equals(scores, user.scores)
-                && status == user.status
-                && Objects.equals(level, user.level)
-                && Objects.equals(ranks, user.ranks)
-                && Objects.equals(unpacked, user.unpacked)
-                && Objects.deepEquals(payload, user.payload);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(name, age, score, tags, address, scores, status, level, ranks, unpacked);
+            && score == user.score
+            && Objects.equals(name, user.name)
+            && Objects.equals(tags, user.tags)
+            && Objects.equals(address, user.address)
+            && Objects.equals(scores, user.scores)
+            && status == user.status
+            && Objects.equals(level, user.level)
+            && Objects.equals(ranks, user.ranks)
+            && Objects.equals(unpacked, user.unpacked)
+            && Objects.deepEquals(payload, user.payload);
     }
 }

@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 
 /**
  * Serialized-size helpers matching official proto3 encoding.
+ *
+ * @author Rawvoid
  */
 public final class CodedSize {
 

@@ -2,19 +2,15 @@ package io.github.rawvoid.protovia.bench;
 
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.bench.model.User;
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.BenchmarkMode;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Measurement;
-import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.annotations.*;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * JMH suite comparing Protovia with official generated {@code protobuf-java} messages.
+ *
+ * @author Rawvoid
+ */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @State(Scope.Thread)
@@ -83,7 +79,7 @@ public class WireBench {
 
     @Benchmark
     public io.github.rawvoid.protovia.bench.official.User officialDeserializeSmall()
-            throws Exception {
+        throws Exception {
         return io.github.rawvoid.protovia.bench.official.User.parseFrom(smallBytes);
     }
 
@@ -104,7 +100,7 @@ public class WireBench {
 
     @Benchmark
     public io.github.rawvoid.protovia.bench.official.User officialDeserializePacked()
-            throws Exception {
+        throws Exception {
         return io.github.rawvoid.protovia.bench.official.User.parseFrom(packedBytes);
     }
 }

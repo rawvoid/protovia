@@ -5,7 +5,7 @@ import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
 @ProtoMessage
 public record Address(
-        @ProtoField(number = 1) String city,
-        @ProtoField(number = 2) String street
+    @ProtoField(number = 1) String city,
+    @ProtoField(number = 2) String street
 ) {
 }

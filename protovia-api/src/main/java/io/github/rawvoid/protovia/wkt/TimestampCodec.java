@@ -10,6 +10,8 @@ import java.time.Instant;
 
 /**
  * {@code google.protobuf.Timestamp}: {@code int64 seconds = 1; int32 nanos = 2}.
+ *
+ * @author Rawvoid
  */
 public final class TimestampCodec implements ProtoCodec<Instant> {
 
@@ -29,11 +31,6 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
     }
 
     @Override
-    public boolean cachesNestedSizes() {
-        return true;
-    }
-
-    @Override
     public int computeSize(Instant value) {
         int size = 0;
         long seconds = value.getEpochSecond();
@@ -45,6 +42,11 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
             size += CodedSize.int32(2, nanos);
         }
         return size;
+    }
+
+    @Override
+    public boolean cachesNestedSizes() {
+        return true;
     }
 
     @Override

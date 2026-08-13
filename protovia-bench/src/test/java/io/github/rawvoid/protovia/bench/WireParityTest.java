@@ -23,7 +23,7 @@ class WireParityTest {
     @Test
     void protoviaBytesAreReadableByOfficial() throws Exception {
         io.github.rawvoid.protovia.bench.official.User back =
-                io.github.rawvoid.protovia.bench.official.User.parseFrom(ProtoVia.toBytes(Samples.protoviaSmall()));
+            io.github.rawvoid.protovia.bench.official.User.parseFrom(ProtoVia.toBytes(Samples.protoviaSmall()));
         assertEquals("Ada", back.getName());
         assertEquals(36, back.getAge());
         assertEquals("Paris", back.getAddress().getCity());
@@ -36,7 +36,7 @@ class WireParityTest {
         User cjk = ProtoVia.fromBytes(User.class, Samples.officialCjk().toByteArray());
         assertEquals(Samples.CJK_BIO, cjk.bio);
         io.github.rawvoid.protovia.bench.official.User officialCjk =
-                io.github.rawvoid.protovia.bench.official.User.parseFrom(ProtoVia.toBytes(Samples.protoviaCjk()));
+            io.github.rawvoid.protovia.bench.official.User.parseFrom(ProtoVia.toBytes(Samples.protoviaCjk()));
         assertEquals(Samples.CJK_BIO, officialCjk.getBio());
 
         User packed = ProtoVia.fromBytes(User.class, Samples.officialPacked().toByteArray());

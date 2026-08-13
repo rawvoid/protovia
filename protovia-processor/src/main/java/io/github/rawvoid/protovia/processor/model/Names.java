@@ -7,16 +7,21 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import java.util.Set;
 
+/**
+ * Identifier helpers for generated Java (packages, codec names, tag constants).
+ *
+ * @author Rawvoid
+ */
 public final class Names {
 
     private static final Set<String> KEYWORDS = Set.of(
-            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
-            "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
-            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
-            "interface", "long", "native", "new", "package", "private", "protected", "public",
-            "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
-            "throw", "throws", "transient", "try", "void", "volatile", "while", "var", "yield",
-            "record", "sealed", "permits", "non-sealed", "true", "false", "null");
+        "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
+        "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
+        "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
+        "interface", "long", "native", "new", "package", "private", "protected", "public",
+        "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
+        "throw", "throws", "transient", "try", "void", "volatile", "while", "var", "yield",
+        "record", "sealed", "permits", "non-sealed", "true", "false", "null");
 
     private Names() {
     }
@@ -99,6 +104,10 @@ public final class Names {
         return "set" + capitalize(property);
     }
 
+    /**
+     * @param fieldNumber protobuf field number
+     * @return {@code TAG_<number>} used in generated codecs
+     */
     public static String tagConstant(int fieldNumber) {
         return "TAG_" + fieldNumber;
     }

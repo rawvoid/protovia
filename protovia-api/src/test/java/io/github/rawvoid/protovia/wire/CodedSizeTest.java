@@ -9,19 +9,19 @@ class CodedSizeTest {
     @Test
     void uint32MatchesBitWidth() {
         int[] values = {
-                0,
-                1,
-                0x7F,
-                0x80,
-                0x3FFF,
-                0x4000,
-                0x1FFFFF,
-                0x200000,
-                0x0FFFFFFF,
-                0x10000000,
-                -1,
-                Integer.MIN_VALUE,
-                Integer.MAX_VALUE
+            0,
+            1,
+            0x7F,
+            0x80,
+            0x3FFF,
+            0x4000,
+            0x1FFFFF,
+            0x200000,
+            0x0FFFFFFF,
+            0x10000000,
+            -1,
+            Integer.MIN_VALUE,
+            Integer.MAX_VALUE
         };
         for (int value : values) {
             assertEquals(referenceUint32(value), CodedSize.uint32(value), Integer.toHexString(value));
@@ -31,28 +31,28 @@ class CodedSizeTest {
     @Test
     void uint64MatchesBitWidth() {
         long[] values = {
-                0L,
-                1L,
-                0x7FL,
-                0x80L,
-                0x3FFFL,
-                0x4000L,
-                0x1FFFFFL,
-                0x200000L,
-                0xFFFFFFFL,
-                0x10000000L,
-                0x7FFFFFFFFL,
-                0x800000000L,
-                0x3FFFFFFFFFFL,
-                0x40000000000L,
-                0x1FFFFFFFFFFFFL,
-                0x2000000000000L,
-                0xFFFFFFFFFFFFFFL,
-                0x100000000000000L,
-                0x7FFFFFFFFFFFFFFFL,
-                -1L,
-                Long.MIN_VALUE,
-                Long.MAX_VALUE
+            0L,
+            1L,
+            0x7FL,
+            0x80L,
+            0x3FFFL,
+            0x4000L,
+            0x1FFFFFL,
+            0x200000L,
+            0xFFFFFFFL,
+            0x10000000L,
+            0x7FFFFFFFFL,
+            0x800000000L,
+            0x3FFFFFFFFFFL,
+            0x40000000000L,
+            0x1FFFFFFFFFFFFL,
+            0x2000000000000L,
+            0xFFFFFFFFFFFFFFL,
+            0x100000000000000L,
+            0x7FFFFFFFFFFFFFFFL,
+            -1L,
+            Long.MIN_VALUE,
+            Long.MAX_VALUE
         };
         for (long value : values) {
             assertEquals(referenceUint64(value), CodedSize.uint64(value), Long.toHexString(value));

@@ -13,6 +13,9 @@ import java.util.Objects;
 
 /**
  * Entry point for Protobuf serialization of {@code @ProtoMessage} entities.
+ * Looks up the generated {@link ProtoCodec} by convention and encodes or decodes proto3 bytes.
+ *
+ * @author Rawvoid
  */
 public final class ProtoVia {
 
@@ -25,6 +28,12 @@ public final class ProtoVia {
     private ProtoVia() {
     }
 
+    /**
+     * Caps encoded size and {@link #fromBytes} input length. Default is
+     * {@link #DEFAULT_MAX_MESSAGE_SIZE}.
+     *
+     * @param maxMessageSize positive byte limit
+     */
     public static void setMaxMessageSize(int maxMessageSize) {
         if (maxMessageSize <= 0) {
             throw new IllegalArgumentException("maxMessageSize must be positive");
@@ -32,6 +41,11 @@ public final class ProtoVia {
         ProtoVia.maxMessageSize = maxMessageSize;
     }
 
+    /**
+     * Caps nested-message depth while parsing. Default is {@link #DEFAULT_MAX_DEPTH}.
+     *
+     * @param maxDepth positive nesting limit
+     */
     public static void setMaxDepth(int maxDepth) {
         if (maxDepth <= 0) {
             throw new IllegalArgumentException("maxDepth must be positive");
@@ -47,14 +61,28 @@ public final class ProtoVia {
         return maxDepth;
     }
 
+    /**
+     * @param type entity class
+     * @return codec for {@code type} (generated, well-known, or {@link #register registered})
+     */
     public static <T> ProtoCodec<T> codec(Class<T> type) {
         return CodecLookup.get(type);
     }
 
+    /**
+     * Overrides codec lookup for {@code type}. Used by tests and hand-written codecs.
+     *
+     * @param type  entity class
+     * @param codec codec to use
+     */
     public static <T> void register(Class<T> type, ProtoCodec<T> codec) {
         CodecLookup.register(type, codec);
     }
 
+    /**
+     * @param message entity to measure
+     * @return encoded size in bytes
+     */
     @SuppressWarnings("unchecked")
     public static int sizeOf(Object message) {
         Objects.requireNonNull(message, "message");
@@ -62,6 +90,12 @@ public final class ProtoVia {
         return codec.computeSize(message);
     }
 
+    /**
+     * Encodes {@code message} to proto3 bytes using an exact-size buffer.
+     *
+     * @param message entity to encode
+     * @return wire bytes
+     */
     @SuppressWarnings("unchecked")
     public static byte[] toBytes(Object message) {
         Objects.requireNonNull(message, "message");
@@ -76,11 +110,23 @@ public final class ProtoVia {
         return writer.finish();
     }
 
+    /**
+     * @param type entity class
+     * @param data complete message bytes
+     * @return decoded instance
+     */
     public static <T> T fromBytes(Class<T> type, byte[] data) {
         Objects.requireNonNull(data, "data");
         return fromBytes(type, data, 0, data.length);
     }
 
+    /**
+     * @param type   entity class
+     * @param data   buffer holding the message
+     * @param offset start index in {@code data}
+     * @param length number of bytes to parse
+     * @return decoded instance
+     */
     public static <T> T fromBytes(Class<T> type, byte[] data, int offset, int length) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(data, "data");
@@ -89,6 +135,12 @@ public final class ProtoVia {
         return codec.readFrom(reader);
     }
 
+    /**
+     * Writes {@link #toBytes(Object)} to {@code out}.
+     *
+     * @param out     destination
+     * @param message entity to encode
+     */
     public static void write(OutputStream out, Object message) {
         Objects.requireNonNull(out, "out");
         byte[] bytes = toBytes(message);
@@ -99,6 +151,13 @@ public final class ProtoVia {
         }
     }
 
+    /**
+     * Reads at most the configured max message size from {@code in} and decodes it.
+     *
+     * @param type entity class
+     * @param in   source
+     * @return decoded instance
+     */
     public static <T> T read(Class<T> type, InputStream in) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(in, "in");
@@ -113,11 +172,19 @@ public final class ProtoVia {
     /**
      * Packs {@code message} as {@code google.protobuf.Any}.
      * {@code type_url} is {@code type.googleapis.com/} plus {@link ProtoCodec#protoFullName()}.
+     *
+     * @param message entity to pack
+     * @return Any envelope
      */
     public static ProtoAny pack(Object message) {
         return pack(message, ProtoAny.TYPE_URL_PREFIX);
     }
 
+    /**
+     * @param message       entity to pack
+     * @param typeUrlPrefix prefix such as {@code type.googleapis.com}; a trailing {@code /} is optional
+     * @return Any envelope
+     */
     @SuppressWarnings("unchecked")
     public static ProtoAny pack(Object message, String typeUrlPrefix) {
         Objects.requireNonNull(message, "message");
@@ -126,11 +193,22 @@ public final class ProtoVia {
         return new ProtoAny(ProtoAny.typeUrl(typeUrlPrefix, codec.protoFullName()), toBytes(message));
     }
 
+    /**
+     * @param any  packed Any
+     * @param type expected entity class
+     * @return unpacked instance
+     * @throws ProtoException if {@code any} is not {@code type}
+     */
     public static <T> T unpack(ProtoAny any, Class<T> type) {
         Objects.requireNonNull(any, "any");
         return any.unpack(codec(type));
     }
 
+    /**
+     * @param any  packed Any
+     * @param type candidate entity class
+     * @return {@code true} if {@code any}'s type URL names {@code type}
+     */
     public static boolean is(ProtoAny any, Class<?> type) {
         Objects.requireNonNull(any, "any");
         return any.is(codec(type));

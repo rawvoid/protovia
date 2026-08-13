@@ -1,24 +1,11 @@
 package io.github.rawvoid.protovia.processor.model;
 
 import io.github.rawvoid.protovia.ProtoType;
-import io.github.rawvoid.protovia.annotation.ProtoEnum;
-import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
-import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
-import io.github.rawvoid.protovia.annotation.ProtoField;
-import io.github.rawvoid.protovia.annotation.ProtoMessage;
-import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
-import io.github.rawvoid.protovia.annotation.ProtoUnknown;
+import io.github.rawvoid.protovia.annotation.*;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import javax.annotation.processing.Messager;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.RecordComponentElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -27,35 +14,33 @@ import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
+/**
+ * Validates {@code @ProtoMessage} / {@code @ProtoEnum} types and builds the models
+ * consumed by {@link io.github.rawvoid.protovia.processor.gen.CodecGenerator}.
+ *
+ * @author Rawvoid
+ */
 public final class SchemaParser {
 
     private static final Map<String, String> WELL_KNOWN_CODECS = Map.ofEntries(
-            Map.entry("java.time.Instant", "io.github.rawvoid.protovia.wkt.TimestampCodec"),
-            Map.entry("java.time.Duration", "io.github.rawvoid.protovia.wkt.DurationCodec"),
-            Map.entry("io.github.rawvoid.protovia.ProtoAny", "io.github.rawvoid.protovia.wkt.AnyCodec"),
-            Map.entry("io.github.rawvoid.protovia.wkt.DoubleValue", "io.github.rawvoid.protovia.wkt.DoubleValue"),
-            Map.entry("io.github.rawvoid.protovia.wkt.FloatValue", "io.github.rawvoid.protovia.wkt.FloatValue"),
-            Map.entry("io.github.rawvoid.protovia.wkt.Int64Value", "io.github.rawvoid.protovia.wkt.Int64Value"),
-            Map.entry("io.github.rawvoid.protovia.wkt.UInt64Value", "io.github.rawvoid.protovia.wkt.UInt64Value"),
-            Map.entry("io.github.rawvoid.protovia.wkt.Int32Value", "io.github.rawvoid.protovia.wkt.Int32Value"),
-            Map.entry("io.github.rawvoid.protovia.wkt.UInt32Value", "io.github.rawvoid.protovia.wkt.UInt32Value"),
-            Map.entry("io.github.rawvoid.protovia.wkt.BoolValue", "io.github.rawvoid.protovia.wkt.BoolValue"),
-            Map.entry("io.github.rawvoid.protovia.wkt.StringValue", "io.github.rawvoid.protovia.wkt.StringValue"),
-            Map.entry("io.github.rawvoid.protovia.wkt.BytesValue", "io.github.rawvoid.protovia.wkt.BytesValue"));
+        Map.entry("java.time.Instant", "io.github.rawvoid.protovia.wkt.TimestampCodec"),
+        Map.entry("java.time.Duration", "io.github.rawvoid.protovia.wkt.DurationCodec"),
+        Map.entry("io.github.rawvoid.protovia.ProtoAny", "io.github.rawvoid.protovia.wkt.AnyCodec"),
+        Map.entry("io.github.rawvoid.protovia.wkt.DoubleValue", "io.github.rawvoid.protovia.wkt.DoubleValue"),
+        Map.entry("io.github.rawvoid.protovia.wkt.FloatValue", "io.github.rawvoid.protovia.wkt.FloatValue"),
+        Map.entry("io.github.rawvoid.protovia.wkt.Int64Value", "io.github.rawvoid.protovia.wkt.Int64Value"),
+        Map.entry("io.github.rawvoid.protovia.wkt.UInt64Value", "io.github.rawvoid.protovia.wkt.UInt64Value"),
+        Map.entry("io.github.rawvoid.protovia.wkt.Int32Value", "io.github.rawvoid.protovia.wkt.Int32Value"),
+        Map.entry("io.github.rawvoid.protovia.wkt.UInt32Value", "io.github.rawvoid.protovia.wkt.UInt32Value"),
+        Map.entry("io.github.rawvoid.protovia.wkt.BoolValue", "io.github.rawvoid.protovia.wkt.BoolValue"),
+        Map.entry("io.github.rawvoid.protovia.wkt.StringValue", "io.github.rawvoid.protovia.wkt.StringValue"),
+        Map.entry("io.github.rawvoid.protovia.wkt.BytesValue", "io.github.rawvoid.protovia.wkt.BytesValue"));
 
     private final Types types;
     private final Elements elements;
     private final Messager messager;
-    private boolean errors;
-
     private final TypeMirror objectType;
     private final TypeMirror stringType;
     private final TypeMirror integerType;
@@ -69,6 +54,7 @@ public final class SchemaParser {
     private final TypeMirror collectionType;
     private final TypeMirror mapType;
     private final TypeMirror optionalType;
+    private boolean errors;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.types = types;
@@ -89,10 +75,17 @@ public final class SchemaParser {
         this.optionalType = erasure("java.util.Optional");
     }
 
+    /**
+     * @return {@code true} if any diagnostic error was reported in this parser
+     */
     public boolean hasErrors() {
         return errors;
     }
 
+    /**
+     * @param type {@code @ProtoEnum} type
+     * @return model, or {@code null} if the enum is invalid
+     */
     public EnumModel parseEnum(TypeElement type) {
         boolean previous = errors;
         errors = false;
@@ -151,6 +144,10 @@ public final class SchemaParser {
         return new EnumModel(type, Names.typeName(type, pkg), constants, unrecognized);
     }
 
+    /**
+     * @param type {@code @ProtoMessage} class or record
+     * @return model, or {@code null} if the message is invalid
+     */
     public MessageModel parseMessage(TypeElement type) {
         boolean previous = errors;
         errors = false;
@@ -168,8 +165,8 @@ public final class SchemaParser {
             error(type, "@ProtoMessage type cannot be abstract");
         }
         if (type.getEnclosingElement().getKind() != ElementKind.PACKAGE
-                && type.getKind() == ElementKind.CLASS
-                && !type.getModifiers().contains(Modifier.STATIC)) {
+            && type.getKind() == ElementKind.CLASS
+            && !type.getModifiers().contains(Modifier.STATIC)) {
             error(type, "non-static inner @ProtoMessage is not supported");
         }
         checkInheritance(type);
@@ -184,8 +181,8 @@ public final class SchemaParser {
         ProtoMessage meta = type.getAnnotation(ProtoMessage.class);
         String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
         String protoMessageName = meta == null || meta.name().isBlank()
-                ? type.getSimpleName().toString()
-                : meta.name().trim();
+            ? type.getSimpleName().toString()
+            : meta.name().trim();
         Map<Integer, FieldModel> byNumber = new LinkedHashMap<>();
         Set<Integer> taken = new HashSet<>();
         Set<String> claimed = new HashSet<>();
@@ -209,61 +206,61 @@ public final class SchemaParser {
         fields.sort(java.util.Comparator.comparingInt(f -> f.number));
         fields.addAll(oneofs);
         return new MessageModel(
-                type,
-                pkg,
-                protoPackage,
-                protoMessageName,
-                typeName,
-                Names.codecSimpleName(elements, type),
-                record,
-                fields,
-                recordComponents,
-                unknown[0]);
+            type,
+            pkg,
+            protoPackage,
+            protoMessageName,
+            typeName,
+            Names.codecSimpleName(elements, type),
+            record,
+            fields,
+            recordComponents,
+            unknown[0]);
     }
 
     private void parseRecord(
-            TypeElement type,
-            String pkg,
-            Map<Integer, FieldModel> byNumber,
-            Set<Integer> taken,
-            Set<String> claimed,
-            List<MessageModel.RecordComponentModel> recordComponents,
-            MessageModel.UnknownField[] unknown,
-            List<FieldModel> oneofs) {
+        TypeElement type,
+        String pkg,
+        Map<Integer, FieldModel> byNumber,
+        Set<Integer> taken,
+        Set<String> claimed,
+        List<MessageModel.RecordComponentModel> recordComponents,
+        MessageModel.UnknownField[] unknown,
+        List<FieldModel> oneofs) {
         for (RecordComponentElement component : type.getRecordComponents()) {
             if (component.getAnnotation(ProtoUnknown.class) != null
-                    || (component.getAccessor() != null
-                    && component.getAccessor().getAnnotation(ProtoUnknown.class) != null)) {
+                || (component.getAccessor() != null
+                && component.getAccessor().getAnnotation(ProtoUnknown.class) != null)) {
                 if (component.getAnnotation(ProtoField.class) != null) {
                     error(component, "cannot combine @ProtoUnknown with @ProtoField");
                     continue;
                 }
                 String name = component.getSimpleName().toString();
                 if (bindUnknown(component, component.asType(), AccessKind.RECORD,
-                        "value." + name + "()", null, name, unknown)) {
+                    "value." + name + "()", null, name, unknown)) {
                     recordComponents.add(new MessageModel.RecordComponentModel(
-                            name,
-                            "io.github.rawvoid.protovia.UnknownFields",
-                            "io.github.rawvoid.protovia.UnknownFields.EMPTY",
-                            null));
+                        name,
+                        "io.github.rawvoid.protovia.UnknownFields",
+                        "io.github.rawvoid.protovia.UnknownFields.EMPTY",
+                        null));
                 }
                 continue;
             }
             if (component.getAnnotation(ProtoOneof.class) != null
-                    || (component.getAccessor() != null
-                    && component.getAccessor().getAnnotation(ProtoOneof.class) != null)) {
+                || (component.getAccessor() != null
+                && component.getAccessor().getAnnotation(ProtoOneof.class) != null)) {
                 if (component.getAnnotation(ProtoField.class) != null) {
                     error(component, "cannot combine @ProtoOneof with @ProtoField");
                     continue;
                 }
                 String name = component.getSimpleName().toString();
                 FieldModel oneof = resolveOneof(
-                        component, name, component.asType(), AccessKind.RECORD,
-                        "value." + name + "()", null, name, pkg, taken);
+                    component, name, component.asType(), AccessKind.RECORD,
+                    "value." + name + "()", null, name, pkg, taken);
                 if (oneof != null && claimed.add(name)) {
                     oneofs.add(oneof);
                     recordComponents.add(new MessageModel.RecordComponentModel(
-                            name, renderType(component.asType(), pkg), "null", oneof));
+                        name, renderType(component.asType(), pkg), "null", oneof));
                 }
                 continue;
             }
@@ -278,37 +275,37 @@ public final class SchemaParser {
             String typeName = renderType(component.asType(), pkg);
             if (ann == null) {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                        name, typeName, defaultExpr(component.asType()), null));
+                    name, typeName, defaultExpr(component.asType()), null));
                 continue;
             }
             FieldModel field = resolveField(
-                    component,
-                    name,
-                    component.asType(),
-                    ann,
-                    AccessKind.RECORD,
-                    "value." + name + "()",
-                    null,
-                    name,
-                    pkg);
+                component,
+                name,
+                component.asType(),
+                ann,
+                AccessKind.RECORD,
+                "value." + name + "()",
+                null,
+                name,
+                pkg);
             if (field != null && addField(byNumber, taken, claimed, field)) {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                        name, typeName, defaultExpr(component.asType()), field));
+                    name, typeName, defaultExpr(component.asType()), field));
             } else {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                        name, typeName, defaultExpr(component.asType()), null));
+                    name, typeName, defaultExpr(component.asType()), null));
             }
         }
     }
 
     private void parsePojo(
-            TypeElement type,
-            String pkg,
-            Map<Integer, FieldModel> byNumber,
-            Set<Integer> taken,
-            Set<String> claimed,
-            MessageModel.UnknownField[] unknown,
-            List<FieldModel> oneofs) {
+        TypeElement type,
+        String pkg,
+        Map<Integer, FieldModel> byNumber,
+        Set<Integer> taken,
+        Set<String> claimed,
+        MessageModel.UnknownField[] unknown,
+        List<FieldModel> oneofs) {
         Map<String, VariableElement> fields = new HashMap<>();
         Map<String, ExecutableElement> methods = new HashMap<>();
         for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
@@ -337,7 +334,7 @@ public final class SchemaParser {
                     continue;
                 }
                 FieldModel oneof = resolveOneof(
-                        field, name, field.asType(), access.kind, access.readExpr, access.setter, name, pkg, taken);
+                    field, name, field.asType(), access.kind, access.readExpr, access.setter, name, pkg, taken);
                 if (oneof != null && claimed.add(name)) {
                     annotatedViaField.add(name);
                     oneofs.add(oneof);
@@ -367,7 +364,7 @@ public final class SchemaParser {
                 continue;
             }
             FieldModel model = resolveField(
-                    field, name, field.asType(), ann, access.kind, access.readExpr, access.setter, name, pkg);
+                field, name, field.asType(), ann, access.kind, access.readExpr, access.setter, name, pkg);
             if (model != null) {
                 addField(byNumber, taken, claimed, model);
             }
@@ -381,7 +378,7 @@ public final class SchemaParser {
                 }
                 String property = Names.propertyFromGetter(method.getSimpleName().toString());
                 if (property == null || !method.getParameters().isEmpty()
-                        || method.getReturnType().getKind() == TypeKind.VOID) {
+                    || method.getReturnType().getKind() == TypeKind.VOID) {
                     error(method, "@ProtoOneof on a method must be a JavaBean getter");
                     continue;
                 }
@@ -396,15 +393,15 @@ public final class SchemaParser {
                     continue;
                 }
                 FieldModel oneof = resolveOneof(
-                        method,
-                        property,
-                        method.getReturnType(),
-                        AccessKind.GETTER_SETTER,
-                        "value." + method.getSimpleName() + "()",
-                        setter,
-                        property,
-                        pkg,
-                        taken);
+                    method,
+                    property,
+                    method.getReturnType(),
+                    AccessKind.GETTER_SETTER,
+                    "value." + method.getSimpleName() + "()",
+                    setter,
+                    property,
+                    pkg,
+                    taken);
                 if (oneof != null && claimed.add(property)) {
                     annotatedViaField.add(property);
                     oneofs.add(oneof);
@@ -428,13 +425,13 @@ public final class SchemaParser {
                     continue;
                 }
                 bindUnknown(
-                        method,
-                        method.getReturnType(),
-                        AccessKind.GETTER_SETTER,
-                        "value." + method.getSimpleName() + "()",
-                        setter,
-                        property,
-                        unknown);
+                    method,
+                    method.getReturnType(),
+                    AccessKind.GETTER_SETTER,
+                    "value." + method.getSimpleName() + "()",
+                    setter,
+                    property,
+                    unknown);
                 continue;
             }
             ProtoField ann = method.getAnnotation(ProtoField.class);
@@ -457,15 +454,15 @@ public final class SchemaParser {
                 continue;
             }
             FieldModel model = resolveField(
-                    method,
-                    property,
-                    method.getReturnType(),
-                    ann,
-                    AccessKind.GETTER_SETTER,
-                    "value." + method.getSimpleName() + "()",
-                    setter,
-                    property,
-                    pkg);
+                method,
+                property,
+                method.getReturnType(),
+                ann,
+                AccessKind.GETTER_SETTER,
+                "value." + method.getSimpleName() + "()",
+                setter,
+                property,
+                pkg);
             if (model != null) {
                 addField(byNumber, taken, claimed, model);
             }
@@ -473,13 +470,13 @@ public final class SchemaParser {
     }
 
     private boolean bindUnknown(
-            Element origin,
-            TypeMirror type,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String name,
-            MessageModel.UnknownField[] unknown) {
+        Element origin,
+        TypeMirror type,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String name,
+        MessageModel.UnknownField[] unknown) {
         TypeElement expected = elements.getTypeElement("io.github.rawvoid.protovia.UnknownFields");
         if (expected == null || !types.isSameType(types.erasure(type), expected.asType())) {
             error(origin, "@ProtoUnknown must be of type UnknownFields");
@@ -490,21 +487,21 @@ public final class SchemaParser {
             return false;
         }
         unknown[0] = new MessageModel.UnknownField(
-                accessKind,
-                name,
-                Names.safeLocal(name),
-                readExpr,
-                setter,
-                name);
+            accessKind,
+            name,
+            Names.safeLocal(name),
+            readExpr,
+            setter,
+            name);
         return true;
     }
 
     private Access resolvePojoAccess(
-            TypeElement type,
-            VariableElement field,
-            String name,
-            TypeMirror fieldType,
-            Map<String, ExecutableElement> methods) {
+        TypeElement type,
+        VariableElement field,
+        String name,
+        TypeMirror fieldType,
+        Map<String, ExecutableElement> methods) {
         boolean primitiveBoolean = fieldType.getKind() == TypeKind.BOOLEAN;
         ExecutableElement getter = methods.get(Names.getterName(name, primitiveBoolean));
         if (getter == null) {
@@ -524,10 +521,10 @@ public final class SchemaParser {
     }
 
     private boolean addField(
-            Map<Integer, FieldModel> byNumber, Set<Integer> taken, Set<String> claimed, FieldModel field) {
+        Map<Integer, FieldModel> byNumber, Set<Integer> taken, Set<String> claimed, FieldModel field) {
         if (!WireType.isValidFieldNumber(field.number)) {
             error(field.origin, "invalid field number " + field.number
-                    + " (must be in [1, 536870911] and not in [19000, 19999])");
+                + " (must be in [1, 536870911] and not in [19000, 19999])");
             return false;
         }
         if (!taken.add(field.number)) {
@@ -543,15 +540,15 @@ public final class SchemaParser {
     }
 
     private FieldModel resolveOneof(
-            Element origin,
-            String name,
-            TypeMirror type,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String fieldName,
-            String pkg,
-            Set<Integer> taken) {
+        Element origin,
+        String name,
+        TypeMirror type,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        Set<Integer> taken) {
         TypeElement sealed = asTypeElement(type);
         if (sealed == null || !sealed.getModifiers().contains(Modifier.SEALED)) {
             error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
@@ -592,18 +589,18 @@ public final class SchemaParser {
             return null;
         }
         return FieldModel.builder()
-                .number(0)
-                .name(name)
-                .localName(Names.safeLocal(name))
-                .kind(FieldKind.ONEOF)
-                .accessKind(accessKind)
-                .readExpr(readExpr)
-                .setterName(setter)
-                .fieldName(fieldName)
-                .javaTypeName(renderType(type, pkg))
-                .oneofCases(cases)
-                .origin(origin)
-                .build();
+            .number(0)
+            .name(name)
+            .localName(Names.safeLocal(name))
+            .kind(FieldKind.ONEOF)
+            .accessKind(accessKind)
+            .readExpr(readExpr)
+            .setterName(setter)
+            .fieldName(fieldName)
+            .javaTypeName(renderType(type, pkg))
+            .oneofCases(cases)
+            .origin(origin)
+            .build();
     }
 
     private OneofCaseModel parseOneofCase(TypeElement caseType, int number, String oneofName, String pkg) {
@@ -616,17 +613,17 @@ public final class SchemaParser {
                 codec = codecPkg + "." + codec;
             }
             FieldModel payload = FieldModel.builder()
-                    .kind(FieldKind.MESSAGE)
-                    .protoType(ProtoType.MESSAGE)
-                    .codecName(codec)
-                    .messageType(caseType)
-                    .javaTypeName(typeName)
-                    .build();
+                .kind(FieldKind.MESSAGE)
+                .protoType(ProtoType.MESSAGE)
+                .codecName(codec)
+                .messageType(caseType)
+                .javaTypeName(typeName)
+                .build();
             return new OneofCaseModel(number, caseType, typeName, tag, payload, null, true);
         }
         if (caseType.getKind() != ElementKind.RECORD) {
             error(caseType, "@ProtoOneofCase " + caseType.getSimpleName()
-                    + " must be a record with 0 or 1 component, or a @ProtoMessage");
+                + " must be a record with 0 or 1 component, or a @ProtoMessage");
             return null;
         }
         List<? extends RecordComponentElement> components = caseType.getRecordComponents();
@@ -635,48 +632,48 @@ public final class SchemaParser {
         }
         if (components.size() != 1) {
             error(caseType, "@ProtoOneofCase record " + caseType.getSimpleName()
-                    + " must have 0 or 1 component");
+                + " must have 0 or 1 component");
             return null;
         }
         RecordComponentElement component = components.get(0);
         TypeMirror payloadType = component.asType();
         if (isMap(payloadType) || isRepeatedContainer(payloadType)
-                && !(payloadType.getKind() == TypeKind.ARRAY
-                && ((ArrayType) payloadType).getComponentType().getKind() == TypeKind.BYTE)) {
+            && !(payloadType.getKind() == TypeKind.ARRAY
+            && ((ArrayType) payloadType).getComponentType().getKind() == TypeKind.BYTE)) {
             error(caseType, "oneof case cannot be repeated or map");
             return null;
         }
         FieldModel payload = resolveSingular(
-                caseType,
-                caseType.getSimpleName() + "Payload",
-                payloadType,
-                ProtoType.AUTO,
-                false,
-                false,
-                AccessKind.RECORD,
-                null,
-                null,
-                null,
-                pkg,
-                false,
-                payloadType);
+            caseType,
+            caseType.getSimpleName() + "Payload",
+            payloadType,
+            ProtoType.AUTO,
+            false,
+            false,
+            AccessKind.RECORD,
+            null,
+            null,
+            null,
+            pkg,
+            false,
+            payloadType);
         if (payload == null) {
             return null;
         }
         return new OneofCaseModel(
-                number, caseType, typeName, tag, payload, component.getSimpleName() + "()", false);
+            number, caseType, typeName, tag, payload, component.getSimpleName() + "()", false);
     }
 
     private FieldModel resolveField(
-            Element origin,
-            String name,
-            TypeMirror type,
-            ProtoField ann,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String fieldName,
-            String pkg) {
+        Element origin,
+        String name,
+        TypeMirror type,
+        ProtoField ann,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg) {
         boolean javaOptional = isOptional(type);
         TypeMirror effective = type;
         if (javaOptional) {
@@ -701,29 +698,29 @@ public final class SchemaParser {
             return resolveRepeated(origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional);
         }
         return resolveSingular(
-                origin, name, effective, ann.type(), optional, ann.packed(),
-                accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
+            origin, name, effective, ann.type(), optional, ann.packed(),
+            accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
     }
 
     private FieldModel resolveRepeated(
-            Element origin,
-            String name,
-            TypeMirror type,
-            ProtoField ann,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String fieldName,
-            String pkg,
-            boolean javaOptional) {
+        Element origin,
+        String name,
+        TypeMirror type,
+        ProtoField ann,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional) {
         boolean array = type.getKind() == TypeKind.ARRAY;
         TypeMirror elementType;
         if (array) {
             elementType = ((ArrayType) type).getComponentType();
             if (elementType.getKind() == TypeKind.BYTE) {
                 return resolveSingular(
-                        origin, name, type, protoOrAuto(ann.type(), ProtoType.BYTES),
-                        ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
+                    origin, name, type, protoOrAuto(ann.type(), ProtoType.BYTES),
+                    ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
             }
         } else {
             elementType = typeArgument(type, 0, origin, "collection");
@@ -732,31 +729,31 @@ public final class SchemaParser {
             }
         }
         FieldModel element = resolveSingular(
-                origin, name + "Element", elementType, protoOrAuto(ann.type(), ProtoType.AUTO),
-                false, false, accessKind, null, null, null, pkg, false, elementType);
+            origin, name + "Element", elementType, protoOrAuto(ann.type(), ProtoType.AUTO),
+            false, false, accessKind, null, null, null, pkg, false, elementType);
         if (element == null) {
             return null;
         }
         String impl = array ? null : collectionImpl(type, pkg, element);
         boolean packed = ann.packed() && isPackable(element);
         FieldModel.Builder b = FieldModel.builder()
-                .number(ann.number())
-                .name(name)
-                .localName(Names.safeLocal(name))
-                .kind(FieldKind.REPEATED)
-                .protoType(element.protoType)
-                .optional(false)
-                .packed(packed)
-                .javaOptional(javaOptional)
-                .accessKind(accessKind)
-                .readExpr(readExpr)
-                .setterName(setter)
-                .fieldName(fieldName)
-                .javaTypeName(renderType(type, pkg))
-                .implTypeName(impl)
-                .element(element)
-                .origin(origin)
-                .array(array);
+            .number(ann.number())
+            .name(name)
+            .localName(Names.safeLocal(name))
+            .kind(FieldKind.REPEATED)
+            .protoType(element.protoType)
+            .optional(false)
+            .packed(packed)
+            .javaOptional(javaOptional)
+            .accessKind(accessKind)
+            .readExpr(readExpr)
+            .setterName(setter)
+            .fieldName(fieldName)
+            .javaTypeName(renderType(type, pkg))
+            .implTypeName(impl)
+            .element(element)
+            .origin(origin)
+            .array(array);
         if (array) {
             b.arrayComponentType(renderType(elementType, pkg));
         }
@@ -764,16 +761,16 @@ public final class SchemaParser {
     }
 
     private FieldModel resolveMap(
-            Element origin,
-            String name,
-            TypeMirror type,
-            ProtoField ann,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String fieldName,
-            String pkg,
-            boolean javaOptional) {
+        Element origin,
+        String name,
+        TypeMirror type,
+        ProtoField ann,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional) {
         TypeMirror keyType = typeArgument(type, 0, origin, "Map");
         TypeMirror valueType = typeArgument(type, 1, origin, "Map");
         if (keyType == null || valueType == null) {
@@ -784,11 +781,11 @@ public final class SchemaParser {
             return null;
         }
         FieldModel key = resolveSingular(
-                origin, name + "Key", keyType, protoOrAuto(ann.keyType(), ProtoType.AUTO),
-                false, false, accessKind, null, null, null, pkg, false, keyType);
+            origin, name + "Key", keyType, protoOrAuto(ann.keyType(), ProtoType.AUTO),
+            false, false, accessKind, null, null, null, pkg, false, keyType);
         FieldModel value = resolveSingular(
-                origin, name + "Value", valueType, protoOrAuto(ann.valueType(), ProtoType.AUTO),
-                false, false, accessKind, null, null, null, pkg, false, valueType);
+            origin, name + "Value", valueType, protoOrAuto(ann.valueType(), ProtoType.AUTO),
+            false, false, accessKind, null, null, null, pkg, false, valueType);
         if (key == null || value == null) {
             return null;
         }
@@ -797,37 +794,37 @@ public final class SchemaParser {
             return null;
         }
         return FieldModel.builder()
-                .number(ann.number())
-                .name(name)
-                .localName(Names.safeLocal(name))
-                .kind(FieldKind.MAP)
-                .optional(false)
-                .accessKind(accessKind)
-                .readExpr(readExpr)
-                .setterName(setter)
-                .fieldName(fieldName)
-                .javaTypeName(renderType(type, pkg))
-                .implTypeName(mapImpl(type, pkg))
-                .mapKey(key)
-                .mapValue(value)
-                .origin(origin)
-                .build();
+            .number(ann.number())
+            .name(name)
+            .localName(Names.safeLocal(name))
+            .kind(FieldKind.MAP)
+            .optional(false)
+            .accessKind(accessKind)
+            .readExpr(readExpr)
+            .setterName(setter)
+            .fieldName(fieldName)
+            .javaTypeName(renderType(type, pkg))
+            .implTypeName(mapImpl(type, pkg))
+            .mapKey(key)
+            .mapValue(value)
+            .origin(origin)
+            .build();
     }
 
     private FieldModel resolveSingular(
-            Element origin,
-            String name,
-            TypeMirror type,
-            ProtoType declared,
-            boolean optional,
-            boolean packed,
-            AccessKind accessKind,
-            String readExpr,
-            String setter,
-            String fieldName,
-            String pkg,
-            boolean javaOptional,
-            TypeMirror declaredJavaType) {
+        Element origin,
+        String name,
+        TypeMirror type,
+        ProtoType declared,
+        boolean optional,
+        boolean packed,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional,
+        TypeMirror declaredJavaType) {
         if (type.getKind().isPrimitive() && optional) {
             error(origin, "optional field '" + name + "' cannot be a primitive; use a boxed type or Optional");
             return null;
@@ -837,27 +834,27 @@ public final class SchemaParser {
             return null;
         }
         return FieldModel.builder()
-                .number(origin.getAnnotation(ProtoField.class) != null ? origin.getAnnotation(ProtoField.class).number() : 0)
-                .name(name)
-                .localName(Names.safeLocal(name))
-                .kind(resolved.kind)
-                .protoType(resolved.protoType)
-                .optional(optional)
-                .packed(packed)
-                .primitive(type.getKind().isPrimitive())
-                .javaOptional(javaOptional)
-                .byteArray(resolved.byteArray)
-                .byteBuffer(resolved.byteBuffer)
-                .accessKind(accessKind)
-                .readExpr(readExpr)
-                .setterName(setter)
-                .fieldName(fieldName)
-                .javaTypeName(renderType(declaredJavaType, pkg))
-                .codecName(resolved.codecName)
-                .enumModel(resolved.enumModel)
-                .messageType(resolved.messageType)
-                .origin(origin)
-                .build();
+            .number(origin.getAnnotation(ProtoField.class) != null ? origin.getAnnotation(ProtoField.class).number() : 0)
+            .name(name)
+            .localName(Names.safeLocal(name))
+            .kind(resolved.kind)
+            .protoType(resolved.protoType)
+            .optional(optional)
+            .packed(packed)
+            .primitive(type.getKind().isPrimitive())
+            .javaOptional(javaOptional)
+            .byteArray(resolved.byteArray)
+            .byteBuffer(resolved.byteBuffer)
+            .accessKind(accessKind)
+            .readExpr(readExpr)
+            .setterName(setter)
+            .fieldName(fieldName)
+            .javaTypeName(renderType(declaredJavaType, pkg))
+            .codecName(resolved.codecName)
+            .enumModel(resolved.enumModel)
+            .messageType(resolved.messageType)
+            .origin(origin)
+            .build();
     }
 
     private Resolved classify(Element origin, String name, TypeMirror type, ProtoType declared, String currentPkg) {
@@ -939,7 +936,7 @@ public final class SchemaParser {
             return r;
         }
         error(origin, "unsupported type for field '" + name + "': " + element.getQualifiedName()
-                + " (annotate with @ProtoMessage / @ProtoEnum)");
+            + " (annotate with @ProtoMessage / @ProtoEnum)");
         return null;
     }
 
@@ -967,18 +964,6 @@ public final class SchemaParser {
         return r;
     }
 
-    private static Set<ProtoType> intFamily() {
-        return Set.of(
-                ProtoType.AUTO, ProtoType.INT32, ProtoType.UINT32, ProtoType.SINT32,
-                ProtoType.FIXED32, ProtoType.SFIXED32);
-    }
-
-    private static Set<ProtoType> longFamily() {
-        return Set.of(
-                ProtoType.AUTO, ProtoType.INT64, ProtoType.UINT64, ProtoType.SINT64,
-                ProtoType.FIXED64, ProtoType.SFIXED64);
-    }
-
     private void checkInheritance(TypeElement type) {
         TypeMirror superType = type.getSuperclass();
         while (superType != null && superType.getKind() != TypeKind.NONE && !types.isSameType(superType, objectType)) {
@@ -992,10 +977,10 @@ public final class SchemaParser {
             }
             for (Element enclosed : superElement.getEnclosedElements()) {
                 if (enclosed.getAnnotation(ProtoField.class) != null
-                        || enclosed.getAnnotation(ProtoOneof.class) != null
-                        || enclosed.getAnnotation(ProtoUnknown.class) != null) {
+                    || enclosed.getAnnotation(ProtoOneof.class) != null
+                    || enclosed.getAnnotation(ProtoUnknown.class) != null) {
                     error(type, "superclass " + superElement.getSimpleName()
-                            + " has proto members; inheritance is not supported");
+                        + " has proto members; inheritance is not supported");
                     return;
                 }
             }
@@ -1021,26 +1006,14 @@ public final class SchemaParser {
         };
     }
 
-    private static boolean isValidMapKey(ProtoType type) {
-        return switch (type) {
-            case INT32, INT64, UINT32, UINT64, SINT32, SINT64,
-                    FIXED32, FIXED64, SFIXED32, SFIXED64, BOOL, STRING -> true;
-            default -> false;
-        };
-    }
-
-    private static ProtoType protoOrAuto(ProtoType type, ProtoType fallback) {
-        return type == ProtoType.AUTO ? fallback : type;
-    }
-
     private boolean isRepeatedContainer(TypeMirror type) {
         if (type.getKind() == TypeKind.ARRAY) {
             return true;
         }
         TypeMirror erased = types.erasure(type);
         return types.isAssignable(erased, listType)
-                || types.isAssignable(erased, setType)
-                || types.isAssignable(erased, collectionType);
+            || types.isAssignable(erased, setType)
+            || types.isAssignable(erased, collectionType);
     }
 
     private boolean isMap(TypeMirror type) {
@@ -1054,9 +1027,9 @@ public final class SchemaParser {
     private String collectionImpl(TypeMirror type, String pkg, FieldModel elementModel) {
         TypeElement element = asTypeElement(type);
         if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
-                && !element.getQualifiedName().contentEquals("java.util.List")
-                && !element.getQualifiedName().contentEquals("java.util.Set")
-                && !element.getQualifiedName().contentEquals("java.util.Collection")) {
+            && !element.getQualifiedName().contentEquals("java.util.List")
+            && !element.getQualifiedName().contentEquals("java.util.Set")
+            && !element.getQualifiedName().contentEquals("java.util.Collection")) {
             return renderType(type, pkg).replace("<?>", "").replaceAll("<.*>", "<>");
         }
         TypeMirror erased = types.erasure(type);
@@ -1073,7 +1046,7 @@ public final class SchemaParser {
     private String mapImpl(TypeMirror type, String pkg) {
         TypeElement element = asTypeElement(type);
         if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
-                && !element.getQualifiedName().contentEquals("java.util.Map")) {
+            && !element.getQualifiedName().contentEquals("java.util.Map")) {
             return renderType(type, pkg).replaceAll("<.*>", "<>");
         }
         return "java.util.LinkedHashMap<>";
@@ -1164,6 +1137,30 @@ public final class SchemaParser {
     private void error(Element element, String message) {
         errors = true;
         messager.printMessage(Diagnostic.Kind.ERROR, message, element);
+    }
+
+    private static Set<ProtoType> intFamily() {
+        return Set.of(
+            ProtoType.AUTO, ProtoType.INT32, ProtoType.UINT32, ProtoType.SINT32,
+            ProtoType.FIXED32, ProtoType.SFIXED32);
+    }
+
+    private static Set<ProtoType> longFamily() {
+        return Set.of(
+            ProtoType.AUTO, ProtoType.INT64, ProtoType.UINT64, ProtoType.SINT64,
+            ProtoType.FIXED64, ProtoType.SFIXED64);
+    }
+
+    private static boolean isValidMapKey(ProtoType type) {
+        return switch (type) {
+            case INT32, INT64, UINT32, UINT64, SINT32, SINT64,
+                 FIXED32, FIXED64, SFIXED32, SFIXED64, BOOL, STRING -> true;
+            default -> false;
+        };
+    }
+
+    private static ProtoType protoOrAuto(ProtoType type, ProtoType fallback) {
+        return type == ProtoType.AUTO ? fallback : type;
     }
 
     private static final class Access {

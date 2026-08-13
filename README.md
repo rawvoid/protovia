@@ -5,27 +5,36 @@ Lightweight compile-time Protobuf for Java 21. **The Java entity is the schema**
 Annotate a POJO or record, compile, and get a generated zero-reflection `ProtoCodec` that speaks official proto3 wire format.
 
 ```java
+
 @ProtoMessage
 public class User {
-    @ProtoField(number = 1) private String name;
-    @ProtoField(number = 2) private int age;
-    @ProtoField(number = 3) private Address address;   // nested @ProtoMessage
-    @ProtoField(number = 4) private List<String> tags; // repeated
-    @ProtoField(number = 5) private Map<String, Integer> scores;
-    @ProtoField(number = 6) private Status status;     // @ProtoEnum
-    @ProtoField(number = 7, optional = true) private Integer level;
-    // getters / setters
+  @ProtoField(number = 1)
+  private String name;
+  @ProtoField(number = 2)
+  private int age;
+  @ProtoField(number = 3)
+  private Address address;   // nested @ProtoMessage
+  @ProtoField(number = 4)
+  private List<String> tags; // repeated
+  @ProtoField(number = 5)
+  private Map<String, Integer> scores;
+  @ProtoField(number = 6)
+  private Status status;     // @ProtoEnum
+  @ProtoField(number = 7, optional = true)
+  private Integer level;
+  // getters / setters
 }
 
 @ProtoMessage
 public record Address(
-        @ProtoField(number = 1) String city,
-        @ProtoField(number = 2) String street) {}
+  @ProtoField(number = 1) String city,
+  @ProtoField(number = 2) String street) {
+}
 
 @ProtoEnum
 public enum Status {
-    @ProtoEnumValue(0) UNKNOWN,
-    @ProtoEnumValue(1) ACTIVE
+  @ProtoEnumValue(0) UNKNOWN,
+  @ProtoEnumValue(1) ACTIVE
 }
 
 byte[] bytes = ProtoVia.toBytes(user);
@@ -48,16 +57,17 @@ Runtime has **no third-party dependencies**.
 ## Maven
 
 ```xml
+
 <dependency>
   <groupId>io.github.rawvoid</groupId>
   <artifactId>protovia-runtime</artifactId>
   <version>1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
-  <groupId>io.github.rawvoid</groupId>
-  <artifactId>protovia-processor</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <scope>provided</scope>
+<groupId>io.github.rawvoid</groupId>
+<artifactId>protovia-processor</artifactId>
+<version>1.0-SNAPSHOT</version>
+<scope>provided</scope>
 </dependency>
 ```
 
@@ -86,25 +96,24 @@ Generated codecs:
 
 ## Type mapping
 
-| Java | Default proto | Override with `ProtoType` |
-|------|---------------|---------------------------|
-| `int` / `Integer` | int32 | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
-| `long` / `Long` | int64 | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
-| `float` / `Float` | float | |
-| `double` / `Double` | double | |
-| `boolean` / `Boolean` | bool | |
-| `String` | string | `BYTES` |
-| `byte[]`, `ByteBuffer` | bytes | |
-| `@ProtoEnum` enum | enum | |
-| `@ProtoMessage` type | message | |
-| `@ProtoOneof` sealed interface | oneof (cases flatten onto the parent) | |
-| `java.time.Instant` | `google.protobuf.Timestamp` | |
-| `java.time.Duration` | `google.protobuf.Duration` | |
-| `ProtoAny` | `google.protobuf.Any` | |
+| Java                                      | Default proto | Override with `ProtoType` |
+|-------------------------------------------|---------------|---------------------------|
+| `int` / `Integer`                         | int32 | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
+| `long` / `Long`                           | int64 | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
+| `float` / `Float`                         | float | |
+| `double` / `Double`                       | double | |
+| `boolean` / `Boolean`                     | bool | |
+| `String`                                  | string | `BYTES` |
+| `byte[]`, `ByteBuffer`                    | bytes | |
+| `@ProtoEnum` enum                         | enum | |
+| `@ProtoMessage` type                      | message | |
+| `@ProtoOneof` sealed interface            | oneof (cases flatten onto the parent) | |
+| `java.time.Instant`                       | `google.protobuf. Timestamp` | |                              | `java.time.Duration`                      | `google.protobuf.Duration` | |
+| `ProtoAny`                                | `google.protobuf.Any` | |
 | `wkt.Int32Value` and the other 8 wrappers | wrapper messages | |
-| `List` / `Set` / array (not `byte[]`) | repeated | `packed` (default `true` for scalars) |
-| `Map<K,V>` | map | `keyType` / `valueType` |
-| `Optional<T>` | proto3 optional T | |
+| `List` / `Set` / array (not `byte[]`)     | repeated | `packed` (default `true` for scalars) |
+| `Map<K,V>`                                | map | `keyType` / `valueType` |
+| `Optional<T>`                             | proto3 optional T | |
 
 Map keys must be integral, `bool`, or `string`. Field numbers are **required** and must stay stable.
 
@@ -148,12 +157,25 @@ Map keys must be integral, `bool`, or `string`. Field numbers are **required** a
 
 ```java
 ProtoVia.toBytes(message);
-ProtoVia.fromBytes(User.class, bytes);
-ProtoVia.write(outputStream, message);
-ProtoVia.read(User.class, inputStream);
-ProtoVia.sizeOf(message);
-ProtoVia.codec(User.class);
-ProtoVia.register(User.class, handWrittenCodec); // tests / override
+ProtoVia.
+
+fromBytes(User .class, bytes);
+ProtoVia.
+
+write(outputStream, message);
+ProtoVia.
+
+read(User .class, inputStream);
+ProtoVia.
+
+sizeOf(message);
+ProtoVia.
+
+codec(User .class);
+ProtoVia.
+
+register(User .class, handWrittenCodec); // tests / override
+
 ProtoAny packed = ProtoVia.pack(user);           // type.googleapis.com/<protoFullName>
 User back = ProtoVia.unpack(packed, User.class);
 ```

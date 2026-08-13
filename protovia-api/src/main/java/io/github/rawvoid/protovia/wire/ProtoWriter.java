@@ -8,27 +8,34 @@ import java.util.function.IntSupplier;
 
 /**
  * Size-preallocated proto3 encoder. Not thread-safe.
+ * Prefer the exact-size constructors; {@link #growing()} is for tests and unknown-field capture.
+ *
+ * @author Rawvoid
  */
 public final class ProtoWriter {
 
-    private byte[] buffer;
-    private int pos;
     private final boolean exact;
     private final SizeCache sizes;
+    private byte[] buffer;
+    private int pos;
 
+    /**
+     * Exact-size writer. {@link #finish()} requires that every allocated byte is written.
+     *
+     * @param size result of {@link io.github.rawvoid.protovia.codec.ProtoCodec#computeSize}
+     */
     public ProtoWriter(int size) {
         this(size, true, SizeCache.NOOP);
     }
 
+    /**
+     * Exact-size writer that consumes nested lengths from {@code sizes} in pre-order.
+     *
+     * @param size  computed encoded size
+     * @param sizes cache filled by {@code computeSize(value, cache)}
+     */
     public ProtoWriter(int size, SizeCache sizes) {
         this(size, true, sizes);
-    }
-
-    /**
-     * Scratch writer that may grow. {@link #toByteArray()} returns the written prefix.
-     */
-    public static ProtoWriter growing() {
-        return new ProtoWriter(64, false, SizeCache.NOOP);
     }
 
     private ProtoWriter(int size, boolean exact, SizeCache sizes) {
@@ -226,8 +233,8 @@ public final class ProtoWriter {
 
     public <T> void writeMessageNoTag(ProtoCodec<T> codec, T value) {
         int size = codec.cachesNestedSizes()
-                ? takeSize(() -> codec.computeSize(value))
-                : codec.computeSize(value);
+            ? takeSize(() -> codec.computeSize(value))
+            : codec.computeSize(value);
         writeUInt32NoTag(size);
         codec.writeTo(this, value);
     }
@@ -356,11 +363,18 @@ public final class ProtoWriter {
         }
         if (exact) {
             throw new ProtoException(
-                    "write overflow: need " + n + " bytes at " + pos + " of " + buffer.length);
+                "write overflow: need " + n + " bytes at " + pos + " of " + buffer.length);
         }
         int next = Math.max(buffer.length * 2, pos + n);
         byte[] grown = new byte[next];
         System.arraycopy(buffer, 0, grown, 0, pos);
         buffer = grown;
+    }
+
+    /**
+     * Scratch writer that may grow. {@link #toByteArray()} returns the written prefix.
+     */
+    public static ProtoWriter growing() {
+        return new ProtoWriter(64, false, SizeCache.NOOP);
     }
 }

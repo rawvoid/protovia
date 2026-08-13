@@ -10,6 +10,8 @@ import java.time.Duration;
 
 /**
  * {@code google.protobuf.Duration}: {@code int64 seconds = 1; int32 nanos = 2}.
+ *
+ * @author Rawvoid
  */
 public final class DurationCodec implements ProtoCodec<Duration> {
 
@@ -29,11 +31,6 @@ public final class DurationCodec implements ProtoCodec<Duration> {
     }
 
     @Override
-    public boolean cachesNestedSizes() {
-        return true;
-    }
-
-    @Override
     public int computeSize(Duration value) {
         int size = 0;
         long seconds = value.getSeconds();
@@ -49,6 +46,11 @@ public final class DurationCodec implements ProtoCodec<Duration> {
             size += CodedSize.int32(2, nanos);
         }
         return size;
+    }
+
+    @Override
+    public boolean cachesNestedSizes() {
+        return true;
     }
 
     @Override

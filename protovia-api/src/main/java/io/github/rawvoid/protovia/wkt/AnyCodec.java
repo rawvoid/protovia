@@ -8,6 +8,8 @@ import io.github.rawvoid.protovia.wire.ProtoWriter;
 
 /**
  * {@code google.protobuf.Any}: {@code string type_url = 1; bytes value = 2}.
+ *
+ * @author Rawvoid
  */
 public final class AnyCodec implements ProtoCodec<ProtoAny> {
 
@@ -29,11 +31,6 @@ public final class AnyCodec implements ProtoCodec<ProtoAny> {
     }
 
     @Override
-    public boolean cachesNestedSizes() {
-        return true;
-    }
-
-    @Override
     public int computeSize(ProtoAny value) {
         int size = 0;
         if (!value.typeUrl().isEmpty()) {
@@ -43,6 +40,11 @@ public final class AnyCodec implements ProtoCodec<ProtoAny> {
             size += CodedSize.bytes(2, value.value());
         }
         return size;
+    }
+
+    @Override
+    public boolean cachesNestedSizes() {
+        return true;
     }
 
     @Override

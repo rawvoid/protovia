@@ -3,6 +3,11 @@ package io.github.rawvoid.protovia.collect;
 import java.util.Arrays;
 import java.util.Collection;
 
+/**
+ * {@code List<Float>} backed by {@code float[]}.
+ *
+ * @author Rawvoid
+ */
 public final class FloatArrayList extends AbstractPrimitiveList<Float> {
 
     private float[] values;
@@ -44,14 +49,22 @@ public final class FloatArrayList extends AbstractPrimitiveList<Float> {
     }
 
     @Override
+    public boolean add(Float value) {
+        addFloat(value);
+        return true;
+    }
+
+    @Override
     public Float get(int index) {
         return getFloat(index);
     }
 
     @Override
-    public boolean add(Float value) {
-        addFloat(value);
-        return true;
+    public Float set(int index, Float value) {
+        checkElementIndex(index);
+        float old = values[index];
+        values[index] = value;
+        return old;
     }
 
     @Override
@@ -62,14 +75,6 @@ public final class FloatArrayList extends AbstractPrimitiveList<Float> {
         values[index] = value;
         size++;
         modCount++;
-    }
-
-    @Override
-    public Float set(int index, Float value) {
-        checkElementIndex(index);
-        float old = values[index];
-        values[index] = value;
-        return old;
     }
 
     @Override
