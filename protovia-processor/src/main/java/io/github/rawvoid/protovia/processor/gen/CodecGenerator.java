@@ -432,16 +432,13 @@ public final class CodecGenerator {
             w.close();
             return;
         }
+        String ensure = collectionEnsureCall(field);
         if (field.accessKind == AccessKind.FIELD) {
-            w.open("if (msg." + field.fieldName + " == null || msg." + field.fieldName + ".isEmpty())");
-            w.line("msg." + field.fieldName + " = new " + field.implTypeName + "();");
-            w.close();
+            w.line("msg." + field.fieldName + " = " + ensure.replace("$C", "msg." + field.fieldName) + ";");
         } else {
             w.line(field.javaTypeName + " " + field.localName + " = " + field.readExpr.replace("value.", "msg.") + ";");
-            w.open("if (" + field.localName + " == null || " + field.localName + ".isEmpty())");
-            w.line(field.localName + " = new " + field.implTypeName + "();");
+            w.line(field.localName + " = " + ensure.replace("$C", field.localName) + ";");
             emitAssign(w, field, "msg", field.localName);
-            w.close();
         }
     }
 
@@ -579,16 +576,14 @@ public final class CodecGenerator {
             w.close();
             return;
         }
+        String ensure = "io.github.rawvoid.protovia.collect.ProtoLists.ensureMutableMap($C, "
+                + implConstructorRef(field) + ")";
         if (field.accessKind == AccessKind.FIELD) {
-            w.open("if (msg." + field.fieldName + " == null)");
-            w.line("msg." + field.fieldName + " = new " + field.implTypeName + "();");
-            w.close();
+            w.line("msg." + field.fieldName + " = " + ensure.replace("$C", "msg." + field.fieldName) + ";");
         } else {
             w.line(field.javaTypeName + " " + field.localName + " = " + field.readExpr.replace("value.", "msg.") + ";");
-            w.open("if (" + field.localName + " == null)");
-            w.line(field.localName + " = new " + field.implTypeName + "();");
+            w.line(field.localName + " = " + ensure.replace("$C", field.localName) + ";");
             emitAssign(w, field, "msg", field.localName);
-            w.close();
         }
     }
 
@@ -871,6 +866,22 @@ public final class CodecGenerator {
             return "java.util.Optional.of(" + expr + ")";
         }
         return expr;
+    }
+
+    private String collectionEnsureCall(FieldModel field) {
+        String ctor = implConstructorRef(field);
+        if (field.implTypeName != null && field.implTypeName.contains("Set")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureMutableSet($C, " + ctor + ")";
+        }
+        return "io.github.rawvoid.protovia.collect.ProtoLists.ensureMutableList($C, " + ctor + ")";
+    }
+
+    private String implConstructorRef(FieldModel field) {
+        String impl = field.implTypeName;
+        if (impl.endsWith("<>")) {
+            impl = impl.substring(0, impl.length() - 2);
+        }
+        return impl + "::new";
     }
 
     private String arrayBuilderType(FieldModel field) {

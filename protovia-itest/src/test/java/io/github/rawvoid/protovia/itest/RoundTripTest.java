@@ -2,11 +2,13 @@ package io.github.rawvoid.protovia.itest;
 
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
+import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.itest.model.Address;
 import io.github.rawvoid.protovia.itest.model.NodeA;
 import io.github.rawvoid.protovia.itest.model.NodeB;
 import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
+import io.github.rawvoid.protovia.itest.model.UserProtoCodec;
 import io.github.rawvoid.protovia.itest.model.UserRecord;
 import org.junit.jupiter.api.Test;
 
@@ -104,10 +106,34 @@ class RoundTripTest {
         User second = new User();
         second.setAddress(new Address(null, "Rue"));
         second.setRanks(List.of(3));
+        first.setScores(Map.of("math", 1));
+        second.setScores(Map.of("math", 99, "eng", 70));
         User back = ProtoVia.fromBytes(User.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
         assertEquals("Paris", back.getAddress().city());
         assertEquals("Rue", back.getAddress().street());
         assertEquals(List.of(1, 2, 3), back.getRanks());
+        assertEquals(99, back.getScores().get("math"));
+        assertEquals(70, back.getScores().get("eng"));
+    }
+
+    @Test
+    void mergeFromCopiesImmutablePojoCollections() {
+        User existing = new User();
+        existing.setTags(List.of("a"));
+        existing.setRanks(List.of(1, 2));
+        existing.setScores(Map.of("math", 1));
+
+        User incoming = new User();
+        incoming.setTags(List.of("b"));
+        incoming.setRanks(List.of(3));
+        incoming.setScores(Map.of("math", 99, "eng", 70));
+
+        UserProtoCodec.INSTANCE.mergeFrom(new ProtoReader(ProtoVia.toBytes(incoming)), existing);
+        assertEquals(List.of("a", "b"), existing.getTags());
+        assertEquals(List.of(1, 2, 3), existing.getRanks());
+        assertEquals(99, existing.getScores().get("math"));
+        assertEquals(70, existing.getScores().get("eng"));
+        assertTrue(existing.getRanks() instanceof IntArrayList);
     }
 
     @Test

@@ -1,6 +1,14 @@
 package io.github.rawvoid.protovia.collect;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Decode helpers that keep packed / repeated scalars on primitive arrays when possible.
@@ -8,6 +16,55 @@ import java.util.List;
 public final class ProtoLists {
 
     private ProtoLists() {
+    }
+
+    /**
+     * Returns {@code list} when it can be appended in place; otherwise a mutable copy from {@code empty}.
+     * {@code List.of} / empty lists become a fresh instance so merge does not throw.
+     */
+    public static <E> List<E> ensureMutableList(List<E> list, Supplier<List<E>> empty) {
+        if (list == null || list.isEmpty()) {
+            return empty.get();
+        }
+        if (isMutableList(list)) {
+            return list;
+        }
+        List<E> copy = empty.get();
+        copy.addAll(list);
+        return copy;
+    }
+
+    public static <E> Set<E> ensureMutableSet(Set<E> set, Supplier<Set<E>> empty) {
+        if (set == null || set.isEmpty()) {
+            return empty.get();
+        }
+        if (set instanceof HashSet || set instanceof LinkedHashSet) {
+            return set;
+        }
+        Set<E> copy = empty.get();
+        copy.addAll(set);
+        return copy;
+    }
+
+    public static <K, V> Map<K, V> ensureMutableMap(Map<K, V> map, Supplier<Map<K, V>> empty) {
+        if (map == null || map.isEmpty()) {
+            return empty.get();
+        }
+        if (map instanceof HashMap || map instanceof LinkedHashMap) {
+            return map;
+        }
+        Map<K, V> copy = empty.get();
+        copy.putAll(map);
+        return copy;
+    }
+
+    public static boolean isMutableList(List<?> list) {
+        return list instanceof ArrayList
+                || list instanceof IntArrayList
+                || list instanceof LongArrayList
+                || list instanceof FloatArrayList
+                || list instanceof DoubleArrayList
+                || list instanceof BooleanArrayList;
     }
 
     public static void addInt(List<Integer> list, int value) {
