@@ -162,3 +162,7 @@ Java 21. Interop tests compare Protovia bytes with `protobuf-java` `DynamicMessa
 mvn -pl protovia-bench -am package
 java -jar protovia-bench/target/benchmarks.jar
 ```
+
+## Documentation
+
+Planning and architecture for maintainers live under [`docs/`](docs/README.md). The overall roadmap (completed phase 1 + later stages) is [`docs/plan.md`](docs/plan.md).
