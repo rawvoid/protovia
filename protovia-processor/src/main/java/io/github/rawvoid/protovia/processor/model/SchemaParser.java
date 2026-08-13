@@ -841,13 +841,15 @@ public final class SchemaParser {
         if (key == null || value == null) {
             return null;
         }
-        if (fieldAdapter != null && key.adapterType == null && value.adapterType == null) {
+        if (fieldAdapter != null) {
             ResolvedAdapter adapter = validateAdapter(fieldAdapter, origin);
-            if (adapter != null) {
+            if (adapter != null
+                && !types.isSameType(adapter.j, keyType)
+                && !types.isSameType(adapter.j, valueType)) {
                 error(origin, "adapter " + fieldAdapter.getSimpleName()
                     + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
+                return null;
             }
-            return null;
         }
         if (!isValidMapKey(key.protoType)) {
             error(origin, "map key of field '" + name + "' must be an integral type, bool, or string");
@@ -1052,6 +1054,15 @@ public final class SchemaParser {
         }
         if (alreadyProtoType(type)) {
             String message = protoAdaptedOnProtoTypeMessage(javaType);
+            error(javaType, message);
+            if (!javaType.equals(origin)) {
+                error(origin, message);
+            }
+            return null;
+        }
+        if (!types.isSameType(adapter.j, type)) {
+            String message = "adapter " + adaptedType.getSimpleName()
+                + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type);
             error(javaType, message);
             if (!javaType.equals(origin)) {
                 error(origin, message);

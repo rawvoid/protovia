@@ -1440,6 +1440,30 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void protoAdaptedJavaTypeMismatchIsE8() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Money",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoAdapted;",
+                    "@ProtoAdapted(LocalDateEpochDay.class)",
+                    "public record Money(long cents) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Order",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class Order {",
+                    "  @ProtoField(number = 1) public Money total;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("handles LocalDate, not Money");
+        assertThat(compilation).failed();
+    }
+
+    @Test
     void protoAdaptedOnMoneyWorks() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
@@ -1621,6 +1645,31 @@ class ProtoviaProcessorTest {
         if (source.indexOf("reader.popLimit(oldLimit)") >= source.lastIndexOf("fromWire(kWire)")) {
             throw new AssertionError("fromWire must run after popLimit:\n" + source);
         }
+    }
+
+    @Test
+    void wrongMapFieldAdapterIsE8EvenWhenDiscoveryMatchesASide() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                uuidAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoAdapters;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "import java.util.Map;",
+                    "@ProtoMessage",
+                    "@ProtoAdapters(LocalDateEpochDay.class)",
+                    "public class Holder {",
+                    "  @ProtoField(number = 1, adapter = UuidString.class)",
+                    "  public Map<String, LocalDate> dates;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("handles UUID, not Map");
+        assertThat(compilation).failed();
     }
 
     @Test
