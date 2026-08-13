@@ -153,3 +153,12 @@ mvn test
 ```
 
 Java 21. Interop tests compare Protovia bytes with `protobuf-java` `DynamicMessage` in both directions.
+
+## Benchmarks
+
+`protovia-bench` compares Protovia with `protobuf-java` **4.35.1 generated** messages (not `DynamicMessage`):
+
+```bash
+mvn -pl protovia-bench -am package
+java -jar protovia-bench/target/benchmarks.jar
+```

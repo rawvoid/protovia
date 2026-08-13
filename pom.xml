@@ -18,6 +18,7 @@
         <module>protovia-runtime</module>
         <module>protovia-processor</module>
         <module>protovia-itest</module>
+        <module>protovia-bench</module>
     </modules>
 
     <properties>
@@ -29,7 +30,8 @@
         <project.build.sourceEncoding>${encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${encoding}</project.reporting.outputEncoding>
         <junit.version>5.11.4</junit.version>
-        <protobuf.version>4.29.3</protobuf.version>
+        <protobuf.version>4.35.1</protobuf.version>
+        <jmh.version>1.37</jmh.version>
         <compile-testing.version>0.21.0</compile-testing.version>
     </properties>
 
@@ -67,6 +69,16 @@
                 <artifactId>compile-testing</artifactId>
                 <version>${compile-testing.version}</version>
                 <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
