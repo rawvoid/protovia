@@ -6,6 +6,8 @@ import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,6 +43,15 @@ class WellKnownCodecTest {
         ProtoAny packed = new ProtoAny("type.googleapis.com/User", new byte[]{0x0A, 0x01, 'a'});
         ProtoAny back = decode(AnyCodec.INSTANCE, encode(AnyCodec.INSTANCE, packed));
         assertEquals(packed, back);
+    }
+
+    @Test
+    void timestampMergeKeepsExistingNanos() {
+        Instant existing = Instant.ofEpochSecond(10, 250);
+        byte[] onlySeconds = encode(TimestampCodec.INSTANCE, Instant.ofEpochSecond(20, 0));
+        Instant merged = TimestampCodec.INSTANCE.mergeFrom(
+                new ProtoReader(onlySeconds), existing);
+        assertEquals(Instant.ofEpochSecond(20, 250), merged);
     }
 
     @Test

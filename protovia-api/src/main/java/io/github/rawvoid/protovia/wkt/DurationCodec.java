@@ -69,8 +69,21 @@ public final class DurationCodec implements ProtoCodec<Duration> {
 
     @Override
     public Duration readFrom(ProtoReader reader) {
+        return mergeFrom(reader, Duration.ZERO);
+    }
+
+    @Override
+    public Duration mergeFrom(ProtoReader reader, Duration existing) {
         long seconds = 0L;
         int nanos = 0;
+        if (existing != null) {
+            seconds = existing.getSeconds();
+            nanos = existing.getNano();
+            if (seconds < 0 && nanos > 0) {
+                seconds += 1;
+                nanos -= 1_000_000_000;
+            }
+        }
         int tag;
         while ((tag = reader.readTag()) != 0) {
             switch (tag) {

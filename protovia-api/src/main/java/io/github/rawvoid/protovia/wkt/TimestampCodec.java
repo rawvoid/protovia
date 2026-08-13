@@ -61,8 +61,13 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
 
     @Override
     public Instant readFrom(ProtoReader reader) {
-        long seconds = 0L;
-        int nanos = 0;
+        return mergeFrom(reader, Instant.EPOCH);
+    }
+
+    @Override
+    public Instant mergeFrom(ProtoReader reader, Instant existing) {
+        long seconds = existing != null ? existing.getEpochSecond() : 0L;
+        int nanos = existing != null ? existing.getNano() : 0;
         int tag;
         while ((tag = reader.readTag()) != 0) {
             switch (tag) {
