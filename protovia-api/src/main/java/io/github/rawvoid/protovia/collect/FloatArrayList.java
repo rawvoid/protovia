@@ -1,14 +1,11 @@
 package io.github.rawvoid.protovia.collect;
 
-import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.RandomAccess;
 
-public final class FloatArrayList extends AbstractList<Float> implements RandomAccess {
+public final class FloatArrayList extends AbstractPrimitiveList<Float> {
 
     private float[] values;
-    private int size;
 
     public FloatArrayList() {
         this(10);
@@ -32,7 +29,7 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
     }
 
     public float getFloat(int index) {
-        rangeCheck(index);
+        checkElementIndex(index);
         return values[index];
     }
 
@@ -42,18 +39,13 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
 
     public void ensureCapacity(int minCapacity) {
         if (minCapacity > values.length) {
-            values = Arrays.copyOf(values, Math.max(values.length * 2, minCapacity));
+            values = Arrays.copyOf(values, grow(values.length, minCapacity));
         }
     }
 
     @Override
     public Float get(int index) {
         return getFloat(index);
-    }
-
-    @Override
-    public int size() {
-        return size;
     }
 
     @Override
@@ -64,9 +56,7 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
 
     @Override
     public void add(int index, Float value) {
-        if (index < 0 || index > size) {
-            throw new IndexOutOfBoundsException("index=" + index + " size=" + size);
-        }
+        checkPositionIndex(index);
         ensureCapacity(size + 1);
         System.arraycopy(values, index, values, index + 1, size - index);
         values[index] = value;
@@ -76,7 +66,7 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
 
     @Override
     public Float set(int index, Float value) {
-        rangeCheck(index);
+        checkElementIndex(index);
         float old = values[index];
         values[index] = value;
         return old;
@@ -84,7 +74,7 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
 
     @Override
     public Float remove(int index) {
-        rangeCheck(index);
+        checkElementIndex(index);
         float old = values[index];
         int moved = size - index - 1;
         if (moved > 0) {
@@ -93,11 +83,5 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
         size--;
         modCount++;
         return old;
-    }
-
-    private void rangeCheck(int index) {
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException("index=" + index + " size=" + size);
-        }
     }
 }

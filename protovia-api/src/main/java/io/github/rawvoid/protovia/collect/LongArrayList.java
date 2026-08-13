@@ -1,14 +1,11 @@
 package io.github.rawvoid.protovia.collect;
 
-import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.RandomAccess;
 
-public final class LongArrayList extends AbstractList<Long> implements RandomAccess {
+public final class LongArrayList extends AbstractPrimitiveList<Long> {
 
     private long[] values;
-    private int size;
 
     public LongArrayList() {
         this(10);
@@ -32,7 +29,7 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
     }
 
     public long getLong(int index) {
-        rangeCheck(index);
+        checkElementIndex(index);
         return values[index];
     }
 
@@ -42,18 +39,13 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
 
     public void ensureCapacity(int minCapacity) {
         if (minCapacity > values.length) {
-            values = Arrays.copyOf(values, Math.max(values.length * 2, minCapacity));
+            values = Arrays.copyOf(values, grow(values.length, minCapacity));
         }
     }
 
     @Override
     public Long get(int index) {
         return getLong(index);
-    }
-
-    @Override
-    public int size() {
-        return size;
     }
 
     @Override
@@ -64,9 +56,7 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
 
     @Override
     public void add(int index, Long value) {
-        if (index < 0 || index > size) {
-            throw new IndexOutOfBoundsException("index=" + index + " size=" + size);
-        }
+        checkPositionIndex(index);
         ensureCapacity(size + 1);
         System.arraycopy(values, index, values, index + 1, size - index);
         values[index] = value;
@@ -76,7 +66,7 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
 
     @Override
     public Long set(int index, Long value) {
-        rangeCheck(index);
+        checkElementIndex(index);
         long old = values[index];
         values[index] = value;
         return old;
@@ -84,7 +74,7 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
 
     @Override
     public Long remove(int index) {
-        rangeCheck(index);
+        checkElementIndex(index);
         long old = values[index];
         int moved = size - index - 1;
         if (moved > 0) {
@@ -93,11 +83,5 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
         size--;
         modCount++;
         return old;
-    }
-
-    private void rangeCheck(int index) {
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException("index=" + index + " size=" + size);
-        }
     }
 }

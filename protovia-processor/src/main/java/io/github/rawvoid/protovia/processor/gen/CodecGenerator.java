@@ -900,79 +900,88 @@ public final class CodecGenerator {
     }
 
     private String arrayBuilderType(FieldModel field) {
-        String primitive = field.primitiveListType();
-        if (primitive != null) {
-            return primitive;
+        PrimitiveListSpec spec = primitiveListSpec(field);
+        if (spec != null) {
+            return spec.listType();
         }
         return "java.util.ArrayList<" + boxed(field.element) + ">";
     }
 
     private String toArray(FieldModel field, String listVar) {
-        String primitive = field.primitiveListType();
-        if (primitive != null) {
-            if (primitive.endsWith("IntArrayList")) {
-                return listVar + ".toIntArray()";
-            }
-            if (primitive.endsWith("LongArrayList")) {
-                return listVar + ".toLongArray()";
-            }
-            if (primitive.endsWith("FloatArrayList")) {
-                return listVar + ".toFloatArray()";
-            }
-            if (primitive.endsWith("DoubleArrayList")) {
-                return listVar + ".toDoubleArray()";
-            }
-            if (primitive.endsWith("BooleanArrayList")) {
-                return listVar + ".toBooleanArray()";
-            }
+        PrimitiveListSpec spec = primitiveListSpec(field);
+        if (spec != null) {
+            return listVar + "." + spec.toArray() + "()";
         }
         return listVar + ".toArray(new " + field.arrayComponentType + "[0])";
     }
 
     private String primitiveAddCall(FieldModel field, String list, String value) {
-        String primitive = field.primitiveListType();
-        if (primitive == null) {
+        PrimitiveListSpec spec = primitiveListSpec(field);
+        if (spec == null) {
             return null;
         }
-        if (primitive.endsWith("IntArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.addInt(" + list + ", " + value + ")";
+        return "io.github.rawvoid.protovia.collect.ProtoLists." + spec.add() + "(" + list + ", " + value + ")";
+    }
+
+    private String packedEnsureCall(FieldModel field, String list) {
+        PrimitiveListSpec spec = primitiveListSpec(field);
+        if (spec == null) {
+            return null;
         }
-        if (primitive.endsWith("LongArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.addLong(" + list + ", " + value + ")";
+        return "io.github.rawvoid.protovia.collect.ProtoLists." + spec.ensure() + "(" + list + ", reader.remaining())";
+    }
+
+    private static PrimitiveListSpec primitiveListSpec(FieldModel field) {
+        String type = field.primitiveListType();
+        if (type == null) {
+            return null;
         }
-        if (primitive.endsWith("FloatArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.addFloat(" + list + ", " + value + ")";
-        }
-        if (primitive.endsWith("DoubleArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.addDouble(" + list + ", " + value + ")";
-        }
-        if (primitive.endsWith("BooleanArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.addBoolean(" + list + ", " + value + ")";
+        for (PrimitiveListSpec spec : PrimitiveListSpec.values()) {
+            if (type.endsWith(spec.simpleName())) {
+                return spec;
+            }
         }
         return null;
     }
 
-    private String packedEnsureCall(FieldModel field, String list) {
-        String primitive = field.primitiveListType();
-        if (primitive == null) {
-            return null;
+    private enum PrimitiveListSpec {
+        INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray"),
+        LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray"),
+        FLOAT("FloatArrayList", "addFloat", "ensureFloatCapacity", "toFloatArray"),
+        DOUBLE("DoubleArrayList", "addDouble", "ensureDoubleCapacity", "toDoubleArray"),
+        BOOLEAN("BooleanArrayList", "addBoolean", "ensureBooleanCapacity", "toBooleanArray");
+
+        private final String simpleName;
+        private final String add;
+        private final String ensure;
+        private final String toArray;
+
+        PrimitiveListSpec(String simpleName, String add, String ensure, String toArray) {
+            this.simpleName = simpleName;
+            this.add = add;
+            this.ensure = ensure;
+            this.toArray = toArray;
         }
-        if (primitive.endsWith("IntArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureIntCapacity(" + list + ", reader.remaining())";
+
+        String simpleName() {
+            return simpleName;
         }
-        if (primitive.endsWith("LongArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureLongCapacity(" + list + ", reader.remaining())";
+
+        String listType() {
+            return "io.github.rawvoid.protovia.collect." + simpleName;
         }
-        if (primitive.endsWith("FloatArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureFloatCapacity(" + list + ", reader.remaining())";
+
+        String add() {
+            return add;
         }
-        if (primitive.endsWith("DoubleArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureDoubleCapacity(" + list + ", reader.remaining())";
+
+        String ensure() {
+            return ensure;
         }
-        if (primitive.endsWith("BooleanArrayList")) {
-            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureBooleanCapacity(" + list + ", reader.remaining())";
+
+        String toArray() {
+            return toArray;
         }
-        return null;
     }
 
     private static int packedFixedWidth(FieldModel element) {
