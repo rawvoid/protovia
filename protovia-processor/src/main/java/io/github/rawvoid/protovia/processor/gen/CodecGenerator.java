@@ -21,6 +21,7 @@ public final class CodecGenerator {
             w.line("");
         }
         w.line("import io.github.rawvoid.protovia.ProtoException;");
+        w.line("import io.github.rawvoid.protovia.UnknownFields;");
         w.line("import io.github.rawvoid.protovia.codec.ProtoCodec;");
         w.line("import io.github.rawvoid.protovia.wire.CodedSize;");
         w.line("import io.github.rawvoid.protovia.wire.ProtoReader;");
@@ -83,6 +84,12 @@ public final class CodecGenerator {
         w.line("int size = 0;");
         for (FieldModel field : model.fields) {
             emitComputeField(w, field);
+        }
+        if (model.unknown != null) {
+            w.line("UnknownFields " + model.unknown.localName() + " = " + model.unknown.readExpr() + ";");
+            w.open("if (" + model.unknown.localName() + " != null)");
+            w.line("size += " + model.unknown.localName() + ".serializedSize();");
+            w.close();
         }
         w.line("return size;");
         w.close();
@@ -191,6 +198,12 @@ public final class CodecGenerator {
         w.open("public void writeTo(ProtoWriter writer, " + model.typeName + " value)");
         for (FieldModel field : model.fields) {
             emitWriteField(w, field);
+        }
+        if (model.unknown != null) {
+            w.line("UnknownFields " + model.unknown.localName() + " = " + model.unknown.readExpr() + ";");
+            w.open("if (" + model.unknown.localName() + " != null)");
+            w.line(model.unknown.localName() + ".writeTo(writer);");
+            w.close();
         }
         w.close();
     }
@@ -302,13 +315,16 @@ public final class CodecGenerator {
                 w.line(arrayBuilderType(field) + " " + field.localName + "Builder = null;");
             }
         }
+        if (model.unknown != null) {
+            emitUnknownInit(w, model);
+        }
         w.line("int tag;");
         w.open("while ((tag = reader.readTag()) != 0)");
         w.open("switch (tag)");
         for (FieldModel field : model.fields) {
             emitReadCases(w, field, false);
         }
-        w.line("default -> reader.skipField();");
+        emitUnknownDefault(w, model);
         w.close();
         w.close();
         for (FieldModel field : model.fields) {
@@ -318,12 +334,15 @@ public final class CodecGenerator {
                 w.close();
             }
         }
+        if (model.unknown != null) {
+            emitUnknownStore(w, model);
+        }
         w.line("return msg;");
     }
 
     private void emitReadRecord(JavaWriter w, MessageModel model) {
         for (MessageModel.RecordComponentModel component : model.recordComponents) {
-            emitRecordComponentInit(w, component);
+            emitRecordComponentInit(w, model, component);
         }
         for (FieldModel field : model.fields) {
             if (field.array) {
@@ -336,7 +355,7 @@ public final class CodecGenerator {
         for (FieldModel field : model.fields) {
             emitReadCases(w, field, true);
         }
-        w.line("default -> reader.skipField();");
+        emitUnknownDefault(w, model);
         w.close();
         w.close();
         for (FieldModel field : model.fields) {
@@ -445,9 +464,40 @@ public final class CodecGenerator {
         }
     }
 
-    private void emitRecordComponentInit(JavaWriter w, MessageModel.RecordComponentModel component) {
+    private void emitUnknownInit(JavaWriter w, MessageModel model) {
+        MessageModel.UnknownField u = model.unknown;
+        String current = u.readExpr().replace("value.", "msg.");
+        w.line("UnknownFields " + u.localName() + " = " + current + " != null ? "
+                + current + " : UnknownFields.EMPTY;");
+    }
+
+    private void emitUnknownDefault(JavaWriter w, MessageModel model) {
+        if (model.unknown != null) {
+            w.line("default -> " + model.unknown.localName() + " = UnknownFields.merge("
+                    + model.unknown.localName() + ", reader);");
+        } else {
+            w.line("default -> reader.skipField();");
+        }
+    }
+
+    private void emitUnknownStore(JavaWriter w, MessageModel model) {
+        MessageModel.UnknownField u = model.unknown;
+        if (u.accessKind() == AccessKind.FIELD) {
+            w.line("msg." + u.fieldName() + " = " + u.localName() + ";");
+        } else {
+            w.line("msg." + u.setterName() + "(" + u.localName() + ");");
+        }
+    }
+
+    private void emitRecordComponentInit(
+            JavaWriter w, MessageModel model, MessageModel.RecordComponentModel component) {
         String local = Names.safeLocal(component.name());
         String fromExisting = "existing." + component.name() + "()";
+        if (model.unknown != null && component.name().equals(model.unknown.name())) {
+            w.line("UnknownFields " + local + " = existing != null && " + fromExisting + " != null");
+            w.line("        ? " + fromExisting + " : UnknownFields.EMPTY;");
+            return;
+        }
         FieldModel field = component.field();
         if (field != null && (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP)) {
             w.line(component.typeName() + " " + local + " = existing != null && " + fromExisting + " != null");

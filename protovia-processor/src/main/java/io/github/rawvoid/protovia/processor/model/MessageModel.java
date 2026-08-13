@@ -12,6 +12,7 @@ public final class MessageModel {
     public final boolean record;
     public final List<FieldModel> fields;
     public final List<RecordComponentModel> recordComponents;
+    public final UnknownField unknown;
 
     public MessageModel(
             TypeElement type,
@@ -20,7 +21,8 @@ public final class MessageModel {
             String codecSimpleName,
             boolean record,
             List<FieldModel> fields,
-            List<RecordComponentModel> recordComponents) {
+            List<RecordComponentModel> recordComponents,
+            UnknownField unknown) {
         this.type = type;
         this.packageName = packageName;
         this.typeName = typeName;
@@ -28,8 +30,18 @@ public final class MessageModel {
         this.record = record;
         this.fields = List.copyOf(fields);
         this.recordComponents = List.copyOf(recordComponents);
+        this.unknown = unknown;
     }
 
     public record RecordComponentModel(String name, String typeName, String defaultExpr, FieldModel field) {
+    }
+
+    public record UnknownField(
+            AccessKind accessKind,
+            String name,
+            String localName,
+            String readExpr,
+            String setterName,
+            String fieldName) {
     }
 }

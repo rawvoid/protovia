@@ -6,6 +6,7 @@ import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.ByteString;
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.itest.model.Address;
+import io.github.rawvoid.protovia.itest.model.Envelope;
 import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
 import org.junit.jupiter.api.BeforeAll;
@@ -138,6 +139,37 @@ class OfficialInteropTest {
         assertEquals(List.of(8, 9), back.getUnpacked());
         assertArrayEquals(new byte[]{1, 2, 3}, back.getPayload());
         assertEquals(99, back.getScores().get("math"));
+    }
+
+    @Test
+    void unknownFieldsSurviveDynamicMessage() throws Exception {
+        Envelope env = new Envelope();
+        env.name = "Ada";
+        byte[] base = ProtoVia.toBytes(env);
+
+        DescriptorProtos.DescriptorProto extra = DescriptorProtos.DescriptorProto.newBuilder()
+                .setName("Envelope")
+                .addField(field("name", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+                .addField(field("secret", 15, DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT32))
+                .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+                DescriptorProtos.FileDescriptorProto.newBuilder()
+                        .setName("envelope.proto")
+                        .setSyntax("proto3")
+                        .addMessageType(extra)
+                        .build(),
+                new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("Envelope");
+
+        DynamicMessage richer = DynamicMessage.newBuilder(desc)
+                .setField(desc.findFieldByName("name"), "Ada")
+                .setField(desc.findFieldByName("secret"), 99)
+                .build();
+        Envelope captured = ProtoVia.fromBytes(Envelope.class, richer.toByteArray());
+        assertEquals("Ada", captured.name);
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(captured));
+        assertEquals(99, parsed.getField(desc.findFieldByName("secret")));
+        assertEquals(base.length < ProtoVia.toBytes(captured).length, true);
     }
 
     @Test

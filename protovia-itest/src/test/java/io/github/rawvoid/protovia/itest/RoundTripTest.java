@@ -4,6 +4,7 @@ import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.itest.model.Address;
+import io.github.rawvoid.protovia.itest.model.Envelope;
 import io.github.rawvoid.protovia.itest.model.NodeA;
 import io.github.rawvoid.protovia.itest.model.NodeB;
 import io.github.rawvoid.protovia.itest.model.Status;
@@ -157,6 +158,53 @@ class RoundTripTest {
         user.setRanks(Arrays.asList(1, null, 3));
         ProtoWriter writer = ProtoWriter.growing();
         assertThrows(ProtoException.class, () -> UserProtoCodec.INSTANCE.writeTo(writer, user));
+    }
+
+    @Test
+    void unknownFieldsRoundTrip() {
+        Envelope env = new Envelope();
+        env.name = "keep";
+        byte[] known = ProtoVia.toBytes(env);
+
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeRawBytes(known, 0, known.length);
+        extra.writeInt32(15, 42);
+        extra.writeString(16, "x");
+
+        Envelope back = ProtoVia.fromBytes(Envelope.class, extra.toByteArray());
+        assertEquals("keep", back.name);
+        assertTrue(back.unknownFields != null && !back.unknownFields.isEmpty());
+
+        Envelope again = ProtoVia.fromBytes(Envelope.class, ProtoVia.toBytes(back));
+        assertEquals("keep", again.name);
+
+        ProtoReader r = new ProtoReader(ProtoVia.toBytes(back));
+        int extraInt = 0;
+        String extraStr = null;
+        int tag;
+        while ((tag = r.readTag()) != 0) {
+            switch (tag) {
+                case 10 -> assertEquals("keep", r.readString());
+                case 120 -> extraInt = r.readInt32();
+                case 130 -> extraStr = r.readString();
+                default -> r.skipField();
+            }
+        }
+        assertEquals(42, extraInt);
+        assertEquals("x", extraStr);
+    }
+
+    @Test
+    void userWithoutUnknownSlotStillSkips() {
+        User user = new User();
+        user.setName("n");
+        byte[] known = ProtoVia.toBytes(user);
+        byte[] extra = new byte[known.length + 2];
+        System.arraycopy(known, 0, extra, 0, known.length);
+        extra[known.length] = 0x78;
+        extra[known.length + 1] = 0x01;
+        User back = ProtoVia.fromBytes(User.class, extra);
+        assertEquals("n", back.getName());
     }
 
     @Test

@@ -5,6 +5,7 @@ import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import javax.annotation.processing.Messager;
@@ -160,10 +161,11 @@ public final class SchemaParser {
         Set<String> claimed = new HashSet<>();
 
         List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
+        MessageModel.UnknownField[] unknown = new MessageModel.UnknownField[1];
         if (record) {
-            parseRecord(type, pkg, byNumber, claimed, recordComponents);
+            parseRecord(type, pkg, byNumber, claimed, recordComponents, unknown);
         } else {
-            parsePojo(type, pkg, byNumber, claimed);
+            parsePojo(type, pkg, byNumber, claimed, unknown);
         }
 
         if (byNumber.isEmpty()) {
@@ -181,7 +183,8 @@ public final class SchemaParser {
                 Names.codecSimpleName(elements, type),
                 record,
                 fields,
-                recordComponents);
+                recordComponents,
+                unknown[0]);
     }
 
     private void parseRecord(
@@ -189,8 +192,27 @@ public final class SchemaParser {
             String pkg,
             Map<Integer, FieldModel> byNumber,
             Set<String> claimed,
-            List<MessageModel.RecordComponentModel> recordComponents) {
+            List<MessageModel.RecordComponentModel> recordComponents,
+            MessageModel.UnknownField[] unknown) {
         for (RecordComponentElement component : type.getRecordComponents()) {
+            if (component.getAnnotation(ProtoUnknown.class) != null
+                    || (component.getAccessor() != null
+                    && component.getAccessor().getAnnotation(ProtoUnknown.class) != null)) {
+                if (component.getAnnotation(ProtoField.class) != null) {
+                    error(component, "cannot combine @ProtoUnknown with @ProtoField");
+                    continue;
+                }
+                String name = component.getSimpleName().toString();
+                if (bindUnknown(component, component.asType(), AccessKind.RECORD,
+                        "value." + name + "()", null, name, unknown)) {
+                    recordComponents.add(new MessageModel.RecordComponentModel(
+                            name,
+                            "io.github.rawvoid.protovia.UnknownFields",
+                            "io.github.rawvoid.protovia.UnknownFields.EMPTY",
+                            null));
+                }
+                continue;
+            }
             ProtoField ann = component.getAnnotation(ProtoField.class);
             if (ann == null) {
                 ExecutableElement accessor = component.getAccessor();
@@ -225,7 +247,12 @@ public final class SchemaParser {
         }
     }
 
-    private void parsePojo(TypeElement type, String pkg, Map<Integer, FieldModel> byNumber, Set<String> claimed) {
+    private void parsePojo(
+            TypeElement type,
+            String pkg,
+            Map<Integer, FieldModel> byNumber,
+            Set<String> claimed,
+            MessageModel.UnknownField[] unknown) {
         Map<String, VariableElement> fields = new HashMap<>();
         Map<String, ExecutableElement> methods = new HashMap<>();
         for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
@@ -243,6 +270,18 @@ public final class SchemaParser {
 
         Set<String> annotatedViaField = new HashSet<>();
         for (VariableElement field : fields.values()) {
+            if (field.getAnnotation(ProtoUnknown.class) != null) {
+                if (field.getAnnotation(ProtoField.class) != null) {
+                    error(field, "cannot combine @ProtoUnknown with @ProtoField");
+                    continue;
+                }
+                String name = field.getSimpleName().toString();
+                Access access = resolvePojoAccess(type, field, name, field.asType(), methods);
+                if (access != null) {
+                    bindUnknown(field, field.asType(), access.kind, access.readExpr, access.setter, name, unknown);
+                }
+                continue;
+            }
             ProtoField ann = field.getAnnotation(ProtoField.class);
             if (ann == null) {
                 continue;
@@ -261,6 +300,32 @@ public final class SchemaParser {
         }
 
         for (ExecutableElement method : methods.values()) {
+            if (method.getAnnotation(ProtoUnknown.class) != null) {
+                if (method.getAnnotation(ProtoField.class) != null) {
+                    error(method, "cannot combine @ProtoUnknown with @ProtoField");
+                    continue;
+                }
+                String property = Names.propertyFromGetter(method.getSimpleName().toString());
+                if (property == null) {
+                    error(method, "@ProtoUnknown on a method must be a JavaBean getter");
+                    continue;
+                }
+                String setter = Names.setterName(property);
+                ExecutableElement set = methods.get(setter);
+                if (set == null || set.getParameters().size() != 1) {
+                    error(method, "annotated getter '" + method.getSimpleName() + "' has no matching setter " + setter);
+                    continue;
+                }
+                bindUnknown(
+                        method,
+                        method.getReturnType(),
+                        AccessKind.GETTER_SETTER,
+                        "value." + method.getSimpleName() + "()",
+                        setter,
+                        property,
+                        unknown);
+                continue;
+            }
             ProtoField ann = method.getAnnotation(ProtoField.class);
             if (ann == null) {
                 continue;
@@ -294,6 +359,33 @@ public final class SchemaParser {
                 addField(byNumber, claimed, model);
             }
         }
+    }
+
+    private boolean bindUnknown(
+            Element origin,
+            TypeMirror type,
+            AccessKind accessKind,
+            String readExpr,
+            String setter,
+            String name,
+            MessageModel.UnknownField[] unknown) {
+        TypeElement expected = elements.getTypeElement("io.github.rawvoid.protovia.UnknownFields");
+        if (expected == null || !types.isSameType(types.erasure(type), expected.asType())) {
+            error(origin, "@ProtoUnknown must be of type UnknownFields");
+            return false;
+        }
+        if (unknown[0] != null) {
+            error(origin, "at most one @ProtoUnknown per message");
+            return false;
+        }
+        unknown[0] = new MessageModel.UnknownField(
+                accessKind,
+                name,
+                Names.safeLocal(name),
+                readExpr,
+                setter,
+                name);
+        return true;
     }
 
     private Access resolvePojoAccess(

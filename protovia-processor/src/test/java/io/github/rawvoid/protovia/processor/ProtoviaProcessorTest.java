@@ -148,6 +148,47 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void unknownFieldsSlotGeneratesMerge() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Env",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.UnknownFields;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                        "@ProtoMessage",
+                        "public class Env {",
+                        "  @ProtoField(number = 1) public String name;",
+                        "  @ProtoUnknown public UnknownFields unknown;",
+                        "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.EnvProtoCodec")
+                .contentsAsUtf8String()
+                .contains("UnknownFields.merge");
+    }
+
+    @Test
+    void unknownMustBeUnknownFieldsType() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Env",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                        "@ProtoMessage",
+                        "public class Env {",
+                        "  @ProtoField(number = 1) public String name;",
+                        "  @ProtoUnknown public byte[] unknown;",
+                        "}"));
+        assertThat(compilation).hadErrorContaining("UnknownFields");
+    }
+
+    @Test
     void boxedIntegerArrayUsesToArrayNotToIntArray() {
         Compilation compilation = javac()
                 .withProcessors(new ProtoviaProcessor())
