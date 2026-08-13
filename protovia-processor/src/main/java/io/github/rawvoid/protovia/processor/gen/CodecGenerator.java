@@ -194,32 +194,36 @@ public final class CodecGenerator {
 
     private void emitWriteField(JavaWriter w, FieldModel field) {
         w.line(field.javaTypeName + " " + field.localName + " = " + field.readExpr + ";");
+        String tag = Names.tagConstant(field.name);
         switch (field.kind) {
             case SCALAR -> {
                 String valueExpr = field.javaOptional ? field.localName + ".get()" : field.localName;
                 w.open("if (" + presentCondition(field, field.localName, field.optional, field.javaOptional) + ")");
-                w.line(writeCall("writer", field, field.number, valueExpr) + ";");
+                w.line("writer.writeUInt32NoTag(" + tag + ");");
+                w.line(writeNoTag("writer", field, valueExpr) + ";");
                 w.close();
             }
             case ENUM -> {
                 String helper = enumNumberHelper(field.enumModel);
                 if (field.optional) {
                     w.open("if (" + field.localName + " != null)");
-                    w.line("writer.writeEnum(" + field.number + ", " + helper + "(" + field.localName + "));");
+                    w.line("writer.writeUInt32NoTag(" + tag + ");");
+                    w.line("writer.writeInt32NoTag(" + helper + "(" + field.localName + "));");
                     w.close();
                 } else {
                     w.open("if (" + field.localName + " != null)");
                     w.line("int " + field.localName + "Number = " + helper + "(" + field.localName + ");");
                     w.open("if (" + field.localName + "Number != 0)");
-                    w.line("writer.writeEnum(" + field.number + ", " + field.localName + "Number);");
+                    w.line("writer.writeUInt32NoTag(" + tag + ");");
+                    w.line("writer.writeInt32NoTag(" + field.localName + "Number);");
                     w.close();
                     w.close();
                 }
             }
             case MESSAGE -> {
                 w.open("if (" + field.localName + " != null)");
-                w.line("writer.writeMessage(" + field.number + ", " + field.codecName + ".INSTANCE, "
-                        + field.localName + ");");
+                w.line("writer.writeUInt32NoTag(" + tag + ");");
+                w.line("writer.writeMessageNoTag(" + field.codecName + ".INSTANCE, " + field.localName + ");");
                 w.close();
             }
             case REPEATED -> emitWriteRepeated(w, field);
@@ -230,11 +234,12 @@ public final class CodecGenerator {
     private void emitWriteRepeated(JavaWriter w, FieldModel field) {
         String empty = field.array ? field.localName + ".length == 0" : field.localName + ".isEmpty()";
         w.open("if (" + field.localName + " != null && !" + empty + ")");
+        String tag = Names.tagConstant(field.name);
         if (field.packed && field.packable()) {
             w.line("int " + field.localName + "Packed = writer.hasCachedSize()");
             w.line("        ? writer.takeSize()");
             w.line("        : " + packedSizeHelper(field) + "(" + field.localName + ");");
-            w.line("writer.writeTag(" + field.number + ", WireType.LEN);");
+            w.line("writer.writeUInt32NoTag(" + tag + "_PACKED);");
             w.line("writer.writeUInt32NoTag(" + field.localName + "Packed);");
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
             if (field.element.kind == FieldKind.ENUM) {
@@ -246,13 +251,13 @@ public final class CodecGenerator {
         } else {
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
             emitNullElementCheck(w, field.element, "item", field.name);
+            w.line("writer.writeUInt32NoTag(" + tag + ");");
             if (field.element.kind == FieldKind.ENUM) {
-                w.line("writer.writeEnum(" + field.number + ", " + enumNumberHelper(field.element.enumModel)
-                        + "(item));");
+                w.line("writer.writeInt32NoTag(" + enumNumberHelper(field.element.enumModel) + "(item));");
             } else if (field.element.kind == FieldKind.MESSAGE) {
-                w.line("writer.writeMessage(" + field.number + ", " + field.element.codecName + ".INSTANCE, item);");
+                w.line("writer.writeMessageNoTag(" + field.element.codecName + ".INSTANCE, item);");
             } else {
-                w.line(writeCall("writer", field.element, field.number, "item") + ";");
+                w.line(writeNoTag("writer", field.element, "item") + ";");
             }
             w.close();
         }
@@ -567,16 +572,27 @@ public final class CodecGenerator {
             }
             w.line("");
             w.open("private static int " + packedSizeHelper(field) + "(" + field.javaTypeName + " values)");
-            w.line("int packed = 0;");
-            w.open("for (" + field.element.javaTypeName + " item : values)");
-            emitNullElementCheck(w, field.element, "item", field.name);
-            if (field.element.kind == FieldKind.ENUM) {
-                w.line("packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel) + "(item));");
+            int width = packedFixedWidth(field.element);
+            if (width > 0) {
+                if (!field.element.primitive) {
+                    w.open("for (" + field.element.javaTypeName + " item : values)");
+                    emitNullElementCheck(w, field.element, "item", field.name);
+                    w.close();
+                }
+                String count = field.array ? "values.length" : "values.size()";
+                w.line("return " + count + " * " + width + ";");
             } else {
-                w.line("packed += " + sizeNoTag(field.element, "item") + ";");
+                w.line("int packed = 0;");
+                w.open("for (" + field.element.javaTypeName + " item : values)");
+                emitNullElementCheck(w, field.element, "item", field.name);
+                if (field.element.kind == FieldKind.ENUM) {
+                    w.line("packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel) + "(item));");
+                } else {
+                    w.line("packed += " + sizeNoTag(field.element, "item") + ";");
+                }
+                w.close();
+                w.line("return packed;");
             }
-            w.close();
-            w.line("return packed;");
             w.close();
         }
     }
@@ -608,7 +624,7 @@ public final class CodecGenerator {
             w.line("int entrySize = writer.hasCachedSize()");
             w.line("        ? writer.takeSize()");
             w.line("        : " + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP);");
-            w.line("writer.writeTag(" + field.number + ", WireType.LEN);");
+            w.line("writer.writeUInt32NoTag(" + Names.tagConstant(field.name) + ");");
             w.line("writer.writeUInt32NoTag(entrySize);");
             emitMapEntryWrite(w, field.mapKey, "k", 1);
             emitMapEntryWrite(w, field.mapValue, "v", 2);
@@ -638,19 +654,23 @@ public final class CodecGenerator {
     }
 
     private void emitMapEntryWrite(JavaWriter w, FieldModel part, String var, int number) {
+        int tag = WireType.tag(number, unpackedWire(part));
         if (part.kind == FieldKind.MESSAGE) {
-            w.line("writer.writeMessage(" + number + ", " + part.codecName + ".INSTANCE, " + var + ");");
+            w.line("writer.writeUInt32NoTag(" + tag + ");");
+            w.line("writer.writeMessageNoTag(" + part.codecName + ".INSTANCE, " + var + ");");
             return;
         }
         if (part.kind == FieldKind.ENUM) {
             w.line("int " + var + "N = " + enumNumberHelper(part.enumModel) + "(" + var + ");");
             w.open("if (" + var + "N != 0)");
-            w.line("writer.writeEnum(" + number + ", " + var + "N);");
+            w.line("writer.writeUInt32NoTag(" + tag + ");");
+            w.line("writer.writeInt32NoTag(" + var + "N);");
             w.close();
             return;
         }
         w.open("if (" + mapDefaultSkip(part, var) + ")");
-        w.line(writeCall("writer", part, number, var) + ";");
+        w.line("writer.writeUInt32NoTag(" + tag + ");");
+        w.line(writeNoTag("writer", part, var) + ";");
         w.close();
     }
 
@@ -750,13 +770,10 @@ public final class CodecGenerator {
 
     private void emitArrayCopyHelpers(JavaWriter w, MessageModel model) {
         for (FieldModel field : model.fields) {
-            if (!field.array) {
+            if (!field.array || !isPrimitiveArrayComponent(field.arrayComponentType)) {
                 continue;
             }
             String component = field.arrayComponentType;
-            if (!"float".equals(component) && !"boolean".equals(component)) {
-                continue;
-            }
             w.line("");
             w.open("private static " + component + "[] copy" + Names.capitalize(field.name)
                     + "Array(java.util.List<" + boxed(field.element) + "> values)");
@@ -771,19 +788,30 @@ public final class CodecGenerator {
 
     private String toArray(FieldModel field, String listVar) {
         String component = field.arrayComponentType;
-        if ("int".equals(component)) {
-            return listVar + ".stream().mapToInt(i -> i).toArray()";
-        }
-        if ("long".equals(component)) {
-            return listVar + ".stream().mapToLong(i -> i).toArray()";
-        }
-        if ("double".equals(component)) {
-            return listVar + ".stream().mapToDouble(i -> i).toArray()";
-        }
-        if ("float".equals(component) || "boolean".equals(component)) {
+        if (isPrimitiveArrayComponent(component)) {
             return "copy" + Names.capitalize(field.name) + "Array(" + listVar + ")";
         }
         return listVar + ".toArray(new " + component + "[0])";
+    }
+
+    private static boolean isPrimitiveArrayComponent(String component) {
+        return "int".equals(component)
+                || "long".equals(component)
+                || "float".equals(component)
+                || "double".equals(component)
+                || "boolean".equals(component);
+    }
+
+    private static int packedFixedWidth(FieldModel element) {
+        if (element.kind != FieldKind.SCALAR || element.protoType == null) {
+            return 0;
+        }
+        return switch (element.protoType) {
+            case BOOL -> 1;
+            case FIXED32, SFIXED32, FLOAT -> 4;
+            case FIXED64, SFIXED64, DOUBLE -> 8;
+            default -> 0;
+        };
     }
 
     private String boxed(FieldModel field) {
@@ -872,29 +900,10 @@ public final class CodecGenerator {
         };
     }
 
-    private String writeCall(String writer, FieldModel field, int number, String value) {
-        return switch (field.protoType) {
-            case INT32 -> writer + ".writeInt32(" + number + ", " + value + ")";
-            case UINT32 -> writer + ".writeUInt32(" + number + ", " + value + ")";
-            case SINT32 -> writer + ".writeSInt32(" + number + ", " + value + ")";
-            case INT64 -> writer + ".writeInt64(" + number + ", " + value + ")";
-            case UINT64 -> writer + ".writeUInt64(" + number + ", " + value + ")";
-            case SINT64 -> writer + ".writeSInt64(" + number + ", " + value + ")";
-            case BOOL -> writer + ".writeBool(" + number + ", " + value + ")";
-            case FIXED32 -> writer + ".writeFixed32(" + number + ", " + value + ")";
-            case SFIXED32 -> writer + ".writeSFixed32(" + number + ", " + value + ")";
-            case FLOAT -> writer + ".writeFloat(" + number + ", " + value + ")";
-            case FIXED64 -> writer + ".writeFixed64(" + number + ", " + value + ")";
-            case SFIXED64 -> writer + ".writeSFixed64(" + number + ", " + value + ")";
-            case DOUBLE -> writer + ".writeDouble(" + number + ", " + value + ")";
-            case STRING -> writer + ".writeString(" + number + ", " + value + ")";
-            case BYTES -> writer + ".writeBytes(" + number + ", " + value + ")";
-            case ENUM -> writer + ".writeEnum(" + number + ", " + value + ")";
-            default -> writer + ".writeInt32(" + number + ", " + value + ")";
-        };
-    }
-
     private String writeNoTag(String writer, FieldModel field, String value) {
+        if (field.byteBuffer) {
+            return writer + ".writeBytesNoTag(" + value + ")";
+        }
         return switch (field.protoType) {
             case INT32, ENUM -> writer + ".writeInt32NoTag(" + value + ")";
             case UINT32 -> writer + ".writeUInt32NoTag(" + value + ")";
@@ -906,6 +915,8 @@ public final class CodecGenerator {
             case FLOAT -> writer + ".writeFloatNoTag(" + value + ")";
             case FIXED64, SFIXED64 -> writer + ".writeFixed64NoTag(" + value + ")";
             case DOUBLE -> writer + ".writeDoubleNoTag(" + value + ")";
+            case STRING -> writer + ".writeStringNoTag(" + value + ")";
+            case BYTES -> writer + ".writeBytesNoTag(" + value + ")";
             default -> writer + ".writeInt32NoTag(" + value + ")";
         };
     }

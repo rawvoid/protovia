@@ -184,13 +184,25 @@ public final class ProtoWriter {
 
     public void writeBytes(int fieldNumber, byte[] value, int offset, int length) {
         writeTag(fieldNumber, WireType.LEN);
+        writeBytesNoTag(value, offset, length);
+    }
+
+    public void writeBytes(int fieldNumber, ByteBuffer value) {
+        writeTag(fieldNumber, WireType.LEN);
+        writeBytesNoTag(value);
+    }
+
+    public void writeBytesNoTag(byte[] value) {
+        writeBytesNoTag(value, 0, value.length);
+    }
+
+    public void writeBytesNoTag(byte[] value, int offset, int length) {
         writeUInt32NoTag(length);
         writeRawBytes(value, offset, length);
     }
 
-    public void writeBytes(int fieldNumber, ByteBuffer value) {
+    public void writeBytesNoTag(ByteBuffer value) {
         int length = value.remaining();
-        writeTag(fieldNumber, WireType.LEN);
         writeUInt32NoTag(length);
         if (value.hasArray()) {
             writeRawBytes(value.array(), value.arrayOffset() + value.position(), length);
@@ -203,8 +215,12 @@ public final class ProtoWriter {
     }
 
     public <T> void writeMessage(int fieldNumber, ProtoCodec<T> codec, T value) {
-        int size = hasCachedSize() ? takeSize() : codec.computeSize(value);
         writeTag(fieldNumber, WireType.LEN);
+        writeMessageNoTag(codec, value);
+    }
+
+    public <T> void writeMessageNoTag(ProtoCodec<T> codec, T value) {
+        int size = hasCachedSize() ? takeSize() : codec.computeSize(value);
         writeUInt32NoTag(size);
         codec.writeTo(this, value);
     }
