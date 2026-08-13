@@ -1103,6 +1103,188 @@ class ProtoviaProcessorTest {
             .contains("readSInt32()");
     }
 
+    @Test
+    void mapValueAdapterConvertsThenSkipsOnWire() throws Exception {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "import java.util.Map;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoField(number = 5, adapter = LocalDateEpochDay.class)",
+                    "  public Map<String, LocalDate> dates;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("int vWire = LocalDateEpochDay.INSTANCE.toWire(v)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (vWire != 0)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("int vWire = 0");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.fromWire(vWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("fromWire(\"\")");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("fromWire(0)");
+        String source = compilation.generatedSourceFile("demo.HolderProtoCodec")
+            .orElseThrow()
+            .getCharContent(false)
+            .toString();
+        if (source.indexOf("reader.popLimit(oldLimit)") >= source.lastIndexOf("fromWire(vWire)")) {
+            throw new AssertionError("fromWire must run after popLimit:\n" + source);
+        }
+    }
+
+    @Test
+    void mapKeyBytesAdapterFailsWithE14() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                uuidBytesAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Map;",
+                    "import java.util.UUID;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoField(number = 1, adapter = UuidBytes.class) public Map<UUID, String> ids;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining(
+            "map key of field 'ids' must be an integral type, bool, or string");
+    }
+
+    @Test
+    void mapBytesValueAdapterSkipsOnLength() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                uuidBytesAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Map;",
+                    "import java.util.UUID;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoField(number = 1, adapter = UuidBytes.class) public Map<String, UUID> ids;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("vWire.length != 0");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("if (vWire != 0)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("byte[] vWire = new byte[0]");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("UuidBytes.INSTANCE.fromWire(vWire)");
+    }
+
+    @Test
+    void oneofAdaptedCaseAlwaysWritesIncludingZero() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Event",
+                    "package demo;",
+                    "public sealed interface Event permits Born, Label {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Born",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "import java.time.LocalDate;",
+                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
+                    "public record Born(LocalDate d) implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof public Event event;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("int dWire = LocalDateEpochDay.INSTANCE.toWire(_c.d())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("CodedSize.int32(10, dWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeUInt32NoTag(TAG_10)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeInt32NoTag(dWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("new Born(LocalDateEpochDay.INSTANCE.fromWire(reader.readInt32()))");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("if (dWire != 0)");
+    }
+
+    @Test
+    void mapFieldAdapterMatchingNeitherSideIsE8() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                uuidAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Map;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoField(number = 1, adapter = UuidString.class)",
+                    "  public Map<String, Integer> scores;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("handles UUID, not Map");
+    }
+
     private static javax.tools.JavaFileObject localDateAdapter() {
         return JavaFileObjects.forSourceLines(
             "demo.LocalDateEpochDay",
@@ -1148,6 +1330,22 @@ class ProtoviaProcessorTest {
             "  public static final UuidString INSTANCE = new UuidString();",
             "  public String toWire(UUID value) { return value.toString(); }",
             "  public UUID fromWire(String wire) { return UUID.fromString(wire); }",
+            "}");
+    }
+
+    private static javax.tools.JavaFileObject uuidBytesAdapter() {
+        return JavaFileObjects.forSourceLines(
+            "demo.UuidBytes",
+            "package demo;",
+            "import io.github.rawvoid.protovia.ProtoType;",
+            "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+            "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+            "import java.util.UUID;",
+            "@ProtoScalar(ProtoType.BYTES)",
+            "public final class UuidBytes implements ProtoAdapter<UUID, byte[]> {",
+            "  public static final UuidBytes INSTANCE = new UuidBytes();",
+            "  public byte[] toWire(UUID value) { return new byte[16]; }",
+            "  public UUID fromWire(byte[] wire) { return new UUID(0L, 0L); }",
             "}");
     }
 

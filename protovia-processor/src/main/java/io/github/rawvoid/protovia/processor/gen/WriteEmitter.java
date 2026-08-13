@@ -39,6 +39,7 @@ import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofWireLocal;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeCachedMessage;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
@@ -175,6 +176,11 @@ final class WriteEmitter {
         } else if (c.payload.kind == FieldKind.ENUM) {
             writeTag(b, c.tagConstant);
             b.addStatement("writer.writeInt32NoTag($L(_c.$L))", enumNumberOf(c.payload.enumModel), c.accessor);
+        } else if (c.payload.adapterType != null) {
+            String w = oneofWireLocal(c);
+            assignToWire(b, c.payload, "_c." + c.accessor, w);
+            writeTag(b, c.tagConstant);
+            b.addStatement("$L", writeNoTag("writer", c.payload, w));
         } else {
             writeTag(b, c.tagConstant);
             b.addStatement("$L", writeNoTag("writer", c.payload, "_c." + c.accessor));

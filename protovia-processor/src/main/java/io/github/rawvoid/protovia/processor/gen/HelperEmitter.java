@@ -47,11 +47,13 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.fromWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntryPartWrite;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntrySizeAdd;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapMissingDefault;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapPartAssign;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocalType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
 
@@ -237,33 +239,55 @@ final class HelperEmitter {
     }
 
     private static MethodSpec mapEntryReadMethod(FieldModel field) {
+        FieldModel key = field.mapKey;
+        FieldModel value = field.mapValue;
+        boolean keyAdapted = key.adapterType != null;
+        boolean valueAdapted = value.adapterType != null;
+        String kLoop = keyAdapted ? "kWire" : "k";
+        String vLoop = valueAdapted ? "vWire" : "v";
         CodeBlock.Builder body = CodeBlock.builder();
-        body.addStatement("$T k = $L", boxedType(field.mapKey), mapMissingDefault(field.mapKey));
-        if (field.mapValue.kind == FieldKind.MESSAGE) {
-            body.addStatement("$T v = null", boxedType(field.mapValue));
+        if (keyAdapted) {
+            body.addStatement("$T kWire = $L", wireLocalType(key), mapMissingDefault(key));
         } else {
-            body.addStatement("$T v = $L", boxedType(field.mapValue), mapMissingDefault(field.mapValue));
+            body.addStatement("$T k = $L", boxedType(key), mapMissingDefault(key));
+        }
+        if (value.kind == FieldKind.MESSAGE) {
+            body.addStatement("$T v = null", boxedType(value));
+        } else if (valueAdapted) {
+            body.addStatement("$T vWire = $L", wireLocalType(value), mapMissingDefault(value));
+        } else {
+            body.addStatement("$T v = $L", boxedType(value), mapMissingDefault(value));
         }
         body.addStatement("int oldLimit = reader.beginPacked()");
         body.addStatement("int tag");
         body.beginControlFlow("while ((tag = reader.readTag()) != 0)");
         body.beginControlFlow("switch (tag)");
-        body.beginControlFlow("case $L ->", WireType.tag(1, unpackedWire(field.mapKey)));
-        mapPartAssign(body, field.mapKey, "k");
+        body.beginControlFlow("case $L ->", WireType.tag(1, unpackedWire(key)));
+        mapPartAssign(body, key, kLoop);
         body.endControlFlow();
-        body.beginControlFlow("case $L ->", WireType.tag(2, unpackedWire(field.mapValue)));
-        mapPartAssign(body, field.mapValue, "v");
+        body.beginControlFlow("case $L ->", WireType.tag(2, unpackedWire(value)));
+        mapPartAssign(body, value, vLoop);
         body.endControlFlow();
         body.addStatement("default -> reader.skipField()");
         body.endControlFlow();
         body.endControlFlow();
         body.addStatement("reader.popLimit(oldLimit)");
-        if (field.mapValue.kind == FieldKind.MESSAGE) {
+        if (value.kind == FieldKind.MESSAGE) {
             body.beginControlFlow("if (v == null)");
-            body.addStatement("v = $L", mapMissingDefault(field.mapValue));
+            body.addStatement("v = $L", mapMissingDefault(value));
             body.endControlFlow();
         }
-        body.addStatement("target.put(k, v)");
+        if (keyAdapted) {
+            body.addStatement("$T k = $L", boxedType(key), fromWire(key, CodeBlock.of("kWire")));
+        }
+        if (valueAdapted && keyAdapted) {
+            body.addStatement("$T v = $L", boxedType(value), fromWire(value, CodeBlock.of("vWire")));
+            body.addStatement("target.put(k, v)");
+        } else if (valueAdapted) {
+            body.addStatement("target.put(k, $L)", fromWire(value, CodeBlock.of("vWire")));
+        } else {
+            body.addStatement("target.put(k, v)");
+        }
         return MethodSpec.methodBuilder(mapEntryRead(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)

@@ -830,6 +830,14 @@ public final class SchemaParser {
         if (key == null || value == null) {
             return null;
         }
+        if (fieldAdapter != null && key.adapterType == null && value.adapterType == null) {
+            ResolvedAdapter adapter = validateAdapter(fieldAdapter, origin);
+            if (adapter != null) {
+                error(origin, "adapter " + fieldAdapter.getSimpleName()
+                    + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
+            }
+            return null;
+        }
         if (!isValidMapKey(key.protoType)) {
             error(origin, "map key of field '" + name + "' must be an integral type, bool, or string");
             return null;
@@ -892,7 +900,7 @@ public final class SchemaParser {
                         + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
                     return null;
                 }
-            } else if (site == AdapterSite.MAP || site == AdapterSite.ONEOF) {
+            } else if (!adaptersEnabled(site)) {
                 error(origin, "adapters on repeated/map/oneof are not enabled yet");
             } else {
                 ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);
@@ -1501,6 +1509,13 @@ public final class SchemaParser {
         REPEATED,
         MAP,
         ONEOF
+    }
+
+    private static boolean adaptersEnabled(AdapterSite site) {
+        return site == AdapterSite.SINGULAR
+            || site == AdapterSite.REPEATED
+            || site == AdapterSite.MAP
+            || site == AdapterSite.ONEOF;
     }
 
     private static final class Access {

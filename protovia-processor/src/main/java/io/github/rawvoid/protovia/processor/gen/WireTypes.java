@@ -129,6 +129,23 @@ final class WireTypes {
         };
     }
 
+    /**
+     * Proto3 implicit-presence skip on a wire local {@code W}, keyed by proto type.
+     * Used after {@code toWire} on adapted map entries — not {@link #mapDefaultSkip},
+     * which reads Java {@code byteArray}/{@code byteBuffer} flags adapted fields do not set.
+     */
+    static CodeBlock wireDefaultPresent(ProtoType protoType, String w) {
+        return switch (protoType) {
+            case BOOL -> CodeBlock.of("$L", w);
+            case STRING -> CodeBlock.of("!$L.isEmpty()", w);
+            case BYTES -> CodeBlock.of("$L.length != 0", w);
+            case FLOAT -> CodeBlock.of("Float.floatToRawIntBits($L) != 0", w);
+            case DOUBLE -> CodeBlock.of("Double.doubleToRawLongBits($L) != 0L", w);
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> CodeBlock.of("$L != 0L", w);
+            default -> CodeBlock.of("$L != 0", w);
+        };
+    }
+
     static CodeBlock enumPresent(FieldModel field, String var) {
         if (field.enumModel.unrecognized == null) {
             return CodeBlock.of("$L != null", var);

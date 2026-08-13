@@ -47,6 +47,7 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.wireDefaultPresent;
 
 /**
  * Shared {@link CodeBlock} fragments and statement patterns for size / write / read.
@@ -83,9 +84,9 @@ final class WireCodegen {
         assignToWire(b, field, javaValue, wireLocal(field));
     }
 
-    static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue, String local) {
+    static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue, String wireVar) {
         b.addStatement("$T $L = $L.toWire($L)",
-            wireLocalType(field), local, adapterInstance(field), javaValue);
+            wireLocalType(field), wireVar, adapterInstance(field), javaValue);
     }
 
     static String adaptedValue(CodeBlock.Builder b, FieldModel field, String javaValue, String wireName) {
@@ -94,6 +95,14 @@ final class WireCodegen {
         }
         assignToWire(b, field, javaValue, wireName);
         return wireName;
+    }
+
+    static String oneofWireLocal(OneofCaseModel c) {
+        String accessor = c.accessor;
+        if (accessor != null && accessor.endsWith("()")) {
+            return accessor.substring(0, accessor.length() - 2) + "Wire";
+        }
+        return wireLocal(c.payload);
     }
 
     static CodeBlock fromWire(FieldModel field, CodeBlock read) {
@@ -248,6 +257,17 @@ final class WireCodegen {
         if (part.kind == FieldKind.ENUM) {
             return CodeBlock.of("$L(0)", enumFrom(part.enumModel));
         }
+        if (part.adapterType != null) {
+            return switch (part.protoType) {
+                case BOOL -> CodeBlock.of("false");
+                case STRING -> CodeBlock.of("$S", "");
+                case BYTES -> CodeBlock.of("new byte[0]");
+                case FLOAT -> CodeBlock.of("0F");
+                case DOUBLE -> CodeBlock.of("0D");
+                case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> CodeBlock.of("0L");
+                default -> CodeBlock.of("0");
+            };
+        }
         if (part.byteArray) {
             return CodeBlock.of("new byte[0]");
         }
@@ -375,8 +395,15 @@ final class WireCodegen {
             b.endControlFlow();
             return;
         }
-        b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
-        b.addStatement("$L += $L", sizeVar, sizeCall(part, number, var));
+        String sizeValue = var;
+        if (part.adapterType != null) {
+            sizeValue = var + "Wire";
+            assignToWire(b, part, var, sizeValue);
+            b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, sizeValue));
+        } else {
+            b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
+        }
+        b.addStatement("$L += $L", sizeVar, sizeCall(part, number, sizeValue));
         b.endControlFlow();
     }
 
@@ -395,9 +422,16 @@ final class WireCodegen {
             b.endControlFlow();
             return;
         }
-        b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
+        String writeValue = var;
+        if (part.adapterType != null) {
+            writeValue = var + "Wire";
+            assignToWire(b, part, var, writeValue);
+            b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, writeValue));
+        } else {
+            b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
+        }
         writeTag(b, tag);
-        b.addStatement("$L", writeNoTag("writer", part, var));
+        b.addStatement("$L", writeNoTag("writer", part, writeValue));
         b.endControlFlow();
     }
 

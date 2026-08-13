@@ -41,6 +41,7 @@ import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofWireLocal;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
@@ -199,6 +200,10 @@ final class SizeEmitter {
         } else if (c.payload.kind == FieldKind.ENUM) {
             b.addStatement("size += $T.enumValue($L, $L(_c.$L))",
                 CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), c.accessor);
+        } else if (c.payload.adapterType != null) {
+            String w = oneofWireLocal(c);
+            assignToWire(b, c.payload, "_c." + c.accessor, w);
+            b.addStatement("size += $L", sizeCall(c.payload, c.number, w));
         } else {
             b.addStatement("size += $L", sizeCall(c.payload, c.number, "_c." + c.accessor));
         }

@@ -227,7 +227,11 @@ final class ReadEmitter {
                 store(b, field, record,
                     CodeBlock.of("new $T($L(reader.readEnum()))", oneofCaseType(c), enumFrom(c.payload.enumModel)));
             } else {
-                store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), readCall(c.payload)));
+                CodeBlock read = readCall(c.payload);
+                if (c.payload.adapterType != null) {
+                    read = fromWire(c.payload, read);
+                }
+                store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
             }
             b.endControlFlow();
         }
