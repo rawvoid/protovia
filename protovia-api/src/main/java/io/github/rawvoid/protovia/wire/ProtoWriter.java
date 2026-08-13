@@ -37,7 +37,7 @@ public final class ProtoWriter {
         }
         this.buffer = size == 0 ? new byte[0] : new byte[size];
         this.exact = exact;
-        this.sizes = sizes == null ? SizeCache.NOOP : sizes;
+        this.sizes = sizes;
     }
 
     public boolean hasCachedSize() {
@@ -333,7 +333,9 @@ public final class ProtoWriter {
     }
 
     public void writeRawByte(int value) {
-        require(1);
+        if (pos == buffer.length) {
+            require(1);
+        }
         buffer[pos++] = (byte) value;
     }
 
@@ -341,7 +343,9 @@ public final class ProtoWriter {
         if (length == 0) {
             return;
         }
-        require(length);
+        if (pos + length > buffer.length) {
+            require(length);
+        }
         System.arraycopy(value, offset, buffer, pos, length);
         pos += length;
     }
