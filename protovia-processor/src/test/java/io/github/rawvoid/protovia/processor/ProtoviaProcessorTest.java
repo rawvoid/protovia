@@ -508,6 +508,6 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.NumsProtoCodec")
             .contentsAsUtf8String()
-            .contains("toArray(new java.lang.Integer[0])");
+            .contains("toArray(new Integer[0])");
     }
 }

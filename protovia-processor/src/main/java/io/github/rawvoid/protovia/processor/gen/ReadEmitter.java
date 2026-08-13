@@ -36,12 +36,12 @@ import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryRead;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.WIRE_TYPE;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.arrayBuilderType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.collectionEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapReadExpr;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.primitiveAdd;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.readCall;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.toArray;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wrapOptional;
@@ -117,7 +117,7 @@ final class ReadEmitter {
     private static void initArrayBuilders(CodeBlock.Builder b, MessageModel model) {
         for (FieldModel field : model.fields) {
             if (field.array) {
-                b.addStatement("$L $LBuilder = null", arrayBuilderType(field), field.localName);
+                b.addStatement("$T $LBuilder = null", WireCodegen.arrayBuilderType(field), field.localName);
             }
         }
     }
@@ -181,7 +181,7 @@ final class ReadEmitter {
     private static void readEnumField(
         CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model, String tag) {
         b.addStatement("int _n = reader.readEnum()");
-        b.addStatement("$L _e = $L(_n)", field.enumModel.typeName, enumFrom(field.enumModel));
+        b.addStatement("$T _e = $L(_n)", sourceType(field.enumModel.typeName), enumFrom(field.enumModel));
         if (field.enumModel.unrecognized != null) {
             b.beginControlFlow("if (_e == $L.$L)", field.enumModel.typeName, field.enumModel.unrecognized);
             mergeUnknownVarint(b, model, tag);
@@ -249,7 +249,7 @@ final class ReadEmitter {
     private static void ensureRepeated(CodeBlock.Builder b, FieldModel field, boolean record) {
         if (field.array) {
             b.beginControlFlow("if ($LBuilder == null)", field.localName);
-            b.addStatement("$LBuilder = new $L()", field.localName, arrayBuilderType(field));
+            b.addStatement("$LBuilder = new $T()", field.localName, WireCodegen.arrayBuilderType(field));
             seedArrayBuilder(b, field, record);
             b.endControlFlow();
             return;
@@ -263,7 +263,7 @@ final class ReadEmitter {
         if (field.accessKind == AccessKind.FIELD) {
             b.addStatement("msg.$L = $L", field.fieldName, collectionEnsure("msg." + field.fieldName, field));
         } else {
-            b.addStatement("$L $L = $L", field.javaTypeName, field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr.replace("value.", "msg."));
             b.addStatement("$L = $L", field.localName, collectionEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -305,12 +305,12 @@ final class ReadEmitter {
         }
         FieldModel field = component.field();
         if (field != null && (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP)) {
-            b.addStatement("$L $L = existing != null && $L != null ? new $L($L) : $L",
-                component.typeName(), local, fromExisting, field.implTypeName, fromExisting, component.defaultExpr());
+            b.addStatement("$T $L = existing != null && $L != null ? new $L($L) : $L",
+                sourceType(component.typeName()), local, fromExisting, field.implTypeName, fromExisting, component.defaultExpr());
             return;
         }
-        b.addStatement("$L $L = existing != null ? $L : $L",
-            component.typeName(), local, fromExisting, component.defaultExpr());
+        b.addStatement("$T $L = existing != null ? $L : $L",
+            sourceType(component.typeName()), local, fromExisting, component.defaultExpr());
     }
 
     private static void readMessage(CodeBlock.Builder b, FieldModel field, boolean record) {
@@ -330,7 +330,7 @@ final class ReadEmitter {
             String getter = field.accessKind == AccessKind.FIELD
                 ? "msg." + field.fieldName
                 : field.readExpr.replace("value.", "msg.");
-            b.addStatement("$L _cur = $L", field.javaTypeName, getter);
+            b.addStatement("$T _cur = $L", sourceType(field.javaTypeName), getter);
             assign(b, field, "msg", wrapOptional(field,
                 CodeBlock.of("reader.readMessage($L, _cur != null && _cur.isPresent() ? _cur.get() : null)", codec)));
             return;
@@ -348,7 +348,7 @@ final class ReadEmitter {
                 ? "msg." + field.fieldName
                 : field.readExpr.replace("value.", "msg.");
         b.beginControlFlow("if ($L != null)", existing);
-        b.beginControlFlow("for ($L item : $L)", field.arrayComponentType, existing);
+        b.beginControlFlow("for ($T item : $L)", sourceType(field.arrayComponentType), existing);
         CodeBlock add = primitiveAdd(field, field.localName + "Builder", CodeBlock.of("item"));
         if (add != null) {
             b.addStatement("$L", add);
@@ -370,7 +370,7 @@ final class ReadEmitter {
         if (field.element.kind == FieldKind.ENUM) {
             EnumModel enums = field.element.enumModel;
             b.addStatement("int _n = reader.readEnum()");
-            b.addStatement("$L _item = $L(_n)", enums.typeName, enumFrom(enums));
+            b.addStatement("$T _item = $L(_n)", sourceType(enums.typeName), enumFrom(enums));
             String tag = Names.tagConstant(field.number);
             if (enums.unrecognized != null) {
                 b.beginControlFlow("if (_item == $L.$L)", enums.typeName, enums.unrecognized);
@@ -420,7 +420,7 @@ final class ReadEmitter {
         if (field.accessKind == AccessKind.FIELD) {
             b.addStatement("msg.$L = $L", field.fieldName, mapEnsure("msg." + field.fieldName, field));
         } else {
-            b.addStatement("$L $L = $L", field.javaTypeName, field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr.replace("value.", "msg."));
             b.addStatement("$L = $L", field.localName, mapEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -471,7 +471,7 @@ final class ReadEmitter {
     static void mapPartAssign(CodeBlock.Builder b, FieldModel part, String var) {
         if (part.kind == FieldKind.ENUM) {
             b.addStatement("int $LN = reader.readEnum()", var);
-            b.addStatement("$L $LE = $L($LN)", part.enumModel.typeName, var, enumFrom(part.enumModel), var);
+            b.addStatement("$T $LE = $L($LN)", sourceType(part.enumModel.typeName), var, enumFrom(part.enumModel), var);
             if (part.enumModel.unrecognized != null) {
                 b.beginControlFlow("if ($LE != null && $LE != $L.$L)",
                     var, var, part.enumModel.typeName, part.enumModel.unrecognized);

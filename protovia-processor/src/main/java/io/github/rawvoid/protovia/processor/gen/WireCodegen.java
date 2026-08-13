@@ -17,9 +17,12 @@
 package io.github.rawvoid.protovia.processor.gen;
 
 import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.ParameterizedTypeName;
+import com.palantir.javapoet.TypeName;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.ARRAY_LIST;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.OPTIONAL;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
@@ -169,12 +172,12 @@ final class WireCodegen {
         return CodeBlock.of("$T.ensureMutableMap($L, $L)", PROTO_LISTS, container, implConstructorRef(field));
     }
 
-    static String arrayBuilderType(FieldModel field) {
+    static TypeName arrayBuilderType(FieldModel field) {
         PrimitiveListSpec spec = primitiveListSpec(field);
         if (spec != null) {
-            return spec.listType().canonicalName();
+            return spec.listType();
         }
-        return "java.util.ArrayList<" + boxed(field.element) + ">";
+        return ParameterizedTypeName.get(ARRAY_LIST, WireTypes.boxedType(field.element));
     }
 
     static CodeBlock toArray(FieldModel field, String listVar) {
@@ -182,7 +185,7 @@ final class WireCodegen {
         if (spec != null) {
             return CodeBlock.of("$L.$L()", listVar, spec.toArray());
         }
-        return CodeBlock.of("$L.toArray(new $L[0])", listVar, field.arrayComponentType);
+        return CodeBlock.of("$L.toArray(new $T[0])", listVar, GenTypes.sourceType(field.arrayComponentType));
     }
 
     static CodeBlock primitiveAdd(FieldModel field, String list, CodeBlock value) {

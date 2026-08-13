@@ -45,7 +45,7 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.rawType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapMissingDefault;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxed;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
 
@@ -202,8 +202,8 @@ final class HelperEmitter {
         return MethodSpec.methodBuilder(mapEntrySizeOf(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.INT)
-            .addParameter(rawType(boxed(field.mapKey)), "k")
-            .addParameter(rawType(boxed(field.mapValue)), "v")
+            .addParameter(boxedType(field.mapKey), "k")
+            .addParameter(boxedType(field.mapValue), "v")
             .addParameter(SIZE_CACHE, "cache")
             .addCode(body.build())
             .build();
@@ -224,19 +224,19 @@ final class HelperEmitter {
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)
             .addParameter(PROTO_WRITER, "writer")
-            .addParameter(rawType(boxed(field.mapKey)), "k")
-            .addParameter(rawType(boxed(field.mapValue)), "v")
+            .addParameter(boxedType(field.mapKey), "k")
+            .addParameter(boxedType(field.mapValue), "v")
             .addCode(body.build())
             .build();
     }
 
     private static MethodSpec mapEntryReadMethod(FieldModel field) {
         CodeBlock.Builder body = CodeBlock.builder();
-        body.addStatement("$L k = $L", boxed(field.mapKey), mapMissingDefault(field.mapKey));
+        body.addStatement("$T k = $L", boxedType(field.mapKey), mapMissingDefault(field.mapKey));
         if (field.mapValue.kind == FieldKind.MESSAGE) {
-            body.addStatement("$L v = null", boxed(field.mapValue));
+            body.addStatement("$T v = null", boxedType(field.mapValue));
         } else {
-            body.addStatement("$L v = $L", boxed(field.mapValue), mapMissingDefault(field.mapValue));
+            body.addStatement("$T v = $L", boxedType(field.mapValue), mapMissingDefault(field.mapValue));
         }
         body.addStatement("int oldLimit = reader.beginPacked()");
         body.addStatement("int tag");

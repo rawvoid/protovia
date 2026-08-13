@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
+import com.palantir.javapoet.TypeName;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
@@ -151,6 +152,10 @@ final class WireTypes {
             case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> var + " != 0L";
             default -> var + " != 0";
         };
+    }
+
+    static TypeName boxedType(FieldModel field) {
+        return GenTypes.sourceType(boxed(field));
     }
 
     static String enumPresent(FieldModel field, String var) {

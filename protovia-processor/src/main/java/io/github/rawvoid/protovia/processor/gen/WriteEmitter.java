@@ -35,9 +35,10 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeNoTag;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeNoTag;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxed;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
@@ -129,7 +130,7 @@ final class WriteEmitter {
             b.addStatement("writer.writeUInt32NoTag($LPacked)", field.localName);
             packedElements(b, field, true);
         } else {
-            b.beginControlFlow("for ($L item : $L)", field.element.javaTypeName, field.localName);
+            b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), field.localName);
             Emit.nullElementCheck(b, field.element, "item", field.name);
             Emit.writeTag(b, tag);
             if (field.element.kind == FieldKind.ENUM) {
@@ -179,7 +180,7 @@ final class WriteEmitter {
     }
 
     private static void boxedPackedLoop(CodeBlock.Builder b, FieldModel field, String list, boolean write) {
-        b.beginControlFlow("for ($L item : $L)", field.element.javaTypeName, list);
+        b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), list);
         Emit.nullElementCheck(b, field.element, "item", field.name);
         if (write) {
             if (field.element.kind == FieldKind.ENUM) {
@@ -210,7 +211,7 @@ final class WriteEmitter {
             Emit.writeTag(b, c.tagConstant);
             Emit.writeCachedMessage(b, c.payload.codecName + ".INSTANCE", "_c", c.tagConstant + "_sz");
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$L _p = _c.$L", c.payload.javaTypeName, c.accessor);
+            b.addStatement("$T _p = _c.$L", sourceType(c.payload.javaTypeName), c.accessor);
             b.beginControlFlow("if (_p != null)");
             Emit.writeTag(b, c.tagConstant);
             Emit.writeCachedMessage(b, c.payload.codecName + ".INSTANCE", "_p", c.tagConstant + "_sz");
@@ -226,8 +227,8 @@ final class WriteEmitter {
 
     private static void writeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
-        b.beginControlFlow("for ($T.Entry<$L, $L> e : $L.entrySet())",
-            MAP, boxed(field.mapKey), boxed(field.mapValue), field.localName);
+        b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
+            MAP, WireTypes.boxedType(field.mapKey), WireTypes.boxedType(field.mapValue), field.localName);
         b.addStatement("$L(writer, e.getKey(), e.getValue())", mapEntryWrite(field));
         b.endControlFlow();
         b.endControlFlow();

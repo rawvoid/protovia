@@ -34,8 +34,9 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxed;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
@@ -136,7 +137,7 @@ final class SizeEmitter {
             b.addStatement("cache.push($LPacked)", field.localName);
             b.addStatement("size += $T.lengthDelimited($L, $LPacked)", CODED_SIZE, field.number, field.localName);
         } else {
-            b.beginControlFlow("for ($L item : $L)", field.element.javaTypeName, field.localName);
+            b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), field.localName);
             Emit.nullElementCheck(b, field.element, "item", field.name);
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("size += $T.enumValue($L, $L(item))",
@@ -156,8 +157,8 @@ final class SizeEmitter {
 
     private static void computeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
-        b.beginControlFlow("for ($T.Entry<$L, $L> e : $L.entrySet())",
-            MAP, boxed(field.mapKey), boxed(field.mapValue), field.localName);
+        b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
+            MAP, WireTypes.boxedType(field.mapKey), WireTypes.boxedType(field.mapValue), field.localName);
         b.addStatement("size += $T.lengthDelimited($L, $L(e.getKey(), e.getValue(), cache))",
             CODED_SIZE, field.number, mapEntrySizeOf(field));
         b.endControlFlow();
@@ -197,7 +198,7 @@ final class SizeEmitter {
             b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$L _p = _c.$L", c.payload.javaTypeName, c.accessor);
+            b.addStatement("$T _p = _c.$L", sourceType(c.payload.javaTypeName), c.accessor);
             b.beginControlFlow("if (_p != null)");
             b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
             b.addStatement("int $L_sz = $L.INSTANCE.computeSize(_p, cache)", c.tagConstant, c.payload.codecName);

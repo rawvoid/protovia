@@ -23,6 +23,7 @@ import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import java.util.function.BiConsumer;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
 
 /**
  * Shared emission patterns used across size / write / read emitters.
@@ -35,7 +36,7 @@ final class Emit {
     }
 
     static void loadField(CodeBlock.Builder b, FieldModel field) {
-        b.addStatement("$L $L = $L", field.javaTypeName, field.localName, field.readExpr);
+        b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr);
     }
 
     static void writeTag(CodeBlock.Builder b, Object tag) {
