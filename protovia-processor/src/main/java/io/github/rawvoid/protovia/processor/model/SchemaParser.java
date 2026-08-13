@@ -44,6 +44,8 @@ public final class SchemaParser {
     private static final String PROTO_ADAPTER_UNSET = "io.github.rawvoid.protovia.codec.ProtoAdapter.Unset";
     private static final String PROTO_FIELD_ANN = "io.github.rawvoid.protovia.annotation.ProtoField";
     private static final String PROTO_ONEOF_CASE_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneofCase";
+    private static final String PROTO_ADAPTERS_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapters";
+    private static final String PROTO_ADAPTED_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapted";
 
     private static final Map<String, String> WELL_KNOWN_CODECS = Map.ofEntries(
         Map.entry("java.time.Instant", "io.github.rawvoid.protovia.wkt.TimestampCodec"),
@@ -77,6 +79,8 @@ public final class SchemaParser {
     private final TypeMirror optionalType;
     private final TypeElement protoAdapterType;
     private boolean errors;
+    /** Parser-local; not stored on {@link MessageModel}. */
+    private List<ResolvedAdapter> discovery = List.of();
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.types = types;
@@ -213,32 +217,39 @@ public final class SchemaParser {
 
         List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
         MessageModel.UnknownField[] unknown = new MessageModel.UnknownField[1];
-        if (record) {
-            parseRecord(type, pkg, byNumber, taken, claimed, recordComponents, unknown, oneofs);
-        } else {
-            parsePojo(type, pkg, byNumber, taken, claimed, unknown, oneofs);
-        }
+        List<ResolvedAdapter> previousDiscovery = discovery;
+        // Package is getPackageOf(the message), never a oneof case type.
+        discovery = buildDiscovery(type);
+        try {
+            if (record) {
+                parseRecord(type, pkg, byNumber, taken, claimed, recordComponents, unknown, oneofs);
+            } else {
+                parsePojo(type, pkg, byNumber, taken, claimed, unknown, oneofs);
+            }
 
-        if (byNumber.isEmpty() && oneofs.isEmpty()) {
-            error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField or @ProtoOneof members");
+            if (byNumber.isEmpty() && oneofs.isEmpty()) {
+                error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField or @ProtoOneof members");
+            }
+            if (errors) {
+                return null;
+            }
+            List<FieldModel> fields = new ArrayList<>(byNumber.values());
+            fields.sort(java.util.Comparator.comparingInt(f -> f.number));
+            fields.addAll(oneofs);
+            return new MessageModel(
+                type,
+                pkg,
+                protoPackage,
+                protoMessageName,
+                typeName,
+                Names.codecSimpleName(elements, type),
+                record,
+                fields,
+                recordComponents,
+                unknown[0]);
+        } finally {
+            discovery = previousDiscovery;
         }
-        if (errors) {
-            return null;
-        }
-        List<FieldModel> fields = new ArrayList<>(byNumber.values());
-        fields.sort(java.util.Comparator.comparingInt(f -> f.number));
-        fields.addAll(oneofs);
-        return new MessageModel(
-            type,
-            pkg,
-            protoPackage,
-            protoMessageName,
-            typeName,
-            Names.codecSimpleName(elements, type),
-            record,
-            fields,
-            recordComponents,
-            unknown[0]);
     }
 
     private void parseRecord(
@@ -884,7 +895,8 @@ public final class SchemaParser {
             error(origin, "optional field '" + name + "' cannot be a primitive; use a boxed type or Optional");
             return null;
         }
-        if (type.getKind().isPrimitive() && fieldAdapter != null) {
+        ResolvedAdapter discovered = findDiscovered(type);
+        if (type.getKind().isPrimitive() && (fieldAdapter != null || discovered != null)) {
             error(origin, "adapter cannot be applied to primitive field '" + name + "'");
             return null;
         }
@@ -893,24 +905,28 @@ public final class SchemaParser {
             if (adapter == null) {
                 return null;
             }
-            boolean jMatch = types.isSameType(adapter.j, type);
-            if (!jMatch) {
+            if (!types.isSameType(adapter.j, type)) {
                 if (site != AdapterSite.MAP) {
                     error(origin, "adapter " + fieldAdapter.getSimpleName()
                         + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
                     return null;
                 }
-            } else if (!adaptersEnabled(site)) {
-                error(origin, "adapters on repeated/map/oneof are not enabled yet");
             } else {
-                ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);
-                if (protoType == null) {
-                    return null;
-                }
-                return adaptedSingular(
-                    origin, name, declaredJavaType, protoType, adapter, optional, packed,
-                    accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
+                return applyAdapter(
+                    adapter, origin, name, declaredJavaType, declared, optional, packed,
+                    accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
             }
+        }
+        if (discovered != null) {
+            return applyAdapter(
+                discovered, origin, name, declaredJavaType, declared, optional, packed,
+                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+        }
+        TypeElement javaType = asTypeElement(type);
+        if (javaType != null && findAnnotation(javaType, PROTO_ADAPTED_ANN) != null) {
+            return resolveProtoAdapted(
+                javaType, origin, name, type, declaredJavaType, declared, optional, packed,
+                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
         }
         Resolved resolved = classify(origin, name, type, declared, pkg);
         if (resolved == null) {
@@ -978,10 +994,177 @@ public final class SchemaParser {
             .build();
     }
 
+    private FieldModel applyAdapter(
+        ResolvedAdapter adapter,
+        Element origin,
+        String name,
+        TypeMirror declaredJavaType,
+        ProtoType declared,
+        boolean optional,
+        boolean packed,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional,
+        int number,
+        AdapterSite site) {
+        if (!adaptersEnabled(site)) {
+            error(origin, "adapters on repeated/map/oneof are not enabled yet");
+            return null;
+        }
+        ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);
+        if (protoType == null) {
+            return null;
+        }
+        return adaptedSingular(
+            origin, name, declaredJavaType, protoType, adapter, optional, packed,
+            accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
+    }
+
+    private FieldModel resolveProtoAdapted(
+        TypeElement javaType,
+        Element origin,
+        String name,
+        TypeMirror type,
+        TypeMirror declaredJavaType,
+        ProtoType declared,
+        boolean optional,
+        boolean packed,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional,
+        int number,
+        AdapterSite site) {
+        TypeElement adaptedType = adaptedFrom(javaType);
+        if (adaptedType == null) {
+            return null;
+        }
+        ResolvedAdapter adapter = javaType.equals(origin)
+            ? validateAdapter(adaptedType, origin)
+            : validateAdapter(adaptedType, javaType, origin);
+        if (adapter == null) {
+            return null;
+        }
+        if (alreadyProtoType(type)) {
+            String message = protoAdaptedOnProtoTypeMessage(javaType);
+            error(javaType, message);
+            if (!javaType.equals(origin)) {
+                error(origin, message);
+            }
+            return null;
+        }
+        return applyAdapter(
+            adapter, origin, name, declaredJavaType, declared, optional, packed,
+            accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+    }
+
     private void rejectOneofAdapter(Element origin, TypeElement fieldAdapter) {
         if (fieldAdapter != null) {
             error(origin, "adapters on repeated/map/oneof are not enabled yet");
         }
+    }
+
+    private List<ResolvedAdapter> buildDiscovery(TypeElement messageType) {
+        List<ResolvedAdapter> list = new ArrayList<>();
+        PackageElement pkg = elements.getPackageOf(messageType);
+        addAdapters(list, adaptersFrom(pkg), pkg);
+        addAdapters(list, adaptersFrom(messageType), messageType);
+        return list;
+    }
+
+    private void addAdapters(List<ResolvedAdapter> discovery, List<TypeElement> adapters, Element origin) {
+        List<ResolvedAdapter> fromThis = new ArrayList<>();
+        for (TypeElement adapter : adapters) {
+            ResolvedAdapter resolved = validateAdapter(adapter, origin);
+            if (resolved == null) {
+                continue;
+            }
+            boolean duplicate = false;
+            for (ResolvedAdapter existing : fromThis) {
+                if (types.isSameType(existing.j, resolved.j)) {
+                    error(origin, "duplicate adapter for " + simpleTypeName(resolved.j));
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                fromThis.add(resolved);
+            }
+        }
+        for (ResolvedAdapter next : fromThis) {
+            discovery.removeIf(existing -> types.isSameType(existing.j, next.j));
+            discovery.add(next);
+        }
+    }
+
+    private ResolvedAdapter findDiscovered(TypeMirror javaJ) {
+        for (ResolvedAdapter adapter : discovery) {
+            if (types.isSameType(adapter.j, javaJ)) {
+                return adapter;
+            }
+        }
+        return null;
+    }
+
+    private boolean alreadyProtoType(TypeMirror javaJ) {
+        TypeElement element = asTypeElement(javaJ);
+        if (element == null) {
+            return false;
+        }
+        if (element.getAnnotation(ProtoMessage.class) != null
+            || element.getAnnotation(ProtoEnum.class) != null) {
+            return true;
+        }
+        return WELL_KNOWN_CODECS.containsKey(element.getQualifiedName().toString());
+    }
+
+    private String protoAdaptedOnProtoTypeMessage(TypeElement type) {
+        String name = type.getSimpleName().toString();
+        String kind;
+        if (type.getAnnotation(ProtoMessage.class) != null) {
+            kind = "@ProtoMessage type " + name;
+        } else if (type.getAnnotation(ProtoEnum.class) != null) {
+            kind = "@ProtoEnum type " + name;
+        } else {
+            kind = "well-known type " + name;
+        }
+        return "@ProtoAdapted cannot be applied to " + kind
+            + "; override at the field or with @ProtoAdapters on the enclosing message";
+    }
+
+    private List<TypeElement> adaptersFrom(Element typeOrPackage) {
+        AnnotationMirror mirror = findAnnotation(typeOrPackage, PROTO_ADAPTERS_ANN);
+        if (mirror == null) {
+            return List.of();
+        }
+        AnnotationValue value = annotationMember(mirror, "value");
+        if (value == null || !(value.getValue() instanceof List<?> items)) {
+            return List.of();
+        }
+        List<TypeElement> adapters = new ArrayList<>();
+        for (Object item : items) {
+            if (!(item instanceof AnnotationValue av)) {
+                continue;
+            }
+            TypeElement adapter = typeElementFrom(av, typeOrPackage, "adapter");
+            if (adapter != null) {
+                adapters.add(adapter);
+            }
+        }
+        return adapters;
+    }
+
+    private TypeElement adaptedFrom(TypeElement javaType) {
+        AnnotationMirror mirror = findAnnotation(javaType, PROTO_ADAPTED_ANN);
+        if (mirror == null) {
+            return null;
+        }
+        return typeElementFrom(annotationMember(mirror, "value"), javaType, "adapter");
     }
 
     private TypeElement adapterFrom(Element origin, String annotationName) {
@@ -989,30 +1172,40 @@ public final class SchemaParser {
         if (mirror == null) {
             return null;
         }
-        AnnotationValue value = null;
-        for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
-            : elements.getElementValuesWithDefaults(mirror).entrySet()) {
-            if (entry.getKey().getSimpleName().contentEquals("adapter")) {
-                value = entry.getValue();
-                break;
-            }
-        }
-        if (value == null || !(value.getValue() instanceof TypeMirror type)) {
-            return null;
-        }
-        if (type.getKind() == TypeKind.ERROR) {
-            error(origin, "adapter " + type + " cannot be resolved");
-            return null;
-        }
-        TypeElement adapter = asTypeElement(type);
+        TypeElement adapter = typeElementFrom(annotationMember(mirror, "adapter"), origin, "adapter");
         if (adapter == null) {
-            error(origin, "adapter " + type + " cannot be resolved");
             return null;
         }
         if (adapter.getQualifiedName().contentEquals(PROTO_ADAPTER_UNSET)) {
             return null;
         }
         return adapter;
+    }
+
+    private TypeElement typeElementFrom(AnnotationValue value, Element origin, String what) {
+        if (value == null || !(value.getValue() instanceof TypeMirror type)) {
+            return null;
+        }
+        if (type.getKind() == TypeKind.ERROR) {
+            error(origin, what + " " + type + " cannot be resolved");
+            return null;
+        }
+        TypeElement element = asTypeElement(type);
+        if (element == null) {
+            error(origin, what + " " + type + " cannot be resolved");
+            return null;
+        }
+        return element;
+    }
+
+    private AnnotationValue annotationMember(AnnotationMirror mirror, String name) {
+        for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+            : elements.getElementValuesWithDefaults(mirror).entrySet()) {
+            if (entry.getKey().getSimpleName().contentEquals(name)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private Element protoFieldHost(Element origin) {
@@ -1040,57 +1233,63 @@ public final class SchemaParser {
         return null;
     }
 
-    private ResolvedAdapter validateAdapter(TypeElement adapter, Element origin) {
+    private ResolvedAdapter validateAdapter(TypeElement adapter, Element... origins) {
         String adapterName = adapter.getSimpleName().toString();
         if (adapter.getKind() != ElementKind.CLASS
             || adapter.getQualifiedName().contentEquals(PROTO_ADAPTER)) {
-            error(origin, "adapter must be a concrete type, not ProtoAdapter");
+            error("adapter must be a concrete type, not ProtoAdapter", origins);
             return null;
         }
         if (!isPublicType(adapter)) {
-            error(origin, "adapter " + adapterName + " must be a public type");
+            error("adapter " + adapterName + " must be a public type", origins);
             return null;
         }
         DeclaredType iface = findProtoAdapterIface(adapter);
         if (iface == null) {
-            error(origin, "adapter " + adapterName + " must implement ProtoAdapter");
+            error("adapter " + adapterName + " must implement ProtoAdapter", origins);
             return null;
         }
         ProtoScalar scalar = adapter.getAnnotation(ProtoScalar.class);
         if (scalar == null) {
-            error(origin, "adapter " + adapterName + " must be annotated with @ProtoScalar");
+            error("adapter " + adapterName + " must be annotated with @ProtoScalar", origins);
             return null;
         }
         ProtoType protoType = scalar.value();
         if (protoType == ProtoType.AUTO || protoType == ProtoType.ENUM || protoType == ProtoType.MESSAGE) {
-            error(origin, "@ProtoScalar must name a scalar ProtoType");
+            error("@ProtoScalar must name a scalar ProtoType", origins);
             return null;
         }
         if (!hasInstance(adapter)) {
-            error(origin, "adapter " + adapterName + " must declare public static final INSTANCE");
+            error("adapter " + adapterName + " must declare public static final INSTANCE", origins);
             return null;
         }
         List<? extends TypeMirror> args = iface.getTypeArguments();
         if (args.size() != 2) {
-            error(origin, "adapter " + adapterName + " must bind ProtoAdapter type parameters");
+            error("adapter " + adapterName + " must bind ProtoAdapter type parameters", origins);
             return null;
         }
         TypeMirror j = args.get(0);
         TypeMirror w = args.get(1);
         if (!isResolvedType(j) || !isResolvedType(w)) {
-            error(origin, "adapter " + adapterName + " must bind ProtoAdapter type parameters");
+            error("adapter " + adapterName + " must bind ProtoAdapter type parameters", origins);
             return null;
         }
         if (j instanceof DeclaredType declaredJ && !declaredJ.getTypeArguments().isEmpty()) {
-            error(origin, "adapter J must be a non-parameterized class");
+            error("adapter J must be a non-parameterized class", origins);
             return null;
         }
         if (!isRequiredWireType(w, protoType)) {
-            error(origin, "adapter " + adapterName + " ProtoType." + protoType
-                + " requires " + requiredWireName(protoType) + ", not " + simpleTypeName(w));
+            error("adapter " + adapterName + " ProtoType." + protoType
+                + " requires " + requiredWireName(protoType) + ", not " + simpleTypeName(w), origins);
             return null;
         }
         return new ResolvedAdapter(adapter, j, w, protoType);
+    }
+
+    private void error(String message, Element... origins) {
+        for (Element origin : origins) {
+            error(origin, message);
+        }
     }
 
     private ProtoType bindAdapterProtoType(ResolvedAdapter adapter, ProtoType declared, Element origin, String name) {
