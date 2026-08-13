@@ -146,4 +146,29 @@ class ProtoviaProcessorTest {
                                 "}"));
         assertThat(compilation).hadErrorContaining("map key");
     }
+
+    @Test
+    void boxedIntegerArrayUsesToArrayNotToIntArray() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Nums",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "@ProtoMessage",
+                        "public class Nums {",
+                        "  @ProtoField(number = 1) public int[] primitive;",
+                        "  @ProtoField(number = 2) public Integer[] boxed;",
+                        "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.NumsProtoCodec")
+                .contentsAsUtf8String()
+                .contains("toIntArray()");
+        assertThat(compilation)
+                .generatedSourceFile("demo.NumsProtoCodec")
+                .contentsAsUtf8String()
+                .contains("toArray(new java.lang.Integer[0])");
+    }
 }

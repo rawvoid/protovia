@@ -127,8 +127,7 @@ public final class CodecGenerator {
     }
 
     private void emitComputeRepeated(JavaWriter w, FieldModel field) {
-        String empty = field.array ? field.localName + ".length == 0" : field.localName + ".isEmpty()";
-        w.open("if (" + field.localName + " != null && !" + empty + ")");
+        w.open("if (" + presentRepeated(field) + ")");
         if (field.packed && field.packable()) {
             w.line("int " + field.localName + "Packed = " + packedSizeHelper(field) + "(" + field.localName + ");");
             w.line("cache.push(" + field.localName + "Packed);");
@@ -231,8 +230,7 @@ public final class CodecGenerator {
     }
 
     private void emitWriteRepeated(JavaWriter w, FieldModel field) {
-        String empty = field.array ? field.localName + ".length == 0" : field.localName + ".isEmpty()";
-        w.open("if (" + field.localName + " != null && !" + empty + ")");
+        w.open("if (" + presentRepeated(field) + ")");
         String tag = Names.tagConstant(field.name);
         if (field.packed && field.packable()) {
             w.line("int " + field.localName + "Packed = writer.hasCachedSize()");
@@ -866,6 +864,13 @@ public final class CodecGenerator {
             return "java.util.Optional.of(" + expr + ")";
         }
         return expr;
+    }
+
+    private String presentRepeated(FieldModel field) {
+        if (field.array) {
+            return field.localName + " != null && " + field.localName + ".length != 0";
+        }
+        return field.localName + " != null && !" + field.localName + ".isEmpty()";
     }
 
     private String collectionEnsureCall(FieldModel field) {

@@ -93,7 +93,7 @@ public final class FieldModel {
 
     public String primitiveListType() {
         if (array) {
-            return primitiveListClass();
+            return element != null && element.primitive ? primitiveListClass() : null;
         }
         if (implTypeName != null && implTypeName.contains("protovia.collect.")) {
             return implTypeName;
