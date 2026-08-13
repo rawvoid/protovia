@@ -475,7 +475,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.NumsProtoCodec")
             .contentsAsUtf8String()
-            .contains("instanceof io.github.rawvoid.protovia.collect.IntArrayList");
+            .contains("import io.github.rawvoid.protovia.collect.IntArrayList");
+        assertThat(compilation)
+            .generatedSourceFile("demo.NumsProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof IntArrayList");
         assertThat(compilation)
             .generatedSourceFile("demo.NumsProtoCodec")
             .contentsAsUtf8String()
