@@ -17,6 +17,7 @@
 package io.github.rawvoid.protovia.annotation;
 
 import io.github.rawvoid.protovia.ProtoType;
+import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
 import java.lang.annotation.*;
 
@@ -62,4 +63,12 @@ public @interface ProtoField {
      * Requires a boxed / {@link java.util.Optional} Java type, not a primitive.
      */
     boolean optional() default false;
+
+    /**
+     * Field-level adapter. {@link ProtoAdapter.Unset} means resolve from
+     * {@link ProtoAdapters} / {@link ProtoAdapted}.
+     * On a {@code Map} this applies to the key or the value only when
+     * the adapter's {@code J} matches that side.
+     */
+    Class<? extends ProtoAdapter<?, ?>> adapter() default ProtoAdapter.Unset.class;
 }

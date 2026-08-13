@@ -22,30 +22,19 @@ import io.github.rawvoid.protovia.codec.ProtoAdapter;
 import java.lang.annotation.*;
 
 /**
- * Field number of one permitted subtype of a {@link ProtoOneof} sealed type.
- * The type may be top-level or nested. The number belongs to the parent message.
+ * Wire proto scalar produced by a {@link ProtoAdapter}. Must not be
+ * {@link ProtoType#AUTO}, {@link ProtoType#ENUM}, or {@link ProtoType#MESSAGE}.
  *
  * @author Rawvoid
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.CLASS)
-public @interface ProtoOneofCase {
+public @interface ProtoScalar {
 
     /**
-     * Parent-message field number for this case, in {@code [1, 536870911]}.
+     * Proto scalar this adapter produces. Must not be {@link ProtoType#AUTO},
+     * {@link ProtoType#ENUM}, or {@link ProtoType#MESSAGE}.
      */
-    int value();
-
-    /**
-     * Wire type of this case's payload. {@link ProtoType#AUTO} infers from the Java type
-     * or the adapter's {@link ProtoScalar}.
-     */
-    ProtoType type() default ProtoType.AUTO;
-
-    /**
-     * Case-level adapter. {@link ProtoAdapter.Unset} means resolve from
-     * {@link ProtoAdapters} / {@link ProtoAdapted}.
-     */
-    Class<? extends ProtoAdapter<?, ?>> adapter() default ProtoAdapter.Unset.class;
+    ProtoType value();
 }
