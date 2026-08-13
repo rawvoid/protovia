@@ -54,6 +54,7 @@ public final class ProtoReader {
 
     /**
      * Reads the next tag. Returns {@code 0} at the current limit / end of input.
+     * Field number 0 is never valid (protobuf {@code ArrayDecoder.readTag}).
      */
     public int readTag() {
         if (pos >= currentLimit) {
@@ -61,16 +62,8 @@ public final class ProtoReader {
             return 0;
         }
         int tag = readRawVarint32();
-        if (tag == 0) {
-            throw new ProtoException("invalid tag 0");
-        }
-        int wireType = WireType.getWireType(tag);
-        if (wireType == WireType.END_GROUP) {
-            lastTag = tag;
-            return tag;
-        }
-        if (wireType > WireType.I32) {
-            throw new ProtoException("invalid wire type " + wireType);
+        if (WireType.fieldNumber(tag) == 0) {
+            throw new ProtoException("invalid tag " + tag);
         }
         lastTag = tag;
         return tag;
@@ -189,11 +182,11 @@ public final class ProtoReader {
 
     public int pushLimit(int byteLength) {
         checkLength(byteLength);
-        int old = currentLimit;
         int next = pos + byteLength;
-        if (next > currentLimit) {
+        if (next < pos || next > currentLimit) {
             throw new ProtoException("truncated message: nested length " + byteLength);
         }
+        int old = currentLimit;
         currentLimit = next;
         return old;
     }

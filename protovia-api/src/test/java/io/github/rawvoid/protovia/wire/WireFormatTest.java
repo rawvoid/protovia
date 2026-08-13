@@ -199,6 +199,23 @@ class WireFormatTest {
     }
 
     @Test
+    void readTagRejectsFieldNumberZero() {
+        // Tags 1–7 are field 0 with a non-zero wire type; official protobuf rejects them all.
+        for (int wireType = 0; wireType <= 5; wireType++) {
+            int tag = wireType; // field 0
+            ProtoReader r = reader(bytes(tag));
+            assertThrows(ProtoException.class, r::readTag, "wireType=" + wireType);
+        }
+    }
+
+    @Test
+    void pushLimitRejectsOverflow() {
+        byte[] data = new byte[8];
+        ProtoReader r = new ProtoReader(data, 4, 4, Integer.MAX_VALUE, 100);
+        assertThrows(ProtoException.class, () -> r.pushLimit(Integer.MAX_VALUE));
+    }
+
+    @Test
     void malformedVarint() {
         byte[] data = new byte[11];
         for (int i = 0; i < 11; i++) {
