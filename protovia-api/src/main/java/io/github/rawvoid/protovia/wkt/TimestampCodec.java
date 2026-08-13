@@ -24,6 +24,11 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
     }
 
     @Override
+    public String protoFullName() {
+        return "google.protobuf.Timestamp";
+    }
+
+    @Override
     public boolean cachesNestedSizes() {
         return true;
     }

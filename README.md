@@ -97,6 +97,11 @@ Generated codecs:
 | `byte[]`, `ByteBuffer` | bytes | |
 | `@ProtoEnum` enum | enum | |
 | `@ProtoMessage` type | message | |
+| `@ProtoOneof` sealed interface | oneof (cases flatten onto the parent) | |
+| `java.time.Instant` | `google.protobuf.Timestamp` | |
+| `java.time.Duration` | `google.protobuf.Duration` | |
+| `ProtoAny` | `google.protobuf.Any` | |
+| `wkt.Int32Value` and the other 8 wrappers | wrapper messages | |
 | `List` / `Set` / array (not `byte[]`) | repeated | `packed` (default `true` for scalars) |
 | `Map<K,V>` | map | `keyType` / `valueType` |
 | `Optional<T>` | proto3 optional T | |
@@ -120,7 +125,18 @@ Map keys must be integral, `bool`, or `string`. Field numbers are **required** a
 
 - `@ProtoEnum` on the type, `@ProtoEnumValue(n)` on every constant
 - A `0` value is required (proto3)
-- Unknown numbers on the wire are skipped
+- Unknown numbers on the wire are skipped unless the enum has `@ProtoUnrecognized`
+- `@ProtoUnrecognized` is a Java-only sentinel and is never written as a number
+
+**oneof**
+
+- Mark the field `@ProtoOneof` (no field number). The type must be `sealed`.
+- Each permitted type is `@ProtoOneofCase(n)` — that number is the parent field.
+- A one-component scalar record encodes as that scalar, not a nested message.
+
+**Unknown fields**
+
+- Opt in with `@ProtoUnknown UnknownFields` to capture and write back unknown tags.
 
 **Presence**
 
@@ -138,13 +154,17 @@ ProtoVia.read(User.class, inputStream);
 ProtoVia.sizeOf(message);
 ProtoVia.codec(User.class);
 ProtoVia.register(User.class, handWrittenCodec); // tests / override
+ProtoAny packed = ProtoVia.pack(user);           // type.googleapis.com/<protoFullName>
+User back = ProtoVia.unpack(packed, User.class);
 ```
+
+`pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. `Integer` stays int32; use `Int32Value` when you need the wrapper message.
 
 Default safety limits: 64 MiB per message, nesting depth 100. Override with `ProtoVia.setMaxMessageSize` / `setMaxDepth`.
 
-## Not in v1
+## Not in this release
 
-`.proto` import/export, oneof, proto2 required/default, well-known types (`Timestamp`, `Any`, …), unknown-field preservation, inheritance, Lombok-specific integration.
+`.proto` import/export, proto2 required/default, `Struct` / `Value`, inheritance, Lombok-specific integration.
 
 ## Build
 

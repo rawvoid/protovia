@@ -110,6 +110,32 @@ public final class ProtoVia {
         }
     }
 
+    /**
+     * Packs {@code message} as {@code google.protobuf.Any}.
+     * {@code type_url} is {@code type.googleapis.com/} plus {@link ProtoCodec#protoFullName()}.
+     */
+    public static ProtoAny pack(Object message) {
+        return pack(message, ProtoAny.TYPE_URL_PREFIX);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static ProtoAny pack(Object message, String typeUrlPrefix) {
+        Objects.requireNonNull(message, "message");
+        Objects.requireNonNull(typeUrlPrefix, "typeUrlPrefix");
+        ProtoCodec<Object> codec = codec((Class<Object>) message.getClass());
+        return new ProtoAny(ProtoAny.typeUrl(typeUrlPrefix, codec.protoFullName()), toBytes(message));
+    }
+
+    public static <T> T unpack(ProtoAny any, Class<T> type) {
+        Objects.requireNonNull(any, "any");
+        return any.unpack(codec(type));
+    }
+
+    public static boolean is(ProtoAny any, Class<?> type) {
+        Objects.requireNonNull(any, "any");
+        return any.is(codec(type));
+    }
+
     static byte[] readBounded(InputStream in, int max) throws IOException {
         byte[] buf = in.readNBytes(max + 1);
         if (buf.length > max) {

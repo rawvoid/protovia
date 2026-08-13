@@ -14,6 +14,8 @@ import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
 import io.github.rawvoid.protovia.itest.model.UserProtoCodec;
 import io.github.rawvoid.protovia.itest.model.UserRecord;
+import io.github.rawvoid.protovia.itest.model.Carrier;
+import io.github.rawvoid.protovia.wkt.Int32Value;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -55,6 +57,19 @@ class RoundTripTest {
         byte[] bytes = ProtoVia.toBytes(record);
         UserRecord back = ProtoVia.fromBytes(UserRecord.class, bytes);
         assertEquals(record, back);
+    }
+
+    @Test
+    void anyAndWrapperRoundTrip() {
+        Carrier carrier = new Carrier();
+        carrier.name = "box";
+        carrier.count = new Int32Value(0);
+        carrier.extra = ProtoVia.pack(new Int32Value(7));
+        Carrier back = ProtoVia.fromBytes(Carrier.class, ProtoVia.toBytes(carrier));
+        assertEquals("box", back.name);
+        assertEquals(new Int32Value(0), back.count);
+        assertEquals(new Int32Value(7), ProtoVia.unpack(back.extra, Int32Value.class));
+        assertEquals("example.v1.Carrier", ProtoVia.codec(Carrier.class).protoFullName());
     }
 
     @Test

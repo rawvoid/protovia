@@ -24,6 +24,11 @@ public final class DurationCodec implements ProtoCodec<Duration> {
     }
 
     @Override
+    public String protoFullName() {
+        return "google.protobuf.Duration";
+    }
+
+    @Override
     public boolean cachesNestedSizes() {
         return true;
     }

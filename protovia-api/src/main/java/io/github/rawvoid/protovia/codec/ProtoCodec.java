@@ -12,6 +12,15 @@ public interface ProtoCodec<T> {
 
     Class<T> type();
 
+    /**
+     * Protobuf full name ({@code package.Message}) used by Any {@code type_url}.
+     * Generated codecs use {@code @ProtoMessage(packageName, name)}; well-known
+     * types return {@code google.protobuf.*}. Default is the Java simple name.
+     */
+    default String protoFullName() {
+        return type().getSimpleName();
+    }
+
     int computeSize(T value);
 
     /**

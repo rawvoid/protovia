@@ -43,6 +43,11 @@ public final class CodecGenerator {
         w.close();
         w.line("");
         w.line("@Override");
+        w.open("public String protoFullName()");
+        w.line("return \"" + model.protoFullName() + "\";");
+        w.close();
+        w.line("");
+        w.line("@Override");
         w.open("public boolean cachesNestedSizes()");
         w.line("return true;");
         w.close();

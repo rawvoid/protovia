@@ -2,8 +2,11 @@ package io.github.rawvoid.protovia;
 
 import io.github.rawvoid.protovia.support.User;
 import io.github.rawvoid.protovia.support.UserProtoCodec;
+import io.github.rawvoid.protovia.wkt.Int32Value;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -14,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProtoViaTest {
 
@@ -74,6 +78,21 @@ class ProtoViaTest {
         ProtoVia.write(out, user);
         User back = ProtoVia.read(User.class, new ByteArrayInputStream(out.toByteArray()));
         assertEquals(user, back);
+    }
+
+    @Test
+    void packUnpackUserAndInstant() {
+        User user = sample();
+        ProtoAny packed = ProtoVia.pack(user);
+        assertEquals("type.googleapis.com/User", packed.typeUrl());
+        assertTrue(ProtoVia.is(packed, User.class));
+        assertEquals(user, ProtoVia.unpack(packed, User.class));
+
+        Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
+        ProtoAny time = ProtoVia.pack(at);
+        assertEquals("type.googleapis.com/google.protobuf.Timestamp", time.typeUrl());
+        assertEquals(at, ProtoVia.unpack(time, Instant.class));
+        assertThrows(ProtoException.class, () -> ProtoVia.unpack(time, Int32Value.class));
     }
 
     @Test

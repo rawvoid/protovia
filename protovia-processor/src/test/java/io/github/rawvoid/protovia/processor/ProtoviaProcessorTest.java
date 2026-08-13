@@ -261,6 +261,43 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void wellKnownAnyAndWrappersUseBuiltinCodecs() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Box",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.ProtoAny;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "import io.github.rawvoid.protovia.wkt.Int32Value;",
+                        "import java.time.Instant;",
+                        "@ProtoMessage(name = \"Box\", packageName = \"example.v1\")",
+                        "public class Box {",
+                        "  @ProtoField(number = 1) public Instant at;",
+                        "  @ProtoField(number = 2) public ProtoAny extra;",
+                        "  @ProtoField(number = 3) public Int32Value count;",
+                        "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.BoxProtoCodec")
+                .contentsAsUtf8String()
+                .contains("return \"example.v1.Box\";");
+        assertThat(compilation)
+                .generatedSourceFile("demo.BoxProtoCodec")
+                .contentsAsUtf8String()
+                .contains("io.github.rawvoid.protovia.wkt.AnyCodec.INSTANCE");
+        assertThat(compilation)
+                .generatedSourceFile("demo.BoxProtoCodec")
+                .contentsAsUtf8String()
+                .contains("io.github.rawvoid.protovia.wkt.Int32Value.INSTANCE");
+        assertThat(compilation)
+                .generatedSourceFile("demo.BoxProtoCodec")
+                .contentsAsUtf8String()
+                .contains("io.github.rawvoid.protovia.wkt.TimestampCodec.INSTANCE");
+    }
+
+    @Test
     void boxedIntegerArrayUsesToArrayNotToIntArray() {
         Compilation compilation = javac()
                 .withProcessors(new ProtoviaProcessor())

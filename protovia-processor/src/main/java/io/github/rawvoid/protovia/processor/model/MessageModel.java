@@ -39,6 +39,10 @@ public final class MessageModel {
         this.unknown = unknown;
     }
 
+    public String protoFullName() {
+        return protoPackage.isEmpty() ? protoMessageName : protoPackage + "." + protoMessageName;
+    }
+
     public record RecordComponentModel(String name, String typeName, String defaultExpr, FieldModel field) {
     }
 

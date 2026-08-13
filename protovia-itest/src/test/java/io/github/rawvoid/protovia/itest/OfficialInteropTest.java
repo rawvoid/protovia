@@ -4,10 +4,12 @@ import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.ByteString;
+import io.github.rawvoid.protovia.ProtoAny;
 import io.github.rawvoid.protovia.ProtoVia;
 
 import java.time.Instant;
 import io.github.rawvoid.protovia.itest.model.Address;
+import io.github.rawvoid.protovia.itest.model.Carrier;
 import io.github.rawvoid.protovia.itest.model.Contact;
 import io.github.rawvoid.protovia.itest.model.Email;
 import io.github.rawvoid.protovia.itest.model.Envelope;
@@ -17,6 +19,8 @@ import io.github.rawvoid.protovia.wkt.DurationCodec;
 import io.github.rawvoid.protovia.wkt.TimestampCodec;
 import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
+import io.github.rawvoid.protovia.wkt.Int32Value;
+import io.github.rawvoid.protovia.wkt.StringValue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +29,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OfficialInteropTest {
@@ -263,6 +268,83 @@ class OfficialInteropTest {
     }
 
     @Test
+    void anyPacksInstantAgainstOfficial() throws Exception {
+        Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
+        ProtoAny packed = ProtoVia.pack(at);
+        com.google.protobuf.Any official = com.google.protobuf.Any.parseFrom(ProtoVia.toBytes(packed));
+        assertEquals("type.googleapis.com/google.protobuf.Timestamp", official.getTypeUrl());
+        com.google.protobuf.Timestamp ts = official.unpack(com.google.protobuf.Timestamp.class);
+        assertEquals(at.getEpochSecond(), ts.getSeconds());
+        assertEquals(at.getNano(), ts.getNanos());
+
+        com.google.protobuf.Any officialPack = com.google.protobuf.Any.pack(
+                com.google.protobuf.Timestamp.newBuilder()
+                        .setSeconds(at.getEpochSecond())
+                        .setNanos(at.getNano())
+                        .build());
+        ProtoAny back = ProtoVia.fromBytes(ProtoAny.class, officialPack.toByteArray());
+        assertTrue(ProtoVia.is(back, Instant.class));
+        assertEquals(at, ProtoVia.unpack(back, Instant.class));
+    }
+
+    @Test
+    void anyPacksUserAgainstDynamicMessage() throws Exception {
+        User user = sample();
+        ProtoAny packed = ProtoVia.pack(user);
+        assertEquals("type.googleapis.com/User", packed.typeUrl());
+        assertEquals(user, ProtoVia.unpack(packed, User.class));
+
+        com.google.protobuf.Any official = com.google.protobuf.Any.parseFrom(ProtoVia.toBytes(packed));
+        assertEquals("type.googleapis.com/User", official.getTypeUrl());
+        DynamicMessage parsed = DynamicMessage.parseFrom(userDescriptor, official.getValue().toByteArray());
+        assertEquals("Ada", parsed.getField(userDescriptor.findFieldByName("name")));
+
+        DynamicMessage officialUser = DynamicMessage.parseFrom(userDescriptor, ProtoVia.toBytes(user));
+        com.google.protobuf.Any officialPack = com.google.protobuf.Any.pack(officialUser);
+        User back = ProtoVia.unpack(ProtoVia.fromBytes(ProtoAny.class, officialPack.toByteArray()), User.class);
+        assertEquals("Ada", back.getName());
+        assertEquals(36, back.getAge());
+    }
+
+    @Test
+    void wrappersMatchOfficial() throws Exception {
+        assertArrayEquals(
+                com.google.protobuf.Int32Value.of(42).toByteArray(),
+                encode(Int32Value.INSTANCE, new Int32Value(42)));
+        assertEquals(0, encode(Int32Value.INSTANCE, new Int32Value(0)).length);
+        assertEquals(
+                42,
+                com.google.protobuf.Int32Value.parseFrom(
+                        encode(Int32Value.INSTANCE, new Int32Value(42))).getValue());
+        assertEquals(
+                new Int32Value(-7),
+                Int32Value.INSTANCE.readFrom(new io.github.rawvoid.protovia.wire.ProtoReader(
+                        com.google.protobuf.Int32Value.of(-7).toByteArray())));
+
+        assertArrayEquals(
+                com.google.protobuf.StringValue.of("hi").toByteArray(),
+                encode(StringValue.INSTANCE, new StringValue("hi")));
+
+        Carrier carrier = new Carrier();
+        carrier.name = "box";
+        carrier.count = new Int32Value(0);
+        carrier.extra = ProtoVia.pack(new Int32Value(7));
+        byte[] bytes = ProtoVia.toBytes(carrier);
+        // field 3 Int32Value(0) is present as an empty nested message: tag 0x1A, length 0
+        assertTrue(indexOf(bytes, new byte[]{0x1A, 0x00}) >= 0);
+
+        com.google.protobuf.Any officialAny = com.google.protobuf.Any.parseFrom(
+                ProtoVia.toBytes(carrier.extra));
+        assertEquals(7, officialAny.unpack(com.google.protobuf.Int32Value.class).getValue());
+
+        Carrier back = ProtoVia.fromBytes(Carrier.class, bytes);
+        assertEquals("box", back.name);
+        assertEquals(new Int32Value(0), back.count);
+        assertEquals(new Int32Value(7), ProtoVia.unpack(back.extra, Int32Value.class));
+        assertFalse(ProtoVia.is(back.extra, StringValue.class));
+    }
+
+    @Test
     void emptyMessageInteroperable() throws Exception {
         byte[] empty = ProtoVia.toBytes(new User());
         DynamicMessage parsed = DynamicMessage.parseFrom(userDescriptor, empty);
@@ -285,6 +367,19 @@ class OfficialInteropTest {
         user.setUnpacked(List.of(8, 9));
         user.setPayload(new byte[]{1, 2, 3});
         return user;
+    }
+
+    private static int indexOf(byte[] haystack, byte[] needle) {
+        outer:
+        for (int i = 0; i <= haystack.length - needle.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
     }
 
     private static DescriptorProtos.FieldDescriptorProto.Builder field(

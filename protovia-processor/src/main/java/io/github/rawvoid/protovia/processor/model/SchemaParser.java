@@ -37,6 +37,20 @@ import java.util.Set;
 
 public final class SchemaParser {
 
+    private static final Map<String, String> WELL_KNOWN_CODECS = Map.ofEntries(
+            Map.entry("java.time.Instant", "io.github.rawvoid.protovia.wkt.TimestampCodec"),
+            Map.entry("java.time.Duration", "io.github.rawvoid.protovia.wkt.DurationCodec"),
+            Map.entry("io.github.rawvoid.protovia.ProtoAny", "io.github.rawvoid.protovia.wkt.AnyCodec"),
+            Map.entry("io.github.rawvoid.protovia.wkt.DoubleValue", "io.github.rawvoid.protovia.wkt.DoubleValue"),
+            Map.entry("io.github.rawvoid.protovia.wkt.FloatValue", "io.github.rawvoid.protovia.wkt.FloatValue"),
+            Map.entry("io.github.rawvoid.protovia.wkt.Int64Value", "io.github.rawvoid.protovia.wkt.Int64Value"),
+            Map.entry("io.github.rawvoid.protovia.wkt.UInt64Value", "io.github.rawvoid.protovia.wkt.UInt64Value"),
+            Map.entry("io.github.rawvoid.protovia.wkt.Int32Value", "io.github.rawvoid.protovia.wkt.Int32Value"),
+            Map.entry("io.github.rawvoid.protovia.wkt.UInt32Value", "io.github.rawvoid.protovia.wkt.UInt32Value"),
+            Map.entry("io.github.rawvoid.protovia.wkt.BoolValue", "io.github.rawvoid.protovia.wkt.BoolValue"),
+            Map.entry("io.github.rawvoid.protovia.wkt.StringValue", "io.github.rawvoid.protovia.wkt.StringValue"),
+            Map.entry("io.github.rawvoid.protovia.wkt.BytesValue", "io.github.rawvoid.protovia.wkt.BytesValue"));
+
     private final Types types;
     private final Elements elements;
     private final Messager messager;
@@ -55,8 +69,6 @@ public final class SchemaParser {
     private final TypeMirror collectionType;
     private final TypeMirror mapType;
     private final TypeMirror optionalType;
-    private final TypeMirror instantType;
-    private final TypeMirror durationType;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.types = types;
@@ -75,8 +87,6 @@ public final class SchemaParser {
         this.collectionType = erasure("java.util.Collection");
         this.mapType = erasure("java.util.Map");
         this.optionalType = erasure("java.util.Optional");
-        this.instantType = elements.getTypeElement("java.time.Instant").asType();
-        this.durationType = elements.getTypeElement("java.time.Duration").asType();
     }
 
     public boolean hasErrors() {
@@ -853,16 +863,14 @@ public final class SchemaParser {
             }
             return r;
         }
-        if (isSame(type, instantType)) {
-            return wellKnown(origin, name, declared, "io.github.rawvoid.protovia.wkt.TimestampCodec");
-        }
-        if (isSame(type, durationType)) {
-            return wellKnown(origin, name, declared, "io.github.rawvoid.protovia.wkt.DurationCodec");
-        }
         TypeElement element = asTypeElement(type);
         if (element == null) {
             error(origin, "unsupported type for field '" + name + "': " + type);
             return null;
+        }
+        String wellKnownCodec = WELL_KNOWN_CODECS.get(element.getQualifiedName().toString());
+        if (wellKnownCodec != null) {
+            return wellKnown(origin, name, declared, wellKnownCodec);
         }
         if (element.getKind() == ElementKind.ENUM) {
             if (element.getAnnotation(ProtoEnum.class) == null) {
