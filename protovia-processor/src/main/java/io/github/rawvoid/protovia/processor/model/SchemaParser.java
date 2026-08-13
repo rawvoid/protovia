@@ -626,7 +626,9 @@ public final class SchemaParser {
     private OneofCaseModel parseOneofCase(TypeElement caseType, int number, String oneofName, String pkg) {
         String typeName = Names.typeName(caseType, pkg);
         String tag = Names.tagConstant(number);
+        TypeElement fieldAdapter = adapterFrom(caseType, PROTO_ONEOF_CASE_ANN);
         if (caseType.getAnnotation(ProtoMessage.class) != null) {
+            rejectOneofAdapter(caseType, fieldAdapter);
             String codec = Names.codecSimpleName(elements, caseType);
             String codecPkg = Names.packageName(caseType);
             if (!codecPkg.equals(pkg) && !codecPkg.isEmpty()) {
@@ -649,6 +651,7 @@ public final class SchemaParser {
         }
         List<? extends RecordComponentElement> components = caseType.getRecordComponents();
         if (components.isEmpty()) {
+            rejectOneofAdapter(caseType, fieldAdapter);
             return new OneofCaseModel(number, caseType, typeName, tag, null, null, false);
         }
         if (components.size() != 1) {
@@ -680,7 +683,7 @@ public final class SchemaParser {
             pkg,
             false,
             payloadType,
-            adapterFrom(caseType, PROTO_ONEOF_CASE_ANN),
+            fieldAdapter,
             number,
             AdapterSite.ONEOF);
         if (payload == null) {
@@ -965,6 +968,12 @@ public final class SchemaParser {
             .wireJavaType(adapter.w)
             .origin(origin)
             .build();
+    }
+
+    private void rejectOneofAdapter(Element origin, TypeElement fieldAdapter) {
+        if (fieldAdapter != null) {
+            error(origin, "adapters on repeated/map/oneof are not enabled yet");
+        }
     }
 
     private TypeElement adapterFrom(Element origin, String annotationName) {

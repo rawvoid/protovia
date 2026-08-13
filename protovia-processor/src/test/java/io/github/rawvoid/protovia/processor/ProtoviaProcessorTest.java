@@ -682,6 +682,73 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void adapterOnEmptyOneofCaseFailsWithE23() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Event",
+                    "package demo;",
+                    "public sealed interface Event permits Empty, Label {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Empty",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
+                    "public record Empty() implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof public Event event;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+    }
+
+    @Test
+    void adapterOnProtoMessageOneofCaseFailsWithE23() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Target",
+                    "package demo;",
+                    "public sealed interface Target permits Addr, Label {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Addr",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoMessage",
+                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
+                    "public record Addr(@ProtoField(number = 1) String city) implements Target {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(11) public record Label(String s) implements Target {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof public Target target;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+    }
+
+    @Test
     void adapterInterfaceAsValueFails() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
