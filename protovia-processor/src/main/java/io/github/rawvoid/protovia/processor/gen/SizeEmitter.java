@@ -37,10 +37,12 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
@@ -113,7 +115,12 @@ final class SizeEmitter {
         CodeBlock.Builder b, FieldModel field, String var, int number, boolean optional, boolean javaOptional) {
         String valueExpr = javaOptional ? var + ".get()" : var;
         b.beginControlFlow("if ($L)", presentCondition(field, var, optional, javaOptional));
-        b.addStatement("size += $L", sizeCall(field, number, valueExpr));
+        if (field.adapterType != null) {
+            assignToWire(b, field, valueExpr);
+            b.addStatement("size += $L", sizeCall(field, number, wireLocal(field)));
+        } else {
+            b.addStatement("size += $L", sizeCall(field, number, valueExpr));
+        }
         b.endControlFlow();
     }
 

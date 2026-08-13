@@ -40,6 +40,11 @@ import java.util.*;
  */
 public final class SchemaParser {
 
+    private static final String PROTO_ADAPTER = "io.github.rawvoid.protovia.codec.ProtoAdapter";
+    private static final String PROTO_ADAPTER_UNSET = "io.github.rawvoid.protovia.codec.ProtoAdapter.Unset";
+    private static final String PROTO_FIELD_ANN = "io.github.rawvoid.protovia.annotation.ProtoField";
+    private static final String PROTO_ONEOF_CASE_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneofCase";
+
     private static final Map<String, String> WELL_KNOWN_CODECS = Map.ofEntries(
         Map.entry("java.time.Instant", "io.github.rawvoid.protovia.wkt.TimestampCodec"),
         Map.entry("java.time.Duration", "io.github.rawvoid.protovia.wkt.DurationCodec"),
@@ -70,6 +75,7 @@ public final class SchemaParser {
     private final TypeMirror collectionType;
     private final TypeMirror mapType;
     private final TypeMirror optionalType;
+    private final TypeElement protoAdapterType;
     private boolean errors;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
@@ -89,6 +95,7 @@ public final class SchemaParser {
         this.collectionType = erasure("java.util.Collection");
         this.mapType = erasure("java.util.Map");
         this.optionalType = erasure("java.util.Optional");
+        this.protoAdapterType = elements.getTypeElement(PROTO_ADAPTER);
     }
 
     /**
@@ -657,11 +664,13 @@ public final class SchemaParser {
             error(caseType, "oneof case cannot be repeated or map");
             return null;
         }
+        ProtoOneofCase caseAnn = caseType.getAnnotation(ProtoOneofCase.class);
+        ProtoType declared = caseAnn == null ? ProtoType.AUTO : caseAnn.type();
         FieldModel payload = resolveSingular(
             caseType,
             caseType.getSimpleName() + "Payload",
             payloadType,
-            ProtoType.AUTO,
+            declared,
             false,
             false,
             AccessKind.RECORD,
@@ -670,7 +679,10 @@ public final class SchemaParser {
             null,
             pkg,
             false,
-            payloadType);
+            payloadType,
+            adapterFrom(caseType, PROTO_ONEOF_CASE_ANN),
+            number,
+            AdapterSite.ONEOF);
         if (payload == null) {
             return null;
         }
@@ -697,23 +709,27 @@ public final class SchemaParser {
             }
         }
         boolean optional = ann.optional() || javaOptional;
+        TypeElement fieldAdapter = adapterFrom(protoFieldHost(origin), PROTO_FIELD_ANN);
         if (isMap(effective)) {
             if (optional) {
                 error(origin, "map field '" + name + "' cannot be optional");
                 return null;
             }
-            return resolveMap(origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional);
+            return resolveMap(
+                origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional, fieldAdapter);
         }
         if (isRepeatedContainer(effective)) {
             if (optional) {
                 error(origin, "repeated field '" + name + "' cannot be optional");
                 return null;
             }
-            return resolveRepeated(origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional);
+            return resolveRepeated(
+                origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional, fieldAdapter);
         }
         return resolveSingular(
             origin, name, effective, ann.type(), optional, ann.packed(),
-            accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
+            accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
+            fieldAdapter, ann.number(), AdapterSite.SINGULAR);
     }
 
     private FieldModel resolveRepeated(
@@ -726,7 +742,8 @@ public final class SchemaParser {
         String setter,
         String fieldName,
         String pkg,
-        boolean javaOptional) {
+        boolean javaOptional,
+        TypeElement fieldAdapter) {
         boolean array = type.getKind() == TypeKind.ARRAY;
         TypeMirror elementType;
         if (array) {
@@ -734,7 +751,8 @@ public final class SchemaParser {
             if (elementType.getKind() == TypeKind.BYTE) {
                 return resolveSingular(
                     origin, name, type, protoOrAuto(ann.type(), ProtoType.BYTES),
-                    ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
+                    ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
+                    fieldAdapter, ann.number(), AdapterSite.SINGULAR);
             }
         } else {
             elementType = typeArgument(type, 0, origin, "collection");
@@ -744,7 +762,8 @@ public final class SchemaParser {
         }
         FieldModel element = resolveSingular(
             origin, name + "Element", elementType, protoOrAuto(ann.type(), ProtoType.AUTO),
-            false, false, accessKind, null, null, null, pkg, false, elementType);
+            false, false, accessKind, null, null, null, pkg, false, elementType,
+            fieldAdapter, ann.number(), AdapterSite.REPEATED);
         if (element == null) {
             return null;
         }
@@ -786,7 +805,8 @@ public final class SchemaParser {
         String setter,
         String fieldName,
         String pkg,
-        boolean javaOptional) {
+        boolean javaOptional,
+        TypeElement fieldAdapter) {
         TypeMirror keyType = typeArgument(type, 0, origin, "Map");
         TypeMirror valueType = typeArgument(type, 1, origin, "Map");
         if (keyType == null || valueType == null) {
@@ -798,10 +818,12 @@ public final class SchemaParser {
         }
         FieldModel key = resolveSingular(
             origin, name + "Key", keyType, protoOrAuto(ann.keyType(), ProtoType.AUTO),
-            false, false, accessKind, null, null, null, pkg, false, keyType);
+            false, false, accessKind, null, null, null, pkg, false, keyType,
+            fieldAdapter, ann.number(), AdapterSite.MAP);
         FieldModel value = resolveSingular(
             origin, name + "Value", valueType, protoOrAuto(ann.valueType(), ProtoType.AUTO),
-            false, false, accessKind, null, null, null, pkg, false, valueType);
+            false, false, accessKind, null, null, null, pkg, false, valueType,
+            fieldAdapter, ann.number(), AdapterSite.MAP);
         if (key == null || value == null) {
             return null;
         }
@@ -843,17 +865,48 @@ public final class SchemaParser {
         String fieldName,
         String pkg,
         boolean javaOptional,
-        TypeMirror declaredJavaType) {
+        TypeMirror declaredJavaType,
+        TypeElement fieldAdapter,
+        int number,
+        AdapterSite site) {
         if (type.getKind().isPrimitive() && optional) {
             error(origin, "optional field '" + name + "' cannot be a primitive; use a boxed type or Optional");
             return null;
+        }
+        if (type.getKind().isPrimitive() && fieldAdapter != null) {
+            error(origin, "adapter cannot be applied to primitive field '" + name + "'");
+            return null;
+        }
+        if (fieldAdapter != null) {
+            ResolvedAdapter adapter = validateAdapter(fieldAdapter, origin);
+            if (adapter == null) {
+                return null;
+            }
+            boolean jMatch = types.isSameType(adapter.j, type);
+            if (!jMatch) {
+                if (site != AdapterSite.MAP) {
+                    error(origin, "adapter " + fieldAdapter.getSimpleName()
+                        + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
+                    return null;
+                }
+            } else if (site != AdapterSite.SINGULAR) {
+                error(origin, "adapters on repeated/map/oneof are not enabled yet");
+            } else {
+                ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);
+                if (protoType == null) {
+                    return null;
+                }
+                return adaptedSingular(
+                    origin, name, declaredJavaType, protoType, adapter, optional, packed,
+                    accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
+            }
         }
         Resolved resolved = classify(origin, name, type, declared, pkg);
         if (resolved == null) {
             return null;
         }
         return FieldModel.builder()
-            .number(origin.getAnnotation(ProtoField.class) != null ? origin.getAnnotation(ProtoField.class).number() : 0)
+            .number(number)
             .name(name)
             .localName(Names.safeLocal(name))
             .kind(resolved.kind)
@@ -875,6 +928,271 @@ public final class SchemaParser {
             .messageType(resolved.messageType)
             .origin(origin)
             .build();
+    }
+
+    private FieldModel adaptedSingular(
+        Element origin,
+        String name,
+        TypeMirror declaredJavaType,
+        ProtoType protoType,
+        ResolvedAdapter adapter,
+        boolean optional,
+        boolean packed,
+        AccessKind accessKind,
+        String readExpr,
+        String setter,
+        String fieldName,
+        String pkg,
+        boolean javaOptional,
+        int number) {
+        return FieldModel.builder()
+            .number(number)
+            .name(name)
+            .localName(Names.safeLocal(name))
+            .kind(FieldKind.SCALAR)
+            .protoType(protoType)
+            .optional(optional)
+            .packed(packed)
+            .primitive(false)
+            .javaOptional(javaOptional)
+            .accessKind(accessKind)
+            .readExpr(readExpr)
+            .setterName(setter)
+            .fieldName(fieldName)
+            .javaTypeName(renderType(declaredJavaType, pkg))
+            .javaType(declaredJavaType)
+            .adapterType(adapter.adapterType)
+            .wireJavaType(adapter.w)
+            .origin(origin)
+            .build();
+    }
+
+    private TypeElement adapterFrom(Element origin, String annotationName) {
+        AnnotationMirror mirror = findAnnotation(origin, annotationName);
+        if (mirror == null) {
+            return null;
+        }
+        AnnotationValue value = null;
+        for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+            : elements.getElementValuesWithDefaults(mirror).entrySet()) {
+            if (entry.getKey().getSimpleName().contentEquals("adapter")) {
+                value = entry.getValue();
+                break;
+            }
+        }
+        if (value == null || !(value.getValue() instanceof TypeMirror type)) {
+            return null;
+        }
+        if (type.getKind() == TypeKind.ERROR) {
+            error(origin, "adapter " + type + " cannot be resolved");
+            return null;
+        }
+        TypeElement adapter = asTypeElement(type);
+        if (adapter == null) {
+            error(origin, "adapter " + type + " cannot be resolved");
+            return null;
+        }
+        if (adapter.getQualifiedName().contentEquals(PROTO_ADAPTER_UNSET)) {
+            return null;
+        }
+        return adapter;
+    }
+
+    private Element protoFieldHost(Element origin) {
+        if (findAnnotation(origin, PROTO_FIELD_ANN) != null) {
+            return origin;
+        }
+        if (origin.getKind() == ElementKind.RECORD_COMPONENT) {
+            RecordComponentElement component = (RecordComponentElement) origin;
+            if (component.getAccessor() != null
+                && findAnnotation(component.getAccessor(), PROTO_FIELD_ANN) != null) {
+                return component.getAccessor();
+            }
+        }
+        return origin;
+    }
+
+    private AnnotationMirror findAnnotation(Element origin, String annotationName) {
+        for (AnnotationMirror mirror : origin.getAnnotationMirrors()) {
+            Element annotation = mirror.getAnnotationType().asElement();
+            if (annotation instanceof TypeElement type
+                && type.getQualifiedName().contentEquals(annotationName)) {
+                return mirror;
+            }
+        }
+        return null;
+    }
+
+    private ResolvedAdapter validateAdapter(TypeElement adapter, Element origin) {
+        String adapterName = adapter.getSimpleName().toString();
+        if (adapter.getKind() != ElementKind.CLASS
+            || adapter.getQualifiedName().contentEquals(PROTO_ADAPTER)) {
+            error(origin, "adapter must be a concrete type, not ProtoAdapter");
+            return null;
+        }
+        if (!isPublicType(adapter)) {
+            error(origin, "adapter " + adapterName + " must be a public type");
+            return null;
+        }
+        DeclaredType iface = findProtoAdapterIface(adapter);
+        if (iface == null) {
+            error(origin, "adapter " + adapterName + " must implement ProtoAdapter");
+            return null;
+        }
+        ProtoScalar scalar = adapter.getAnnotation(ProtoScalar.class);
+        if (scalar == null) {
+            error(origin, "adapter " + adapterName + " must be annotated with @ProtoScalar");
+            return null;
+        }
+        ProtoType protoType = scalar.value();
+        if (protoType == ProtoType.AUTO || protoType == ProtoType.ENUM || protoType == ProtoType.MESSAGE) {
+            error(origin, "@ProtoScalar must name a scalar ProtoType");
+            return null;
+        }
+        if (!hasInstance(adapter)) {
+            error(origin, "adapter " + adapterName + " must declare public static final INSTANCE");
+            return null;
+        }
+        List<? extends TypeMirror> args = iface.getTypeArguments();
+        if (args.size() != 2) {
+            error(origin, "adapter " + adapterName + " must bind ProtoAdapter type parameters");
+            return null;
+        }
+        TypeMirror j = args.get(0);
+        TypeMirror w = args.get(1);
+        if (!isResolvedType(j) || !isResolvedType(w)) {
+            error(origin, "adapter " + adapterName + " must bind ProtoAdapter type parameters");
+            return null;
+        }
+        if (j instanceof DeclaredType declaredJ && !declaredJ.getTypeArguments().isEmpty()) {
+            error(origin, "adapter J must be a non-parameterized class");
+            return null;
+        }
+        if (!isRequiredWireType(w, protoType)) {
+            error(origin, "adapter " + adapterName + " ProtoType." + protoType
+                + " requires " + requiredWireName(protoType) + ", not " + simpleTypeName(w));
+            return null;
+        }
+        return new ResolvedAdapter(adapter, j, w, protoType);
+    }
+
+    private ProtoType bindAdapterProtoType(ResolvedAdapter adapter, ProtoType declared, Element origin, String name) {
+        if (declared == ProtoType.AUTO) {
+            return adapter.p;
+        }
+        if (!familyOf(adapter.p).contains(declared)) {
+            error(origin, "field '" + name + "' Java type cannot use ProtoType." + declared);
+            return null;
+        }
+        return declared;
+    }
+
+    private DeclaredType findProtoAdapterIface(TypeElement adapter) {
+        if (protoAdapterType == null) {
+            return null;
+        }
+        TypeMirror target = types.erasure(protoAdapterType.asType());
+        Deque<TypeMirror> queue = new ArrayDeque<>();
+        queue.add(adapter.asType());
+        Set<String> seen = new HashSet<>();
+        while (!queue.isEmpty()) {
+            TypeMirror current = queue.removeFirst();
+            if (!(current instanceof DeclaredType declared)) {
+                continue;
+            }
+            TypeElement element = asTypeElement(declared);
+            if (element == null || !seen.add(element.getQualifiedName().toString())) {
+                continue;
+            }
+            if (types.isSameType(types.erasure(declared), target)) {
+                return declared;
+            }
+            queue.addAll(types.directSupertypes(declared));
+        }
+        return null;
+    }
+
+    private boolean isPublicType(TypeElement type) {
+        if (!type.getModifiers().contains(Modifier.PUBLIC)) {
+            return false;
+        }
+        Element enclosing = type.getEnclosingElement();
+        if (enclosing.getKind() == ElementKind.PACKAGE) {
+            return true;
+        }
+        if (enclosing instanceof TypeElement parent) {
+            return type.getModifiers().contains(Modifier.STATIC) && isPublicType(parent);
+        }
+        return false;
+    }
+
+    private boolean hasInstance(TypeElement adapter) {
+        for (VariableElement field : ElementFilter.fieldsIn(adapter.getEnclosedElements())) {
+            if (!field.getSimpleName().contentEquals("INSTANCE")) {
+                continue;
+            }
+            Set<Modifier> mods = field.getModifiers();
+            if (mods.contains(Modifier.PUBLIC)
+                && mods.contains(Modifier.STATIC)
+                && mods.contains(Modifier.FINAL)
+                && types.isAssignable(field.asType(), adapter.asType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isResolvedType(TypeMirror type) {
+        TypeKind kind = type.getKind();
+        return kind != TypeKind.WILDCARD && kind != TypeKind.TYPEVAR && kind != TypeKind.ERROR;
+    }
+
+    private boolean isRequiredWireType(TypeMirror w, ProtoType protoType) {
+        return switch (protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> isSame(w, integerType);
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> isSame(w, longType);
+            case BOOL -> isSame(w, booleanType);
+            case FLOAT -> isSame(w, floatType);
+            case DOUBLE -> isSame(w, doubleType);
+            case STRING -> isSame(w, stringType);
+            case BYTES -> w.getKind() == TypeKind.ARRAY
+                && ((ArrayType) w).getComponentType().getKind() == TypeKind.BYTE;
+            default -> false;
+        };
+    }
+
+    private String requiredWireName(ProtoType protoType) {
+        return switch (protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> "Integer";
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> "Long";
+            case BOOL -> "Boolean";
+            case FLOAT -> "Float";
+            case DOUBLE -> "Double";
+            case STRING -> "String";
+            case BYTES -> "byte[]";
+            default -> protoType.name();
+        };
+    }
+
+    private Set<ProtoType> familyOf(ProtoType protoType) {
+        return switch (protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> intFamily();
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> longFamily();
+            case BOOL -> Set.of(ProtoType.AUTO, ProtoType.BOOL);
+            case FLOAT -> Set.of(ProtoType.AUTO, ProtoType.FLOAT);
+            case DOUBLE -> Set.of(ProtoType.AUTO, ProtoType.DOUBLE);
+            case STRING -> Set.of(ProtoType.AUTO, ProtoType.STRING);
+            case BYTES -> Set.of(ProtoType.AUTO, ProtoType.BYTES);
+            default -> Set.of(ProtoType.AUTO);
+        };
+    }
+
+    private String simpleTypeName(TypeMirror type) {
+        if (type.getKind() == TypeKind.ARRAY) {
+            return simpleTypeName(((ArrayType) type).getComponentType()) + "[]";
+        }
+        TypeElement element = asTypeElement(type);
+        return element != null ? element.getSimpleName().toString() : type.toString();
     }
 
     private Resolved classify(Element origin, String name, TypeMirror type, ProtoType declared, String currentPkg) {
@@ -1169,6 +1487,13 @@ public final class SchemaParser {
         return type == ProtoType.AUTO ? fallback : type;
     }
 
+    enum AdapterSite {
+        SINGULAR,
+        REPEATED,
+        MAP,
+        ONEOF
+    }
+
     private static final class Access {
         final AccessKind kind;
         final String readExpr;
@@ -1189,5 +1514,19 @@ public final class SchemaParser {
         EnumModel enumModel;
         TypeElement messageType;
         String codecName;
+    }
+
+    private static final class ResolvedAdapter {
+        final TypeElement adapterType;
+        final TypeMirror j;
+        final TypeMirror w;
+        final ProtoType p;
+
+        ResolvedAdapter(TypeElement adapterType, TypeMirror j, TypeMirror w, ProtoType p) {
+            this.adapterType = adapterType;
+            this.j = j;
+            this.w = w;
+            this.p = p;
+        }
     }
 }

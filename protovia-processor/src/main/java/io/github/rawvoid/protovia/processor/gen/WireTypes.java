@@ -77,6 +77,9 @@ final class WireTypes {
         if (optional) {
             return CodeBlock.of("$L != null", var);
         }
+        if (field.adapterType != null) {
+            return CodeBlock.of("$L != null", var);
+        }
         if (field.primitive) {
             return switch (field.protoType) {
                 case BOOL -> CodeBlock.of("$L", var);

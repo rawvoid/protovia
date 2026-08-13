@@ -16,6 +16,8 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
+import com.palantir.javapoet.ArrayTypeName;
+import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
@@ -29,6 +31,7 @@ import java.util.function.BiConsumer;
 import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
 import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.ARRAY_LIST;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.adapterInstance;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.OPTIONAL;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
@@ -57,6 +60,32 @@ final class WireCodegen {
 
     static void loadField(CodeBlock.Builder b, FieldModel field) {
         b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr);
+    }
+
+    static TypeName wireLocalType(FieldModel field) {
+        return switch (field.protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> TypeName.INT;
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> TypeName.LONG;
+            case BOOL -> TypeName.BOOLEAN;
+            case FLOAT -> TypeName.FLOAT;
+            case DOUBLE -> TypeName.DOUBLE;
+            case STRING -> ClassName.get(String.class);
+            case BYTES -> ArrayTypeName.of(TypeName.BYTE);
+            default -> field.wireJavaType != null ? TypeName.get(field.wireJavaType) : TypeName.INT;
+        };
+    }
+
+    static String wireLocal(FieldModel field) {
+        return field.localName + "Wire";
+    }
+
+    static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue) {
+        b.addStatement("$T $L = $L.toWire($L)",
+            wireLocalType(field), wireLocal(field), adapterInstance(field), javaValue);
+    }
+
+    static CodeBlock fromWire(FieldModel field, CodeBlock read) {
+        return CodeBlock.of("$L.fromWire($L)", adapterInstance(field), read);
     }
 
     static void writeTag(CodeBlock.Builder b, Object tag) {

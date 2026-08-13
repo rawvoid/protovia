@@ -45,6 +45,7 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.messageType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.newImpl;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.collectionEnsure;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.fromWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.primitiveAdd;
@@ -160,7 +161,11 @@ final class ReadEmitter {
         switch (field.kind) {
             case SCALAR -> {
                 b.beginControlFlow("case $L ->", tag);
-                store(b, field, record, wrapOptional(field, readCall(field)));
+                CodeBlock read = readCall(field);
+                if (field.adapterType != null) {
+                    read = fromWire(field, read);
+                }
+                store(b, field, record, wrapOptional(field, read));
                 b.endControlFlow();
             }
             case ENUM -> {

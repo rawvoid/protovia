@@ -35,11 +35,13 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeCachedMessage;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeNoTag;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeTag;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
@@ -84,8 +86,14 @@ final class WriteEmitter {
             case SCALAR -> {
                 String valueExpr = field.javaOptional ? field.localName + ".get()" : field.localName;
                 b.beginControlFlow("if ($L)", presentCondition(field, field.localName, field.optional, field.javaOptional));
-                writeTag(b, tag);
-                b.addStatement("$L", writeNoTag("writer", field, valueExpr));
+                if (field.adapterType != null) {
+                    assignToWire(b, field, valueExpr);
+                    writeTag(b, tag);
+                    b.addStatement("$L", writeNoTag("writer", field, wireLocal(field)));
+                } else {
+                    writeTag(b, tag);
+                    b.addStatement("$L", writeNoTag("writer", field, valueExpr));
+                }
                 b.endControlFlow();
             }
             case ENUM -> writeEnum(b, field, tag);

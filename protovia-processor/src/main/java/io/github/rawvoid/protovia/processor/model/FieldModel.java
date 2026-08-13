@@ -49,6 +49,8 @@ public final class FieldModel {
     public final String implTypeName;
     public final TypeElement implType;
     public final String codecName;
+    public final TypeElement adapterType;
+    public final TypeMirror wireJavaType;
     public final EnumModel enumModel;
     public final TypeElement messageType;
     public final FieldModel element;
@@ -80,6 +82,8 @@ public final class FieldModel {
         this.implTypeName = b.implTypeName;
         this.implType = b.implType;
         this.codecName = b.codecName;
+        this.adapterType = b.adapterType;
+        this.wireJavaType = b.wireJavaType;
         this.enumModel = b.enumModel;
         this.messageType = b.messageType;
         this.element = b.element;
@@ -104,7 +108,7 @@ public final class FieldModel {
 
     public String primitiveListClass() {
         FieldModel el = kind == FieldKind.REPEATED ? element : this;
-        if (el == null || el.kind != FieldKind.SCALAR || el.protoType == null) {
+        if (el == null || el.kind != FieldKind.SCALAR || el.protoType == null || el.adapterType != null) {
             return null;
         }
         return switch (el.protoType) {
@@ -155,6 +159,8 @@ public final class FieldModel {
         private String implTypeName;
         private TypeElement implType;
         private String codecName;
+        private TypeElement adapterType;
+        private TypeMirror wireJavaType;
         private EnumModel enumModel;
         private TypeElement messageType;
         private FieldModel element;
@@ -263,6 +269,16 @@ public final class FieldModel {
 
         public Builder codecName(String codecName) {
             this.codecName = codecName;
+            return this;
+        }
+
+        public Builder adapterType(TypeElement adapterType) {
+            this.adapterType = adapterType;
+            return this;
+        }
+
+        public Builder wireJavaType(TypeMirror wireJavaType) {
+            this.wireJavaType = wireJavaType;
             return this;
         }
 

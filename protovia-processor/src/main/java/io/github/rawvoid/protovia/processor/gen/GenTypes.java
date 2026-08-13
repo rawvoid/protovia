@@ -86,6 +86,10 @@ final class GenTypes {
         return CodeBlock.of("$T.INSTANCE", codecType(field));
     }
 
+    static CodeBlock adapterInstance(FieldModel field) {
+        return CodeBlock.of("$T.INSTANCE", ClassName.get(field.adapterType));
+    }
+
     static ClassName implType(FieldModel field) {
         return ClassName.get(field.implType);
     }

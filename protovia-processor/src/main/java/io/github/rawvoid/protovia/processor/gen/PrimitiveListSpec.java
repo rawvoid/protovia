@@ -53,7 +53,7 @@ enum PrimitiveListSpec {
             return null;
         }
         FieldModel el = field.kind == FieldKind.REPEATED ? field.element : field;
-        if (el == null || el.protoType == null) {
+        if (el == null || el.protoType == null || el.adapterType != null) {
             return null;
         }
         return switch (el.protoType) {

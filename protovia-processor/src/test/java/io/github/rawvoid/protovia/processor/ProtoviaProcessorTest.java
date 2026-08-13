@@ -518,4 +518,521 @@ class ProtoviaProcessorTest {
             .contentsAsUtf8String()
             .contains("toArray(new Integer[0])");
     }
+
+    @Test
+    void adapterMissingProtoScalarFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.NoScalar",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "public final class NoScalar implements ProtoAdapter<LocalDate, Integer> {",
+                    "  public static final NoScalar INSTANCE = new NoScalar();",
+                    "  public Integer toWire(LocalDate value) { return 0; }",
+                    "  public LocalDate fromWire(Integer wire) { return LocalDate.ofEpochDay(wire); }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = NoScalar.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("must be annotated with @ProtoScalar");
+    }
+
+    @Test
+    void adapterMissingInstanceFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapterWithoutInstance(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = NoInstance.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("must declare public static final INSTANCE");
+    }
+
+    @Test
+    void adapterJavaTypeMismatchFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                uuidAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = UuidString.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("handles UUID, not LocalDate");
+    }
+
+    @Test
+    void adapterOnPrimitiveFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = LocalDateEpochDay.class) public int n;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapter cannot be applied to primitive field 'n'");
+    }
+
+    @Test
+    void adapterProtoScalarMessageFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.AsMessage",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "@ProtoScalar(ProtoType.MESSAGE)",
+                    "public final class AsMessage implements ProtoAdapter<LocalDate, Integer> {",
+                    "  public static final AsMessage INSTANCE = new AsMessage();",
+                    "  public Integer toWire(LocalDate value) { return 0; }",
+                    "  public LocalDate fromWire(Integer wire) { return LocalDate.ofEpochDay(wire); }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = AsMessage.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("@ProtoScalar must name a scalar ProtoType");
+    }
+
+    @Test
+    void adapterParameterizedJavaTypeFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "public final class Box<T> { public T value; }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BoxAdapter",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "@ProtoScalar(ProtoType.INT32)",
+                    "public final class BoxAdapter implements ProtoAdapter<Box<LocalDate>, Integer> {",
+                    "  public static final BoxAdapter INSTANCE = new BoxAdapter();",
+                    "  public Integer toWire(Box<LocalDate> value) { return 0; }",
+                    "  public Box<LocalDate> fromWire(Integer wire) { return new Box<>(); }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = BoxAdapter.class) public Box<java.time.LocalDate> birth;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapter J must be a non-parameterized class");
+    }
+
+    @Test
+    void adapterOnRepeatedFailsWithE23() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "import java.util.List;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = LocalDateEpochDay.class) public List<LocalDate> days;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+    }
+
+    @Test
+    void adapterInterfaceAsValueFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.AdapterIface",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "public interface AdapterIface extends ProtoAdapter<LocalDate, Integer> {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = AdapterIface.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapter must be a concrete type, not ProtoAdapter");
+    }
+
+    @Test
+    void adapterWireTypeMustMatchProtoScalar() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.WrongW",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "@ProtoScalar(ProtoType.INT32)",
+                    "public final class WrongW implements ProtoAdapter<LocalDate, String> {",
+                    "  public static final WrongW INSTANCE = new WrongW();",
+                    "  public String toWire(LocalDate value) { return \"\"; }",
+                    "  public LocalDate fromWire(String wire) { return LocalDate.EPOCH; }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = WrongW.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("ProtoType.INT32 requires Integer, not String");
+    }
+
+    @Test
+    void adapterFieldTypeOverrideMustStayInFamily() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, type = ProtoType.STRING, adapter = LocalDateEpochDay.class)",
+                    "  public LocalDate birth;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("field 'birth' Java type cannot use ProtoType.STRING");
+    }
+
+    @Test
+    void adapterMustBePublic() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Hidden",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+                    "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+                    "import java.time.LocalDate;",
+                    "@ProtoScalar(ProtoType.INT32)",
+                    "final class Hidden implements ProtoAdapter<LocalDate, Integer> {",
+                    "  public static final Hidden INSTANCE = new Hidden();",
+                    "  public Integer toWire(LocalDate value) { return 0; }",
+                    "  public LocalDate fromWire(Integer wire) { return LocalDate.ofEpochDay(wire); }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = Hidden.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("adapter Hidden must be a public type");
+    }
+
+    @Test
+    void singularAdapterGeneratesToWireAndFromWire() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1) public String name;",
+                    "  @ProtoField(number = 3, adapter = LocalDateEpochDay.class) public LocalDate birthDate;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.toWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.fromWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (birthDate != null)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("birthDate != 0");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("int birthDateWire =");
+    }
+
+    @Test
+    void recordComponentAdapterGeneratesToWire() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Event",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "@ProtoMessage public record Event(",
+                    "  @ProtoField(number = 1) String id,",
+                    "  @ProtoField(number = 2, adapter = LocalDateEpochDay.class) LocalDate on) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.EventProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.toWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.EventProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.fromWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.EventProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.on()");
+    }
+
+    @Test
+    void optionalLocalDateUsesIsPresentAndFromWire() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 1, adapter = LocalDateEpochDay.class) public Optional<LocalDate> birthDate;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("isPresent()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("LocalDateEpochDay.INSTANCE.fromWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("birthDate.get()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("birthDate != 0");
+    }
+
+    @Test
+    void fieldLevelInstantOverrideIsScalarNotTimestamp() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                instantAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Audit",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.Instant;",
+                    "@ProtoMessage public class Audit {",
+                    "  @ProtoField(number = 1) public String id;",
+                    "  @ProtoField(number = 2, adapter = InstantEpochMilli.class) public Instant created;",
+                    "  @ProtoField(number = 3) public Instant published;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.AuditProtoCodec")
+            .contentsAsUtf8String()
+            .contains("InstantEpochMilli.INSTANCE.toWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.AuditProtoCodec")
+            .contentsAsUtf8String()
+            .contains("InstantEpochMilli.INSTANCE.fromWire");
+        assertThat(compilation)
+            .generatedSourceFile("demo.AuditProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeUInt64NoTag(createdWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.AuditProtoCodec")
+            .contentsAsUtf8String()
+            .contains("TimestampCodec.INSTANCE");
+        assertThat(compilation)
+            .generatedSourceFile("demo.AuditProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("TimestampCodec.INSTANCE.writeTo(writer, created)");
+    }
+
+    @Test
+    void oneofCaseTypeEmitsSint32() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Event",
+                    "package demo;",
+                    "public sealed interface Event permits Count, Label {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Count",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(value = 10, type = ProtoType.SINT32)",
+                    "public record Count(int n) implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof public Event event;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeSInt32NoTag");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("CodedSize.sint32");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("readSInt32()");
+    }
+
+    private static javax.tools.JavaFileObject localDateAdapter() {
+        return JavaFileObjects.forSourceLines(
+            "demo.LocalDateEpochDay",
+            "package demo;",
+            "import io.github.rawvoid.protovia.ProtoType;",
+            "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+            "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+            "import java.time.LocalDate;",
+            "@ProtoScalar(ProtoType.INT32)",
+            "public final class LocalDateEpochDay implements ProtoAdapter<LocalDate, Integer> {",
+            "  public static final LocalDateEpochDay INSTANCE = new LocalDateEpochDay();",
+            "  private LocalDateEpochDay() {}",
+            "  public Integer toWire(LocalDate value) { return (int) value.toEpochDay(); }",
+            "  public LocalDate fromWire(Integer wire) { return LocalDate.ofEpochDay(wire); }",
+            "}");
+    }
+
+    private static javax.tools.JavaFileObject localDateAdapterWithoutInstance() {
+        return JavaFileObjects.forSourceLines(
+            "demo.NoInstance",
+            "package demo;",
+            "import io.github.rawvoid.protovia.ProtoType;",
+            "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+            "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+            "import java.time.LocalDate;",
+            "@ProtoScalar(ProtoType.INT32)",
+            "public final class NoInstance implements ProtoAdapter<LocalDate, Integer> {",
+            "  public Integer toWire(LocalDate value) { return (int) value.toEpochDay(); }",
+            "  public LocalDate fromWire(Integer wire) { return LocalDate.ofEpochDay(wire); }",
+            "}");
+    }
+
+    private static javax.tools.JavaFileObject uuidAdapter() {
+        return JavaFileObjects.forSourceLines(
+            "demo.UuidString",
+            "package demo;",
+            "import io.github.rawvoid.protovia.ProtoType;",
+            "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+            "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+            "import java.util.UUID;",
+            "@ProtoScalar(ProtoType.STRING)",
+            "public final class UuidString implements ProtoAdapter<UUID, String> {",
+            "  public static final UuidString INSTANCE = new UuidString();",
+            "  public String toWire(UUID value) { return value.toString(); }",
+            "  public UUID fromWire(String wire) { return UUID.fromString(wire); }",
+            "}");
+    }
+
+    private static javax.tools.JavaFileObject instantAdapter() {
+        return JavaFileObjects.forSourceLines(
+            "demo.InstantEpochMilli",
+            "package demo;",
+            "import io.github.rawvoid.protovia.ProtoType;",
+            "import io.github.rawvoid.protovia.annotation.ProtoScalar;",
+            "import io.github.rawvoid.protovia.codec.ProtoAdapter;",
+            "import java.time.Instant;",
+            "@ProtoScalar(ProtoType.INT64)",
+            "public final class InstantEpochMilli implements ProtoAdapter<Instant, Long> {",
+            "  public static final InstantEpochMilli INSTANCE = new InstantEpochMilli();",
+            "  public Long toWire(Instant value) { return value.toEpochMilli(); }",
+            "  public Instant fromWire(Long wire) { return Instant.ofEpochMilli(wire); }",
+            "}");
+    }
 }
