@@ -41,6 +41,32 @@ public final class UnknownFields {
         return base.append(reader.captureField());
     }
 
+    /**
+     * Appends an already-consumed varint field (used when an enum number is unrecognized).
+     */
+    public static UnknownFields mergeVarint(UnknownFields existing, int tag, int number) {
+        UnknownFields base = existing == null ? EMPTY : existing;
+        return base.append(encodeTagAndVarint(tag, number));
+    }
+
+    private static byte[] encodeTagAndVarint(int tag, int number) {
+        int tagSize = io.github.rawvoid.protovia.wire.CodedSize.uint32(tag);
+        int numSize = io.github.rawvoid.protovia.wire.CodedSize.uint32(number);
+        byte[] out = new byte[tagSize + numSize];
+        int i = writeVarint(out, 0, tag);
+        writeVarint(out, i, number);
+        return out;
+    }
+
+    private static int writeVarint(byte[] out, int i, int value) {
+        while ((value & ~0x7F) != 0) {
+            out[i++] = (byte) (value | 0x80);
+            value >>>= 7;
+        }
+        out[i++] = (byte) value;
+        return i;
+    }
+
     UnknownFields append(byte[] chunk) {
         if (chunk.length == 0) {
             return this;

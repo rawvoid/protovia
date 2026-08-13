@@ -3,6 +3,7 @@ package io.github.rawvoid.protovia.processor.model;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
@@ -94,11 +95,25 @@ public final class SchemaParser {
         List<EnumModel.Constant> constants = new ArrayList<>();
         Set<Integer> numbers = new HashSet<>();
         boolean hasZero = false;
+        String unrecognized = null;
         for (VariableElement constant : ElementFilter.fieldsIn(type.getEnclosedElements())) {
             if (constant.getKind() != ElementKind.ENUM_CONSTANT) {
                 continue;
             }
+            boolean sentinel = constant.getAnnotation(ProtoUnrecognized.class) != null;
             ProtoEnumValue value = constant.getAnnotation(ProtoEnumValue.class);
+            if (sentinel) {
+                if (value != null) {
+                    error(constant, "@ProtoUnrecognized cannot be combined with @ProtoEnumValue");
+                    continue;
+                }
+                if (unrecognized != null) {
+                    error(constant, "at most one @ProtoUnrecognized per enum");
+                    continue;
+                }
+                unrecognized = constant.getSimpleName().toString();
+                continue;
+            }
             if (value == null) {
                 error(constant, "enum constant " + constant.getSimpleName() + " must have @ProtoEnumValue");
                 continue;
@@ -119,7 +134,7 @@ public final class SchemaParser {
             return null;
         }
         String pkg = Names.packageName(type);
-        return new EnumModel(type, Names.typeName(type, pkg), constants);
+        return new EnumModel(type, Names.typeName(type, pkg), constants, unrecognized);
     }
 
     public MessageModel parseMessage(TypeElement type) {

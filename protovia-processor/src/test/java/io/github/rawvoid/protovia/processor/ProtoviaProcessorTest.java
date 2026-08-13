@@ -148,6 +148,23 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void unrecognizedCannotHaveNumber() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Color",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                        "@ProtoEnum public enum Color {",
+                        "  @ProtoEnumValue(0) UNKNOWN,",
+                        "  @ProtoUnrecognized @ProtoEnumValue(-1) UNRECOGNIZED",
+                        "}"));
+        assertThat(compilation).hadErrorContaining("@ProtoUnrecognized");
+    }
+
+    @Test
     void oneofGeneratesInstanceofSwitch() {
         Compilation compilation = javac()
                 .withProcessors(new ProtoviaProcessor())

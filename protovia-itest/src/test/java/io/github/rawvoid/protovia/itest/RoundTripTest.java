@@ -88,7 +88,31 @@ class RoundTripTest {
         extra[known.length + 1] = 0x63; // 99
         User back = ProtoVia.fromBytes(User.class, extra);
         assertEquals("n", back.getName());
-        assertNull(back.getStatus());
+        assertEquals(Status.UNRECOGNIZED, back.getStatus());
+    }
+
+    @Test
+    void unknownEnumRewrittenViaUnknownFields() {
+        Envelope env = new Envelope();
+        env.name = "n";
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeRawBytes(ProtoVia.toBytes(env), 0, ProtoVia.toBytes(env).length);
+        extra.writeInt32(7, 99);
+        Envelope back = ProtoVia.fromBytes(Envelope.class, extra.toByteArray());
+        assertEquals(Status.UNRECOGNIZED, back.status);
+        Envelope again = ProtoVia.fromBytes(Envelope.class, ProtoVia.toBytes(back));
+        assertEquals(Status.UNRECOGNIZED, again.status);
+        ProtoReader r = new ProtoReader(ProtoVia.toBytes(back));
+        int raw = -1;
+        int tag;
+        while ((tag = r.readTag()) != 0) {
+            if (tag == 56) {
+                raw = r.readEnum();
+            } else {
+                r.skipField();
+            }
+        }
+        assertEquals(99, raw);
     }
 
     @Test

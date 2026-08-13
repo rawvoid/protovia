@@ -133,12 +133,15 @@ public final class CodecGenerator {
 
     private void emitComputeEnum(JavaWriter w, FieldModel field, String var, int number, boolean optional) {
         String helper = enumNumberHelper(field.enumModel);
+        String present = field.enumModel.unrecognized == null
+                ? var + " != null"
+                : var + " != null && " + var + " != " + field.enumModel.typeName + "." + field.enumModel.unrecognized;
         if (optional) {
-            w.open("if (" + var + " != null)");
+            w.open("if (" + present + ")");
             w.line("size += CodedSize.enumValue(" + number + ", " + helper + "(" + var + "));");
             w.close();
         } else {
-            w.open("if (" + var + " != null)");
+            w.open("if (" + present + ")");
             w.line("int " + var + "Number = " + helper + "(" + var + ");");
             w.open("if (" + var + "Number != 0)");
             w.line("size += CodedSize.enumValue(" + number + ", " + var + "Number);");
@@ -230,13 +233,17 @@ public final class CodecGenerator {
             }
             case ENUM -> {
                 String helper = enumNumberHelper(field.enumModel);
+                String notSentinel = field.enumModel.unrecognized == null
+                        ? field.localName + " != null"
+                        : field.localName + " != null && " + field.localName + " != "
+                                + field.enumModel.typeName + "." + field.enumModel.unrecognized;
                 if (field.optional) {
-                    w.open("if (" + field.localName + " != null)");
+                    w.open("if (" + notSentinel + ")");
                     w.line("writer.writeUInt32NoTag(" + tag + ");");
                     w.line("writer.writeInt32NoTag(" + helper + "(" + field.localName + "));");
                     w.close();
                 } else {
-                    w.open("if (" + field.localName + " != null)");
+                    w.open("if (" + notSentinel + ")");
                     w.line("int " + field.localName + "Number = " + helper + "(" + field.localName + ");");
                     w.open("if (" + field.localName + "Number != 0)");
                     w.line("writer.writeUInt32NoTag(" + tag + ");");
@@ -415,7 +422,7 @@ public final class CodecGenerator {
         w.open("while ((tag = reader.readTag()) != 0)");
         w.open("switch (tag)");
         for (FieldModel field : model.fields) {
-            emitReadCases(w, field, false);
+            emitReadCases(w, field, false, model);
         }
         emitUnknownDefault(w, model);
         w.close();
@@ -446,7 +453,7 @@ public final class CodecGenerator {
         w.open("while ((tag = reader.readTag()) != 0)");
         w.open("switch (tag)");
         for (FieldModel field : model.fields) {
-            emitReadCases(w, field, true);
+            emitReadCases(w, field, true, model);
         }
         emitUnknownDefault(w, model);
         w.close();
@@ -468,7 +475,7 @@ public final class CodecGenerator {
         w.line("return new " + model.typeName + "(" + args + ");");
     }
 
-    private void emitReadCases(JavaWriter w, FieldModel field, boolean record) {
+    private void emitReadCases(JavaWriter w, FieldModel field, boolean record, MessageModel model) {
         String tag = Names.tagConstant(field.name);
         switch (field.kind) {
             case SCALAR -> {
@@ -479,16 +486,28 @@ public final class CodecGenerator {
             }
             case ENUM -> {
                 w.open("case " + tag + " ->");
-                String decoded = enumFromHelper(field.enumModel) + "(reader.readEnum())";
-                if (record) {
-                    w.line(field.enumModel.typeName + " _e = " + decoded + ";");
-                    w.open("if (_e != null)");
-                    w.line(storeTarget(field) + " = " + wrapOptional(field, "_e") + ";");
+                w.line("int _n = reader.readEnum();");
+                w.line(field.enumModel.typeName + " _e = " + enumFromHelper(field.enumModel) + "(_n);");
+                if (field.enumModel.unrecognized != null) {
+                    w.open("if (_e == " + field.enumModel.typeName + "." + field.enumModel.unrecognized + ")");
+                    if (model.unknown != null) {
+                        w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
+                                + model.unknown.localName() + ", tag, _n);");
+                    }
+                    emitStore(w, field, record, wrapOptional(field, "_e"));
+                    w.close();
+                    w.open("else if (_e != null)");
+                    emitStore(w, field, record, wrapOptional(field, "_e"));
                     w.close();
                 } else {
-                    w.line(field.enumModel.typeName + " _e = " + decoded + ";");
+                    if (model.unknown != null) {
+                        w.open("if (_e == null)");
+                        w.line(model.unknown.localName() + " = UnknownFields.mergeVarint("
+                                + model.unknown.localName() + ", tag, _n);");
+                        w.close();
+                    }
                     w.open("if (_e != null)");
-                    emitAssign(w, field, "msg", wrapOptional(field, "_e"));
+                    emitStore(w, field, record, wrapOptional(field, "_e"));
                     w.close();
                 }
                 w.close();
@@ -804,6 +823,11 @@ public final class CodecGenerator {
         for (EnumModel.Constant c : model.constants) {
             w.line("case " + c.name() + " -> " + c.number() + ";");
         }
+        if (model.unrecognized != null) {
+            w.line("case " + model.unrecognized
+                    + " -> throw new ProtoException(\"" + model.typeName + "." + model.unrecognized
+                    + " has no wire number\");");
+        }
         w.close();
         w.line(";");
         w.close();
@@ -813,7 +837,11 @@ public final class CodecGenerator {
         for (EnumModel.Constant c : model.constants) {
             w.line("case " + c.number() + " -> " + model.typeName + "." + c.name() + ";");
         }
-        w.line("default -> null;");
+        if (model.unrecognized != null) {
+            w.line("default -> " + model.typeName + "." + model.unrecognized + ";");
+        } else {
+            w.line("default -> null;");
+        }
         w.close();
         w.line(";");
         w.close();

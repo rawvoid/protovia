@@ -11,6 +11,9 @@ public class Envelope {
     @ProtoField(number = 1)
     public String name;
 
+    @ProtoField(number = 7)
+    public Status status;
+
     @ProtoUnknown
     public UnknownFields unknownFields;
 }
