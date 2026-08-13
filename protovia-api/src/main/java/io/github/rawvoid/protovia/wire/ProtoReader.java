@@ -35,7 +35,7 @@ public final class ProtoReader {
         if (data == null) {
             throw new ProtoException("data is null");
         }
-        if (offset < 0 || length < 0 || offset + length > data.length) {
+        if (offset < 0 || length < 0 || offset > data.length || length > data.length - offset) {
             throw new ProtoException("invalid slice offset=" + offset + " length=" + length);
         }
         if (length > maxMessageSize) {
@@ -187,7 +187,6 @@ public final class ProtoReader {
     public String readString() {
         int length = readRawVarint32();
         if (length > 0 && length <= currentLimit - pos) {
-            checkLength(length);
             String value = Utf8.decode(buffer, pos, length);
             pos += length;
             return value;
@@ -202,7 +201,6 @@ public final class ProtoReader {
     public byte[] readBytes() {
         int length = readRawVarint32();
         if (length > 0 && length <= currentLimit - pos) {
-            checkLength(length);
             byte[] copy = new byte[length];
             System.arraycopy(buffer, pos, copy, 0, length);
             pos += length;
@@ -249,17 +247,21 @@ public final class ProtoReader {
         return readMessage(codec, existing);
     }
 
-    private <T> T readMessage(ProtoCodec<T> codec, T existing) {
+    public <T> T readMessage(ProtoCodec<T> codec, T existing) {
         int length = readRawVarint32();
         if (depth >= maxDepth) {
             throw new ProtoException("message nesting exceeds max depth " + maxDepth);
         }
         int old = pushLimit(length);
         depth++;
-        T value = existing == null ? codec.readFrom(this) : codec.mergeFrom(this, existing);
-        depth--;
-        popLimit(old);
-        return value;
+        try {
+            T value = existing == null ? codec.readFrom(this) : codec.mergeFrom(this, existing);
+            popLimit(old);
+            return value;
+        } finally {
+            depth--;
+            currentLimit = old;
+        }
     }
 
     /**
@@ -434,19 +436,22 @@ public final class ProtoReader {
             throw new ProtoException("message nesting exceeds max depth " + maxDepth);
         }
         depth++;
-        while (true) {
-            int tag = readTag();
-            if (tag == 0) {
-                throw new ProtoException("truncated group");
-            }
-            if (WireType.getWireType(tag) == WireType.END_GROUP) {
-                if (WireType.fieldNumber(tag) != fieldNumber) {
-                    throw new ProtoException("end group field mismatch");
+        try {
+            while (true) {
+                int tag = readTag();
+                if (tag == 0) {
+                    throw new ProtoException("truncated group");
                 }
-                depth--;
-                return;
+                if (WireType.getWireType(tag) == WireType.END_GROUP) {
+                    if (WireType.fieldNumber(tag) != fieldNumber) {
+                        throw new ProtoException("end group field mismatch");
+                    }
+                    return;
+                }
+                skipField(tag);
             }
-            skipField(tag);
+        } finally {
+            depth--;
         }
     }
 

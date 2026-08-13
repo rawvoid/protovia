@@ -65,6 +65,18 @@ class UnknownFieldsTest {
     }
 
     @Test
+    void mergeVarintUsesInt32EncodingForNegatives() {
+        UnknownFields unknown = UnknownFields.mergeVarint(UnknownFields.EMPTY, 56, -1);
+        assertEquals(CodedSize.uint32(56) + CodedSize.int32(-1), unknown.serializedSize());
+        assertEquals(11, unknown.serializedSize());
+        ProtoWriter out = new ProtoWriter(unknown.serializedSize());
+        unknown.writeTo(out);
+        ProtoReader back = new ProtoReader(out.finish());
+        assertEquals(56, back.readTag());
+        assertEquals(-1, back.readInt32());
+    }
+
+    @Test
     void emptyIsNoop() {
         assertTrue(UnknownFields.EMPTY.isEmpty());
         assertEquals(0, UnknownFields.EMPTY.serializedSize());

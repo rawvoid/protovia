@@ -51,16 +51,29 @@ public final class UnknownFields {
 
     private static byte[] encodeTagAndVarint(int tag, int number) {
         int tagSize = io.github.rawvoid.protovia.wire.CodedSize.uint32(tag);
-        int numSize = io.github.rawvoid.protovia.wire.CodedSize.uint32(number);
+        int numSize = io.github.rawvoid.protovia.wire.CodedSize.int32(number);
         byte[] out = new byte[tagSize + numSize];
-        int i = writeVarint(out, 0, tag);
-        writeVarint(out, i, number);
+        int i = writeVarint32(out, 0, tag);
+        if (number >= 0) {
+            writeVarint32(out, i, number);
+        } else {
+            writeVarint64(out, i, number);
+        }
         return out;
     }
 
-    private static int writeVarint(byte[] out, int i, int value) {
+    private static int writeVarint32(byte[] out, int i, int value) {
         while ((value & ~0x7F) != 0) {
             out[i++] = (byte) (value | 0x80);
+            value >>>= 7;
+        }
+        out[i++] = (byte) value;
+        return i;
+    }
+
+    private static int writeVarint64(byte[] out, int i, long value) {
+        while ((value & ~0x7FL) != 0L) {
+            out[i++] = (byte) ((int) value | 0x80);
             value >>>= 7;
         }
         out[i++] = (byte) value;

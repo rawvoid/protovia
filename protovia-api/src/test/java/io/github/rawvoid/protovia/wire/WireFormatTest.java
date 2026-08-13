@@ -209,6 +209,13 @@ class WireFormatTest {
     }
 
     @Test
+    void constructorRejectsOverflowingSlice() {
+        byte[] data = new byte[8];
+        assertThrows(ProtoException.class, () -> new ProtoReader(data, 4, Integer.MAX_VALUE));
+        assertThrows(ProtoException.class, () -> new ProtoReader(data, Integer.MAX_VALUE, 4));
+    }
+
+    @Test
     void pushLimitRejectsOverflow() {
         byte[] data = new byte[8];
         ProtoReader r = new ProtoReader(data, 4, 4, Integer.MAX_VALUE, 100);

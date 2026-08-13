@@ -682,21 +682,11 @@ public final class CodecGenerator {
         if (record) {
             String current = storeTarget(field);
             if (field.javaOptional) {
-                w.open("if (" + current + " != null && " + current + ".isPresent())");
-                w.line(current + " = " + wrapOptional(field,
-                        "reader.readMessageMerging(" + codec + ", " + current + ".get())") + ";");
-                w.close();
-                w.open("else");
-                w.line(current + " = " + wrapOptional(field, "reader.readMessage(" + codec + ")") + ";");
-                w.close();
+                w.line(current + " = " + wrapOptional(field, "reader.readMessage(" + codec + ", "
+                        + current + " != null && " + current + ".isPresent() ? " + current + ".get() : null)") + ";");
                 return;
             }
-            w.open("if (" + current + " != null)");
-            w.line(current + " = reader.readMessageMerging(" + codec + ", " + current + ");");
-            w.close();
-            w.open("else");
-            w.line(current + " = reader.readMessage(" + codec + ");");
-            w.close();
+            w.line(current + " = reader.readMessage(" + codec + ", " + current + ");");
             return;
         }
         if (field.javaOptional) {
@@ -704,24 +694,14 @@ public final class CodecGenerator {
                     ? "msg." + field.fieldName
                     : field.readExpr.replace("value.", "msg.");
             w.line(field.javaTypeName + " _cur = " + getter + ";");
-            w.open("if (_cur != null && _cur.isPresent())");
-            emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessageMerging(" + codec + ", _cur.get())"));
-            w.close();
-            w.open("else");
-            emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessage(" + codec + ")"));
-            w.close();
+            emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessage(" + codec + ", "
+                    + "_cur != null && _cur.isPresent() ? _cur.get() : null)"));
             return;
         }
         String current = field.accessKind == AccessKind.FIELD
                 ? "msg." + field.fieldName
                 : field.readExpr.replace("value.", "msg.");
-        w.line(field.javaTypeName + " _cur = " + current + ";");
-        w.open("if (_cur != null)");
-        emitAssign(w, field, "msg", "reader.readMessageMerging(" + codec + ", _cur)");
-        w.close();
-        w.open("else");
-        emitAssign(w, field, "msg", "reader.readMessage(" + codec + ")");
-        w.close();
+        emitAssign(w, field, "msg", "reader.readMessage(" + codec + ", " + current + ")");
     }
 
     private void emitSeedArrayBuilder(JavaWriter w, FieldModel field, boolean record) {
