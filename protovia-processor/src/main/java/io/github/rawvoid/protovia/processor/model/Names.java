@@ -1,0 +1,113 @@
+package io.github.rawvoid.protovia.processor.model;
+
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.Elements;
+import java.util.Set;
+
+public final class Names {
+
+    private static final Set<String> KEYWORDS = Set.of(
+            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
+            "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
+            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
+            "interface", "long", "native", "new", "package", "private", "protected", "public",
+            "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
+            "throw", "throws", "transient", "try", "void", "volatile", "while", "var", "yield",
+            "record", "sealed", "permits", "non-sealed", "true", "false", "null");
+
+    private Names() {
+    }
+
+    public static String packageName(TypeElement type) {
+        Element e = type;
+        while (e != null && e.getKind() != ElementKind.PACKAGE) {
+            e = e.getEnclosingElement();
+        }
+        return e instanceof PackageElement pkg ? pkg.getQualifiedName().toString() : "";
+    }
+
+    public static String binaryName(Elements elements, TypeElement type) {
+        return elements.getBinaryName(type).toString();
+    }
+
+    public static String codecFqcn(Elements elements, TypeElement type) {
+        return binaryName(elements, type) + "ProtoCodec";
+    }
+
+    public static String codecSimpleName(Elements elements, TypeElement type) {
+        String fqcn = codecFqcn(elements, type);
+        int dot = fqcn.lastIndexOf('.');
+        return dot < 0 ? fqcn : fqcn.substring(dot + 1);
+    }
+
+    public static String typeName(TypeElement type, String currentPackage) {
+        return render(type, currentPackage);
+    }
+
+    private static String render(TypeElement type, String currentPackage) {
+        Element enclosing = type.getEnclosingElement();
+        if (enclosing instanceof TypeElement parent) {
+            return render(parent, currentPackage) + "." + type.getSimpleName();
+        }
+        String pkg = packageName(type);
+        if (pkg.equals(currentPackage) || pkg.isEmpty()) {
+            return type.getSimpleName().toString();
+        }
+        return type.getQualifiedName().toString();
+    }
+
+    public static String safeLocal(String name) {
+        return KEYWORDS.contains(name) ? "f_" + name : name;
+    }
+
+    public static String capitalize(String name) {
+        if (name.isEmpty()) {
+            return name;
+        }
+        return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
+    public static String decapitalize(String name) {
+        if (name.isEmpty()) {
+            return name;
+        }
+        if (name.length() > 1 && Character.isUpperCase(name.charAt(0)) && Character.isUpperCase(name.charAt(1))) {
+            return name;
+        }
+        return Character.toLowerCase(name.charAt(0)) + name.substring(1);
+    }
+
+    public static String propertyFromGetter(String methodName) {
+        if (methodName.startsWith("get") && methodName.length() > 3) {
+            return decapitalize(methodName.substring(3));
+        }
+        if (methodName.startsWith("is") && methodName.length() > 2) {
+            return decapitalize(methodName.substring(2));
+        }
+        return null;
+    }
+
+    public static String getterName(String property, boolean primitiveBoolean) {
+        String cap = capitalize(property);
+        return primitiveBoolean ? "is" + cap : "get" + cap;
+    }
+
+    public static String setterName(String property) {
+        return "set" + capitalize(property);
+    }
+
+    public static String tagConstant(String name) {
+        StringBuilder sb = new StringBuilder("TAG_");
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (Character.isUpperCase(c) && i > 0) {
+                sb.append('_');
+            }
+            sb.append(Character.toUpperCase(c));
+        }
+        return sb.toString();
+    }
+}
