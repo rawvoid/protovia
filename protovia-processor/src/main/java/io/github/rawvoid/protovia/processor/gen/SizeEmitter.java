@@ -158,7 +158,8 @@ final class SizeEmitter {
                 b.addStatement("cache.set(itemSlot, itemSize)");
                 b.addStatement("size += $T.message($L, itemSize)", CODED_SIZE, field.number);
             } else {
-                b.addStatement("size += $L", sizeCall(field.element, field.number, "item"));
+                String value = WireCodegen.adaptedValue(b, field.element, "item", "itemWire");
+                b.addStatement("size += $L", sizeCall(field.element, field.number, value));
             }
             b.endControlFlow();
         }

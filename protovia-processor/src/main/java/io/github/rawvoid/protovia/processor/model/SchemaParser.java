@@ -892,7 +892,7 @@ public final class SchemaParser {
                         + " handles " + simpleTypeName(adapter.j) + ", not " + simpleTypeName(type));
                     return null;
                 }
-            } else if (site != AdapterSite.SINGULAR) {
+            } else if (site == AdapterSite.MAP || site == AdapterSite.ONEOF) {
                 error(origin, "adapters on repeated/map/oneof are not enabled yet");
             } else {
                 ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);

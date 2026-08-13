@@ -80,8 +80,20 @@ final class WireCodegen {
     }
 
     static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue) {
+        assignToWire(b, field, javaValue, wireLocal(field));
+    }
+
+    static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue, String local) {
         b.addStatement("$T $L = $L.toWire($L)",
-            wireLocalType(field), wireLocal(field), adapterInstance(field), javaValue);
+            wireLocalType(field), local, adapterInstance(field), javaValue);
+    }
+
+    static String adaptedValue(CodeBlock.Builder b, FieldModel field, String javaValue, String wireName) {
+        if (field.adapterType == null) {
+            return javaValue;
+        }
+        assignToWire(b, field, javaValue, wireName);
+        return wireName;
     }
 
     static CodeBlock fromWire(FieldModel field, CodeBlock read) {
@@ -330,18 +342,19 @@ final class WireCodegen {
     private static void boxedPackedLoop(CodeBlock.Builder b, FieldModel field, String list, boolean write) {
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), list);
         nullElementCheck(b, field.element, "item", field.name);
+        String value = adaptedValue(b, field.element, "item", "itemWire");
         if (write) {
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
             } else {
-                b.addStatement("$L", writeNoTag("writer", field.element, "item"));
+                b.addStatement("$L", writeNoTag("writer", field.element, value));
             }
         } else if (packedFixedWidth(field.element) == 0) {
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("packed += $T.enumValue($L(item))",
                     CODED_SIZE, enumNumberOf(field.element.enumModel));
             } else {
-                b.addStatement("packed += $L", sizeNoTag(field.element, "item"));
+                b.addStatement("packed += $L", sizeNoTag(field.element, value));
             }
         }
         b.endControlFlow();

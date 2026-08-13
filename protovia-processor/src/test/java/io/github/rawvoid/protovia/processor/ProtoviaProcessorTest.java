@@ -663,7 +663,7 @@ class ProtoviaProcessorTest {
     }
 
     @Test
-    void adapterOnRepeatedFailsWithE23() {
+    void packedAdaptedListUsesArrayListAndFromWire() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(
@@ -678,7 +678,71 @@ class ProtoviaProcessorTest {
                     "@ProtoMessage public class Person {",
                     "  @ProtoField(number = 1, adapter = LocalDateEpochDay.class) public List<LocalDate> days;",
                     "}"));
-        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("toWire(item)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("TAG_1_PACKED");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("fromWire(reader.readInt32())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ArrayList");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("addInt");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("IntArrayList");
+    }
+
+    @Test
+    void unpackedAdaptedListConvertsViaToWire() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Person",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.LocalDate;",
+                    "import java.util.List;",
+                    "@ProtoMessage public class Person {",
+                    "  @ProtoField(number = 2, packed = false, adapter = LocalDateEpochDay.class)",
+                    "  public List<LocalDate> days;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("toWire(item)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("CodedSize.int32(2, itemWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeInt32NoTag(itemWire)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .contains("fromWire(reader.readInt32())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PersonProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("addInt");
     }
 
     @Test

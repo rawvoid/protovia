@@ -398,6 +398,9 @@ final class ReadEmitter {
         CodeBlock addend = field.element.kind == FieldKind.MESSAGE
             ? CodeBlock.of("reader.readMessage($L)", codecInstance(field.element))
             : readCall(field.element);
+        if (field.element.adapterType != null) {
+            addend = fromWire(field.element, addend);
+        }
         repeatedAddValue(b, field, record, addend);
     }
 

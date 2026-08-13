@@ -139,13 +139,16 @@ final class WriteEmitter {
         } else {
             b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
             nullElementCheck(b, field.element, "item", field.name);
-            writeTag(b, tag);
             if (field.element.kind == FieldKind.ENUM) {
+                writeTag(b, tag);
                 b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
             } else if (field.element.kind == FieldKind.MESSAGE) {
+                writeTag(b, tag);
                 writeCachedMessage(b, field.element, "item", "itemSize");
             } else {
-                b.addStatement("$L", writeNoTag("writer", field.element, "item"));
+                String value = WireCodegen.adaptedValue(b, field.element, "item", "itemWire");
+                writeTag(b, tag);
+                b.addStatement("$L", writeNoTag("writer", field.element, value));
             }
             b.endControlFlow();
         }
