@@ -5,11 +5,16 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.ByteString;
 import io.github.rawvoid.protovia.ProtoVia;
+
+import java.time.Instant;
 import io.github.rawvoid.protovia.itest.model.Address;
 import io.github.rawvoid.protovia.itest.model.Contact;
 import io.github.rawvoid.protovia.itest.model.Email;
 import io.github.rawvoid.protovia.itest.model.Envelope;
 import io.github.rawvoid.protovia.itest.model.Home;
+import io.github.rawvoid.protovia.itest.model.Timed;
+import io.github.rawvoid.protovia.wkt.DurationCodec;
+import io.github.rawvoid.protovia.wkt.TimestampCodec;
 import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
 import org.junit.jupiter.api.BeforeAll;
@@ -142,6 +147,40 @@ class OfficialInteropTest {
         assertEquals(List.of(8, 9), back.getUnpacked());
         assertArrayEquals(new byte[]{1, 2, 3}, back.getPayload());
         assertEquals(99, back.getScores().get("math"));
+    }
+
+    @Test
+    void timestampAndDurationMatchOfficial() throws Exception {
+        Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
+        java.time.Duration wait = java.time.Duration.ofSeconds(-1, 500_000_000);
+
+        com.google.protobuf.Timestamp officialTs = com.google.protobuf.Timestamp.newBuilder()
+                .setSeconds(at.getEpochSecond())
+                .setNanos(at.getNano())
+                .build();
+        assertArrayEquals(officialTs.toByteArray(), encode(TimestampCodec.INSTANCE, at));
+        assertEquals(at, TimestampCodec.INSTANCE.readFrom(
+                new io.github.rawvoid.protovia.wire.ProtoReader(officialTs.toByteArray())));
+
+        com.google.protobuf.Duration officialDur = com.google.protobuf.Duration.parseFrom(
+                encode(DurationCodec.INSTANCE, wait));
+        assertEquals(wait, DurationCodec.INSTANCE.readFrom(
+                new io.github.rawvoid.protovia.wire.ProtoReader(officialDur.toByteArray())));
+
+        Timed timed = new Timed();
+        timed.at = at;
+        timed.wait = wait;
+        Timed back = ProtoVia.fromBytes(Timed.class, ProtoVia.toBytes(timed));
+        assertEquals(at, back.at);
+        assertEquals(wait, back.wait);
+    }
+
+    private static <T> byte[] encode(io.github.rawvoid.protovia.codec.ProtoCodec<T> codec, T value) {
+        int size = codec.computeSize(value);
+        io.github.rawvoid.protovia.wire.ProtoWriter w =
+                new io.github.rawvoid.protovia.wire.ProtoWriter(size);
+        codec.writeTo(w, value);
+        return w.finish();
     }
 
     @Test

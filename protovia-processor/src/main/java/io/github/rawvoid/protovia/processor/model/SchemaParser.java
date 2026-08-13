@@ -55,6 +55,8 @@ public final class SchemaParser {
     private final TypeMirror collectionType;
     private final TypeMirror mapType;
     private final TypeMirror optionalType;
+    private final TypeMirror instantType;
+    private final TypeMirror durationType;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.types = types;
@@ -73,6 +75,8 @@ public final class SchemaParser {
         this.collectionType = erasure("java.util.Collection");
         this.mapType = erasure("java.util.Map");
         this.optionalType = erasure("java.util.Optional");
+        this.instantType = elements.getTypeElement("java.time.Instant").asType();
+        this.durationType = elements.getTypeElement("java.time.Duration").asType();
     }
 
     public boolean hasErrors() {
@@ -849,6 +853,12 @@ public final class SchemaParser {
             }
             return r;
         }
+        if (isSame(type, instantType)) {
+            return wellKnown(origin, name, declared, "io.github.rawvoid.protovia.wkt.TimestampCodec");
+        }
+        if (isSame(type, durationType)) {
+            return wellKnown(origin, name, declared, "io.github.rawvoid.protovia.wkt.DurationCodec");
+        }
         TypeElement element = asTypeElement(type);
         if (element == null) {
             error(origin, "unsupported type for field '" + name + "': " + type);
@@ -901,6 +911,18 @@ public final class SchemaParser {
             e = e.getEnclosingElement();
         }
         return e instanceof TypeElement te ? te : null;
+    }
+
+    private Resolved wellKnown(Element origin, String name, ProtoType declared, String codec) {
+        if (declared != ProtoType.AUTO && declared != ProtoType.MESSAGE) {
+            error(origin, "field '" + name + "' Java type cannot use ProtoType." + declared);
+            return null;
+        }
+        Resolved r = new Resolved();
+        r.kind = FieldKind.MESSAGE;
+        r.protoType = ProtoType.MESSAGE;
+        r.codecName = codec;
+        return r;
     }
 
     private Resolved scalar(Element origin, String name, ProtoType declared, ProtoType inferred, Set<ProtoType> allowed) {
