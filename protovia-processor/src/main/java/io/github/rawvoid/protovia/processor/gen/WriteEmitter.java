@@ -27,16 +27,21 @@ import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 
 import javax.lang.model.element.Modifier;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryWrite;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.packedSizeOf;
+import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntryWrite;
+import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeCachedMessage;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeNoTag;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeTag;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
@@ -73,21 +78,21 @@ final class WriteEmitter {
     }
 
     private static void writeField(CodeBlock.Builder b, FieldModel field) {
-        Emit.loadField(b, field);
+        loadField(b, field);
         String tag = Names.tagConstant(field.number);
         switch (field.kind) {
             case SCALAR -> {
                 String valueExpr = field.javaOptional ? field.localName + ".get()" : field.localName;
                 b.beginControlFlow("if ($L)", presentCondition(field, field.localName, field.optional, field.javaOptional));
-                Emit.writeTag(b, tag);
+                writeTag(b, tag);
                 b.addStatement("$L", writeNoTag("writer", field, valueExpr));
                 b.endControlFlow();
             }
             case ENUM -> writeEnum(b, field, tag);
             case MESSAGE -> {
                 b.beginControlFlow("if ($L != null)", field.localName);
-                Emit.writeTag(b, tag);
-                Emit.writeCachedMessage(b, field, field.localName, field.localName + "Size");
+                writeTag(b, tag);
+                writeCachedMessage(b, field, field.localName, field.localName + "Size");
                 b.endControlFlow();
             }
             case REPEATED -> writeRepeated(b, field);
@@ -100,14 +105,14 @@ final class WriteEmitter {
         String helper = enumNumberOf(field.enumModel);
         if (field.optional) {
             b.beginControlFlow("if ($L)", enumPresent(field, field.localName));
-            Emit.writeTag(b, tag);
+            writeTag(b, tag);
             b.addStatement("writer.writeInt32NoTag($L($L))", helper, field.localName);
             b.endControlFlow();
         } else {
             b.beginControlFlow("if ($L)", enumPresent(field, field.localName));
             b.addStatement("int $LNumber = $L($L)", field.localName, helper, field.localName);
             b.beginControlFlow("if ($LNumber != 0)", field.localName);
-            Emit.writeTag(b, tag);
+            writeTag(b, tag);
             b.addStatement("writer.writeInt32NoTag($LNumber)", field.localName);
             b.endControlFlow();
             b.endControlFlow();
@@ -125,12 +130,12 @@ final class WriteEmitter {
             packedElements(b, field, true);
         } else {
             b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
-            Emit.nullElementCheck(b, field.element, "item", field.name);
-            Emit.writeTag(b, tag);
+            nullElementCheck(b, field.element, "item", field.name);
+            writeTag(b, tag);
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
             } else if (field.element.kind == FieldKind.MESSAGE) {
-                Emit.writeCachedMessage(b, field.element, "item", "itemSize");
+                writeCachedMessage(b, field.element, "item", "itemSize");
             } else {
                 b.addStatement("$L", writeNoTag("writer", field.element, "item"));
             }
@@ -140,27 +145,27 @@ final class WriteEmitter {
     }
 
     private static void writeOneof(CodeBlock.Builder b, FieldModel field) {
-        Emit.oneofCases(b, field, WriteEmitter::oneofCaseWrite);
+        oneofCases(b, field, WriteEmitter::oneofCaseWrite);
     }
 
     private static void oneofCaseWrite(CodeBlock.Builder b, OneofCaseModel c) {
         if (c.empty()) {
-            Emit.writeTag(b, c.tagConstant);
+            writeTag(b, c.tagConstant);
             b.addStatement("writer.writeUInt32NoTag(0)");
         } else if (c.selfMessage) {
-            Emit.writeTag(b, c.tagConstant);
-            Emit.writeCachedMessage(b, c.payload, "_c", c.tagConstant + "_sz");
+            writeTag(b, c.tagConstant);
+            writeCachedMessage(b, c.payload, "_c", c.tagConstant + "_sz");
         } else if (c.payload.kind == FieldKind.MESSAGE) {
             b.addStatement("$T _p = _c.$L", javaType(c.payload), c.accessor);
             b.beginControlFlow("if (_p != null)");
-            Emit.writeTag(b, c.tagConstant);
-            Emit.writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
+            writeTag(b, c.tagConstant);
+            writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
-            Emit.writeTag(b, c.tagConstant);
+            writeTag(b, c.tagConstant);
             b.addStatement("writer.writeInt32NoTag($L(_c.$L))", enumNumberOf(c.payload.enumModel), c.accessor);
         } else {
-            Emit.writeTag(b, c.tagConstant);
+            writeTag(b, c.tagConstant);
             b.addStatement("$L", writeNoTag("writer", c.payload, "_c." + c.accessor));
         }
     }

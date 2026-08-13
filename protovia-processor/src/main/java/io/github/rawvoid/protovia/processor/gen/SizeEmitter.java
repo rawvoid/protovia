@@ -27,9 +27,9 @@ import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import javax.lang.model.element.Modifier;
 import java.util.List;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntrySizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.packedSizeOf;
+import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntrySizeOf;
+import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
@@ -37,6 +37,9 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
@@ -86,8 +89,8 @@ final class SizeEmitter {
             .build();
     }
 
-    static void computeField(CodeBlock.Builder b, FieldModel field) {
-        Emit.loadField(b, field);
+    private static void computeField(CodeBlock.Builder b, FieldModel field) {
+        loadField(b, field);
         switch (field.kind) {
             case SCALAR -> computeScalar(b, field, field.localName, field.number, field.optional, field.javaOptional);
             case ENUM -> computeEnum(b, field, field.localName, field.number, field.optional);
@@ -138,7 +141,7 @@ final class SizeEmitter {
             b.addStatement("size += $T.lengthDelimited($L, $LPacked)", CODED_SIZE, field.number, field.localName);
         } else {
             b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
-            Emit.nullElementCheck(b, field.element, "item", field.name);
+            nullElementCheck(b, field.element, "item", field.name);
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("size += $T.enumValue($L, $L(item))",
                     CODED_SIZE, field.number, enumNumberOf(field.element.enumModel));
@@ -166,7 +169,7 @@ final class SizeEmitter {
     }
 
     private static void computeOneof(CodeBlock.Builder b, FieldModel field) {
-        Emit.oneofCases(b, field, SizeEmitter::oneofCaseSize);
+        oneofCases(b, field, SizeEmitter::oneofCaseSize);
     }
 
     private static void oneofCaseSize(CodeBlock.Builder b, OneofCaseModel c) {

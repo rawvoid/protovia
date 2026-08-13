@@ -33,10 +33,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryRead;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntrySizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryWrite;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.packedSizeOf;
+import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
+import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntrySizeOf;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntryWrite;
+import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
@@ -124,7 +126,7 @@ final class HelperEmitter {
         }
         body.unindent();
         body.add("};\n");
-        return MethodSpec.methodBuilder(GenNames.enumNumberOf(model))
+        return MethodSpec.methodBuilder(enumNumberOf(model))
             .addModifiers(Modifier.STATIC)
             .returns(TypeName.INT)
             .addParameter(enumType(model), "value")
@@ -146,7 +148,7 @@ final class HelperEmitter {
         }
         body.unindent();
         body.add("};\n");
-        return MethodSpec.methodBuilder(GenNames.enumFrom(model))
+        return MethodSpec.methodBuilder(enumFrom(model))
             .addModifiers(Modifier.STATIC)
             .returns(enumType(model))
             .addParameter(TypeName.INT, "number")

@@ -24,7 +24,7 @@ import javax.lang.model.util.Elements;
 import java.util.Set;
 
 /**
- * Identifier helpers for generated Java (packages, codec names, tag constants).
+ * Identifier helpers for generated Java (packages, codec names, tags, helpers).
  *
  * @author Rawvoid
  */
@@ -126,5 +126,33 @@ public final class Names {
      */
     public static String tagConstant(int fieldNumber) {
         return "TAG_" + fieldNumber;
+    }
+
+    public static String enumNumberOf(EnumModel model) {
+        return "numberOf" + sanitizeTypeName(model.typeName);
+    }
+
+    public static String enumFrom(EnumModel model) {
+        return "from" + sanitizeTypeName(model.typeName);
+    }
+
+    public static String packedSizeOf(FieldModel field) {
+        return "packedSizeOf" + capitalize(field.name);
+    }
+
+    public static String mapEntrySizeOf(FieldModel field) {
+        return "sizeOf" + capitalize(field.name) + "Entry";
+    }
+
+    public static String mapEntryWrite(FieldModel field) {
+        return "write" + capitalize(field.name) + "Entry";
+    }
+
+    public static String mapEntryRead(FieldModel field) {
+        return "read" + capitalize(field.name) + "Entry";
+    }
+
+    private static String sanitizeTypeName(String typeName) {
+        return typeName.replace(".", "_");
     }
 }

@@ -31,8 +31,8 @@ import javax.lang.model.element.Modifier;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumFrom;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryRead;
+import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
+import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.WIRE_TYPE;

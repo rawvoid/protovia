@@ -17,6 +17,8 @@
 package io.github.rawvoid.protovia.processor.gen;
 
 import com.palantir.javapoet.ClassName;
+import io.github.rawvoid.protovia.processor.model.FieldKind;
+import io.github.rawvoid.protovia.processor.model.FieldModel;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
 
@@ -46,8 +48,22 @@ enum PrimitiveListSpec {
         this.get = get;
     }
 
-    String simpleName() {
-        return simpleName;
+    static PrimitiveListSpec of(FieldModel field) {
+        if (field.primitiveListType() == null) {
+            return null;
+        }
+        FieldModel el = field.kind == FieldKind.REPEATED ? field.element : field;
+        if (el == null || el.protoType == null) {
+            return null;
+        }
+        return switch (el.protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 -> INT;
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> LONG;
+            case FLOAT -> FLOAT;
+            case DOUBLE -> DOUBLE;
+            case BOOL -> BOOLEAN;
+            default -> null;
+        };
     }
 
     ClassName listType() {

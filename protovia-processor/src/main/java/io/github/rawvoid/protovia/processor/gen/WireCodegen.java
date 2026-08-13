@@ -21,13 +21,17 @@ import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.wire.WireType;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumFrom;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumNumberOf;
+import java.util.function.BiConsumer;
+
+import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
+import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.ARRAY_LIST;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.OPTIONAL;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
@@ -36,19 +40,64 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.implConstructorRef;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.primitiveListSpec;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
 
 /**
- * JavaPoet {@link CodeBlock} fragments for wire read/write/size expressions.
+ * Shared {@link CodeBlock} fragments and statement patterns for size / write / read.
  *
  * @author Rawvoid
  */
 final class WireCodegen {
 
     private WireCodegen() {
+    }
+
+    static void loadField(CodeBlock.Builder b, FieldModel field) {
+        b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr);
+    }
+
+    static void writeTag(CodeBlock.Builder b, Object tag) {
+        b.addStatement("writer.writeUInt32NoTag($L)", tag);
+    }
+
+    static void writeCachedMessage(CodeBlock.Builder b, FieldModel field, String value, String sizeLocal) {
+        CodeBlock codec = codecInstance(field);
+        b.addStatement("int $L = writer.hasCachedSize() ? writer.takeSize() : $L.computeSize($L)",
+            sizeLocal, codec, value);
+        b.addStatement("writer.writeUInt32NoTag($L)", sizeLocal);
+        b.addStatement("$L.writeTo(writer, $L)", codec, value);
+    }
+
+    static void nullElementCheck(CodeBlock.Builder b, FieldModel element, String var, String fieldName) {
+        if (!element.primitive) {
+            b.beginControlFlow("if ($L == null)", var);
+            b.addStatement("throw new $T($S)", PROTO_EXCEPTION, "null element in field " + fieldName);
+            b.endControlFlow();
+        }
+    }
+
+    static void oneofCases(
+        CodeBlock.Builder b,
+        FieldModel field,
+        BiConsumer<CodeBlock.Builder, OneofCaseModel> caseBody) {
+        b.beginControlFlow("if ($L != null)", field.localName);
+        boolean first = true;
+        for (OneofCaseModel c : field.oneofCases) {
+            if (first) {
+                b.beginControlFlow("if ($L instanceof $T _c)", field.localName, oneofCaseType(c));
+            } else {
+                b.nextControlFlow("else if ($L instanceof $T _c)", field.localName, oneofCaseType(c));
+            }
+            first = false;
+            caseBody.accept(b, c);
+        }
+        if (!first) {
+            b.endControlFlow();
+        }
+        b.endControlFlow();
     }
 
     static CodeBlock sizeCall(FieldModel field, int number, String value) {
@@ -184,7 +233,7 @@ final class WireCodegen {
     }
 
     static TypeName arrayBuilderType(FieldModel field) {
-        PrimitiveListSpec spec = primitiveListSpec(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         if (spec != null) {
             return spec.listType();
         }
@@ -192,7 +241,7 @@ final class WireCodegen {
     }
 
     static CodeBlock toArray(FieldModel field, String listVar) {
-        PrimitiveListSpec spec = primitiveListSpec(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         if (spec != null) {
             return CodeBlock.of("$L.$L()", listVar, spec.toArray());
         }
@@ -200,7 +249,7 @@ final class WireCodegen {
     }
 
     static CodeBlock primitiveAdd(FieldModel field, String list, CodeBlock value) {
-        PrimitiveListSpec spec = primitiveListSpec(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         if (spec == null) {
             return null;
         }
@@ -208,7 +257,7 @@ final class WireCodegen {
     }
 
     static CodeBlock packedEnsure(FieldModel field, String list) {
-        PrimitiveListSpec spec = primitiveListSpec(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         if (spec == null) {
             return null;
         }
@@ -217,7 +266,7 @@ final class WireCodegen {
 
     static void packedElements(CodeBlock.Builder b, FieldModel field, boolean write) {
         String list = write ? field.localName : "values";
-        PrimitiveListSpec spec = primitiveListSpec(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         int width = packedFixedWidth(field.element);
         if (spec != null && !field.array && (write || width == 0)) {
             String prim = field.localName + "Prim";
@@ -251,7 +300,7 @@ final class WireCodegen {
 
     private static void boxedPackedLoop(CodeBlock.Builder b, FieldModel field, String list, boolean write) {
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), list);
-        Emit.nullElementCheck(b, field.element, "item", field.name);
+        nullElementCheck(b, field.element, "item", field.name);
         if (write) {
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
@@ -292,20 +341,20 @@ final class WireCodegen {
     static void mapEntryPartWrite(CodeBlock.Builder b, FieldModel part, String var, int number) {
         int tag = WireType.tag(number, unpackedWire(part));
         if (part.kind == FieldKind.MESSAGE) {
-            Emit.writeTag(b, tag);
-            Emit.writeCachedMessage(b, part, var, var + "Size");
+            writeTag(b, tag);
+            writeCachedMessage(b, part, var, var + "Size");
             return;
         }
         if (part.kind == FieldKind.ENUM) {
             b.addStatement("int $LN = $L($L)", var, enumNumberOf(part.enumModel), var);
             b.beginControlFlow("if ($LN != 0)", var);
-            Emit.writeTag(b, tag);
+            writeTag(b, tag);
             b.addStatement("writer.writeInt32NoTag($LN)", var);
             b.endControlFlow();
             return;
         }
         b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
-        Emit.writeTag(b, tag);
+        writeTag(b, tag);
         b.addStatement("$L", writeNoTag("writer", part, var));
         b.endControlFlow();
     }

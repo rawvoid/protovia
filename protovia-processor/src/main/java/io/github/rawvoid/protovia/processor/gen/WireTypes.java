@@ -70,72 +70,59 @@ final class WireTypes {
         };
     }
 
-    static PrimitiveListSpec primitiveListSpec(FieldModel field) {
-        String type = field.primitiveListType();
-        if (type == null) {
-            return null;
-        }
-        for (PrimitiveListSpec spec : PrimitiveListSpec.values()) {
-            if (type.endsWith(spec.simpleName())) {
-                return spec;
-            }
-        }
-        return null;
-    }
-
-    static String presentCondition(FieldModel field, String var, boolean optional, boolean javaOptional) {
+    static CodeBlock presentCondition(FieldModel field, String var, boolean optional, boolean javaOptional) {
         if (javaOptional) {
-            return var + " != null && " + var + ".isPresent()";
+            return CodeBlock.of("$L != null && $L.isPresent()", var, var);
         }
         if (optional) {
-            return var + " != null";
+            return CodeBlock.of("$L != null", var);
         }
         if (field.primitive) {
             return switch (field.protoType) {
-                case BOOL -> var;
-                case FLOAT -> "Float.floatToRawIntBits(" + var + ") != 0";
-                case DOUBLE -> "Double.doubleToRawLongBits(" + var + ") != 0L";
-                case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> var + " != 0L";
-                default -> var + " != 0";
+                case BOOL -> CodeBlock.of("$L", var);
+                case FLOAT -> CodeBlock.of("Float.floatToRawIntBits($L) != 0", var);
+                case DOUBLE -> CodeBlock.of("Double.doubleToRawLongBits($L) != 0L", var);
+                case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> CodeBlock.of("$L != 0L", var);
+                default -> CodeBlock.of("$L != 0", var);
             };
         }
         if (field.byteArray) {
-            return var + " != null && " + var + ".length != 0";
+            return CodeBlock.of("$L != null && $L.length != 0", var, var);
         }
         if (field.byteBuffer) {
-            return var + " != null && " + var + ".remaining() != 0";
+            return CodeBlock.of("$L != null && $L.remaining() != 0", var, var);
         }
         return switch (field.protoType) {
-            case STRING -> var + " != null && !" + var + ".isEmpty()";
-            case BOOL -> var + " != null && " + var;
-            case FLOAT -> var + " != null && Float.floatToRawIntBits(" + var + ") != 0";
-            case DOUBLE -> var + " != null && Double.doubleToRawLongBits(" + var + ") != 0L";
-            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> var + " != null && " + var + " != 0L";
-            default -> var + " != null && " + var + " != 0";
+            case STRING -> CodeBlock.of("$L != null && !$L.isEmpty()", var, var);
+            case BOOL -> CodeBlock.of("$L != null && $L", var, var);
+            case FLOAT -> CodeBlock.of("$L != null && Float.floatToRawIntBits($L) != 0", var, var);
+            case DOUBLE -> CodeBlock.of("$L != null && Double.doubleToRawLongBits($L) != 0L", var, var);
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> CodeBlock.of("$L != null && $L != 0L", var, var);
+            default -> CodeBlock.of("$L != null && $L != 0", var, var);
         };
     }
 
-    static String presentRepeated(FieldModel field) {
+    static CodeBlock presentRepeated(FieldModel field) {
         if (field.array) {
-            return field.localName + " != null && " + field.localName + ".length != 0";
+            return CodeBlock.of("$L != null && $L.length != 0", field.localName, field.localName);
         }
-        return field.localName + " != null && !" + field.localName + ".isEmpty()";
+        return CodeBlock.of("$L != null && !$L.isEmpty()", field.localName, field.localName);
     }
 
-    static String mapDefaultSkip(FieldModel part, String var) {
+    static CodeBlock mapDefaultSkip(FieldModel part, String var) {
         if (part.byteArray) {
-            return var + ".length != 0";
+            return CodeBlock.of("$L.length != 0", var);
         }
         if (part.byteBuffer) {
-            return var + ".remaining() != 0";
+            return CodeBlock.of("$L.remaining() != 0", var);
         }
         return switch (part.protoType) {
-            case BOOL -> var;
-            case STRING -> "!" + var + ".isEmpty()";
-            case FLOAT -> "Float.floatToRawIntBits(" + var + ") != 0";
-            case DOUBLE -> "Double.doubleToRawLongBits(" + var + ") != 0L";
-            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> var + " != 0L";
-            default -> var + " != 0";
+            case BOOL -> CodeBlock.of("$L", var);
+            case STRING -> CodeBlock.of("!$L.isEmpty()", var);
+            case FLOAT -> CodeBlock.of("Float.floatToRawIntBits($L) != 0", var);
+            case DOUBLE -> CodeBlock.of("Double.doubleToRawLongBits($L) != 0L", var);
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 -> CodeBlock.of("$L != 0L", var);
+            default -> CodeBlock.of("$L != 0", var);
         };
     }
 
