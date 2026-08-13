@@ -6,7 +6,10 @@ import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.ByteString;
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.itest.model.Address;
+import io.github.rawvoid.protovia.itest.model.Contact;
+import io.github.rawvoid.protovia.itest.model.Email;
 import io.github.rawvoid.protovia.itest.model.Envelope;
+import io.github.rawvoid.protovia.itest.model.Home;
 import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
 import org.junit.jupiter.api.BeforeAll;
@@ -139,6 +142,54 @@ class OfficialInteropTest {
         assertEquals(List.of(8, 9), back.getUnpacked());
         assertArrayEquals(new byte[]{1, 2, 3}, back.getPayload());
         assertEquals(99, back.getScores().get("math"));
+    }
+
+    @Test
+    void oneofInteropsWithDynamicMessage() throws Exception {
+        DescriptorProtos.DescriptorProto address = DescriptorProtos.DescriptorProto.newBuilder()
+                .setName("Address")
+                .addField(field("city", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+                .addField(field("street", 2, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+                .build();
+        DescriptorProtos.DescriptorProto contact = DescriptorProtos.DescriptorProto.newBuilder()
+                .setName("Contact")
+                .addField(field("name", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+                .addOneofDecl(DescriptorProtos.OneofDescriptorProto.newBuilder().setName("target"))
+                .addField(field("email", 10, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING)
+                        .setOneofIndex(0))
+                .addField(field("address", 11, DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
+                        .setTypeName(".Address")
+                        .setOneofIndex(0))
+                .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+                DescriptorProtos.FileDescriptorProto.newBuilder()
+                        .setName("contact.proto")
+                        .setSyntax("proto3")
+                        .addMessageType(address)
+                        .addMessageType(contact)
+                        .build(),
+                new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("Contact");
+        Descriptors.Descriptor addrDesc = fd.findMessageTypeByName("Address");
+
+        Contact c = new Contact();
+        c.name = "Ada";
+        c.target = new Email("ada@example.com");
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(c));
+        assertEquals("Ada", parsed.getField(desc.findFieldByName("name")));
+        assertEquals("ada@example.com", parsed.getField(desc.findFieldByName("email")));
+
+        DynamicMessage official = DynamicMessage.newBuilder(desc)
+                .setField(desc.findFieldByName("name"), "Ada")
+                .setField(desc.findFieldByName("address"),
+                        DynamicMessage.newBuilder(addrDesc)
+                                .setField(addrDesc.findFieldByName("city"), "Paris")
+                                .setField(addrDesc.findFieldByName("street"), "Rue")
+                                .build())
+                .build();
+        Contact back = ProtoVia.fromBytes(Contact.class, official.toByteArray());
+        assertEquals("Ada", back.name);
+        assertEquals(new Home(new Address("Paris", "Rue")), back.target);
     }
 
     @Test

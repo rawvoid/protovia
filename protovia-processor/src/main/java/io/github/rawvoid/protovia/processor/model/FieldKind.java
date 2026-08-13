@@ -5,5 +5,6 @@ public enum FieldKind {
     ENUM,
     MESSAGE,
     REPEATED,
-    MAP
+    MAP,
+    ONEOF
 }

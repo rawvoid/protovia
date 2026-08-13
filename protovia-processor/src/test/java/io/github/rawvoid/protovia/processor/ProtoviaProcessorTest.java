@@ -148,6 +148,61 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void oneofGeneratesInstanceofSwitch() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(
+                        JavaFileObjects.forSourceLines(
+                                "demo.Target",
+                                "package demo;",
+                                "public sealed interface Target permits Email, Home {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Email",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Addr",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Home",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Contact",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                                "@ProtoMessage public class Contact {",
+                                "  @ProtoField(number = 1) public String name;",
+                                "  @ProtoOneof public Target target;",
+                                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.ContactProtoCodec")
+                .contentsAsUtf8String()
+                .contains("instanceof Email");
+    }
+
+    @Test
+    void oneofRejectsNonSealed() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Bad",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                        "@ProtoMessage public class Bad { @ProtoOneof public String target; }"));
+        assertThat(compilation).hadErrorContaining("sealed");
+    }
+
+    @Test
     void unknownFieldsSlotGeneratesMerge() {
         Compilation compilation = javac()
                 .withProcessors(new ProtoviaProcessor())

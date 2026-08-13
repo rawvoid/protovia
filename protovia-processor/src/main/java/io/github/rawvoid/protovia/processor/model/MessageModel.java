@@ -7,6 +7,8 @@ public final class MessageModel {
 
     public final TypeElement type;
     public final String packageName;
+    public final String protoPackage;
+    public final String protoMessageName;
     public final String typeName;
     public final String codecSimpleName;
     public final boolean record;
@@ -17,6 +19,8 @@ public final class MessageModel {
     public MessageModel(
             TypeElement type,
             String packageName,
+            String protoPackage,
+            String protoMessageName,
             String typeName,
             String codecSimpleName,
             boolean record,
@@ -25,6 +29,8 @@ public final class MessageModel {
             UnknownField unknown) {
         this.type = type;
         this.packageName = packageName;
+        this.protoPackage = protoPackage;
+        this.protoMessageName = protoMessageName;
         this.typeName = typeName;
         this.codecSimpleName = codecSimpleName;
         this.record = record;

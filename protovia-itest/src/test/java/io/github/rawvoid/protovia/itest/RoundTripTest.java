@@ -4,6 +4,9 @@ import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.itest.model.Address;
+import io.github.rawvoid.protovia.itest.model.Contact;
+import io.github.rawvoid.protovia.itest.model.Email;
+import io.github.rawvoid.protovia.itest.model.Home;
 import io.github.rawvoid.protovia.itest.model.Envelope;
 import io.github.rawvoid.protovia.itest.model.NodeA;
 import io.github.rawvoid.protovia.itest.model.NodeB;
@@ -158,6 +161,41 @@ class RoundTripTest {
         user.setRanks(Arrays.asList(1, null, 3));
         ProtoWriter writer = ProtoWriter.growing();
         assertThrows(ProtoException.class, () -> UserProtoCodec.INSTANCE.writeTo(writer, user));
+    }
+
+    @Test
+    void oneofEmailRoundTrip() {
+        Contact c = new Contact();
+        c.name = "Ada";
+        c.target = new Email("ada@example.com");
+        Contact back = ProtoVia.fromBytes(Contact.class, ProtoVia.toBytes(c));
+        assertEquals("Ada", back.name);
+        assertEquals(new Email("ada@example.com"), back.target);
+    }
+
+    @Test
+    void oneofEmptyEmailIsWritten() {
+        Contact c = new Contact();
+        c.target = new Email("");
+        byte[] bytes = ProtoVia.toBytes(c);
+        assertTrue(bytes.length > 0);
+        Contact back = ProtoVia.fromBytes(Contact.class, bytes);
+        assertEquals(new Email(""), back.target);
+    }
+
+    @Test
+    void oneofLastTagWins() {
+        Contact email = new Contact();
+        email.target = new Email("a@b.c");
+        Contact home = new Contact();
+        home.target = new Home(new Address("Paris", "Rue"));
+        byte[] first = ProtoVia.toBytes(email);
+        byte[] second = ProtoVia.toBytes(home);
+        byte[] both = new byte[first.length + second.length];
+        System.arraycopy(first, 0, both, 0, first.length);
+        System.arraycopy(second, 0, both, first.length, second.length);
+        Contact back = ProtoVia.fromBytes(Contact.class, both);
+        assertEquals(new Home(new Address("Paris", "Rue")), back.target);
     }
 
     @Test

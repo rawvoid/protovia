@@ -7,6 +7,7 @@ import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import java.util.LinkedHashSet;
@@ -60,6 +61,13 @@ public final class CodecGenerator {
 
     private void emitTags(JavaWriter w, MessageModel model) {
         for (FieldModel field : model.fields) {
+            if (field.kind == FieldKind.ONEOF) {
+                for (OneofCaseModel c : field.oneofCases) {
+                    w.line("private static final int " + c.tagConstant + " = "
+                            + WireType.tag(c.number, oneofWire(c)) + ";");
+                }
+                continue;
+            }
             String tag = Names.tagConstant(field.name);
             int unpacked = unpackedWire(field);
             w.line("private static final int " + tag + " = " + WireType.tag(field.number, unpacked) + ";");
@@ -111,6 +119,7 @@ public final class CodecGenerator {
             }
             case REPEATED -> emitComputeRepeated(w, field);
             case MAP -> emitComputeMap(w, field);
+            case ONEOF -> emitComputeOneof(w, field);
         }
     }
 
@@ -244,6 +253,7 @@ public final class CodecGenerator {
             }
             case REPEATED -> emitWriteRepeated(w, field);
             case MAP -> emitWriteMap(w, field);
+            case ONEOF -> emitWriteOneof(w, field);
         }
     }
 
@@ -277,6 +287,89 @@ public final class CodecGenerator {
             w.close();
         }
         w.close();
+    }
+
+    private void emitComputeOneof(JavaWriter w, FieldModel field) {
+        w.open("if (" + field.localName + " != null)");
+        for (OneofCaseModel c : field.oneofCases) {
+            w.open("if (" + field.localName + " instanceof " + c.typeName + " _c)");
+            if (c.empty()) {
+                w.line("size += CodedSize.lengthDelimited(" + c.number + ", 0);");
+            } else if (c.selfMessage) {
+                w.line("int " + c.tagConstant + "_slot = cache.reserve();");
+                w.line("int " + c.tagConstant + "_sz = " + c.payload.codecName + ".INSTANCE.computeSize(_c, cache);");
+                w.line("cache.set(" + c.tagConstant + "_slot, " + c.tagConstant + "_sz);");
+                w.line("size += CodedSize.message(" + c.number + ", " + c.tagConstant + "_sz);");
+            } else if (c.payload.kind == FieldKind.MESSAGE) {
+                w.line(c.payload.javaTypeName + " _p = _c." + c.accessor + ";");
+                w.open("if (_p != null)");
+                w.line("int " + c.tagConstant + "_slot = cache.reserve();");
+                w.line("int " + c.tagConstant + "_sz = " + c.payload.codecName + ".INSTANCE.computeSize(_p, cache);");
+                w.line("cache.set(" + c.tagConstant + "_slot, " + c.tagConstant + "_sz);");
+                w.line("size += CodedSize.message(" + c.number + ", " + c.tagConstant + "_sz);");
+                w.close();
+            } else if (c.payload.kind == FieldKind.ENUM) {
+                w.line("size += CodedSize.enumValue(" + c.number + ", "
+                        + enumNumberHelper(c.payload.enumModel) + "(_c." + c.accessor + "));");
+            } else {
+                w.line("size += " + sizeCall(c.payload, c.number, "_c." + c.accessor) + ";");
+            }
+            w.close();
+        }
+        w.close();
+    }
+
+    private void emitWriteOneof(JavaWriter w, FieldModel field) {
+        w.open("if (" + field.localName + " != null)");
+        for (OneofCaseModel c : field.oneofCases) {
+            w.open("if (" + field.localName + " instanceof " + c.typeName + " _c)");
+            if (c.empty()) {
+                w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
+                w.line("writer.writeUInt32NoTag(0);");
+            } else if (c.selfMessage) {
+                w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
+                emitWriteCachedMessage(w, c.payload.codecName + ".INSTANCE", "_c", c.tagConstant + "_sz");
+            } else if (c.payload.kind == FieldKind.MESSAGE) {
+                w.line(c.payload.javaTypeName + " _p = _c." + c.accessor + ";");
+                w.open("if (_p != null)");
+                w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
+                emitWriteCachedMessage(w, c.payload.codecName + ".INSTANCE", "_p", c.tagConstant + "_sz");
+                w.close();
+            } else if (c.payload.kind == FieldKind.ENUM) {
+                w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
+                w.line("writer.writeInt32NoTag(" + enumNumberHelper(c.payload.enumModel) + "(_c." + c.accessor + "));");
+            } else {
+                w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
+                w.line(writeNoTag("writer", c.payload, "_c." + c.accessor) + ";");
+            }
+            w.close();
+        }
+        w.close();
+    }
+
+    private void emitReadOneof(JavaWriter w, FieldModel field, boolean record) {
+        for (OneofCaseModel c : field.oneofCases) {
+            w.open("case " + c.tagConstant + " ->");
+            String expr;
+            if (c.empty()) {
+                w.line("int _old = reader.beginPacked();");
+                w.open("while (reader.readTag() != 0)");
+                w.line("reader.skipField();");
+                w.close();
+                w.line("reader.popLimit(_old);");
+                expr = "new " + c.typeName + "()";
+            } else if (c.selfMessage) {
+                expr = "reader.readMessage(" + c.payload.codecName + ".INSTANCE)";
+            } else if (c.payload.kind == FieldKind.MESSAGE) {
+                expr = "new " + c.typeName + "(reader.readMessage(" + c.payload.codecName + ".INSTANCE))";
+            } else if (c.payload.kind == FieldKind.ENUM) {
+                expr = "new " + c.typeName + "(" + enumFromHelper(c.payload.enumModel) + "(reader.readEnum()))";
+            } else {
+                expr = "new " + c.typeName + "(" + readCall(c.payload) + ")";
+            }
+            emitStore(w, field, record, expr);
+            w.close();
+        }
     }
 
     private void emitWriteMap(JavaWriter w, FieldModel field) {
@@ -412,6 +505,7 @@ public final class CodecGenerator {
                 w.line("read" + Names.capitalize(field.name) + "Entry(reader, " + mapVar(field, record) + ");");
                 w.close();
             }
+            case ONEOF -> emitReadOneof(w, field, record);
         }
     }
 
@@ -683,6 +777,13 @@ public final class CodecGenerator {
         }
         if (field.element != null) {
             collectEnums(field.element, seen, w);
+        }
+        if (field.oneofCases != null) {
+            for (OneofCaseModel c : field.oneofCases) {
+                if (c.payload != null) {
+                    collectEnums(c.payload, seen, w);
+                }
+            }
         }
         if (field.mapKey != null) {
             collectEnums(field.mapKey, seen, w);
@@ -1081,6 +1182,13 @@ public final class CodecGenerator {
 
     private static String sanitize(String typeName) {
         return typeName.replace(".", "_");
+    }
+
+    private int oneofWire(OneofCaseModel c) {
+        if (c.empty() || c.selfMessage) {
+            return WireType.LEN;
+        }
+        return unpackedWire(c.payload);
     }
 
     private int unpackedWire(FieldModel field) {

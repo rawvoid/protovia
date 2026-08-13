@@ -33,6 +33,7 @@ public final class FieldModel {
     public final Element origin;
     public final boolean array;
     public final String arrayComponentType;
+    public final java.util.List<OneofCaseModel> oneofCases;
 
     private FieldModel(Builder b) {
         this.number = b.number;
@@ -61,6 +62,7 @@ public final class FieldModel {
         this.origin = b.origin;
         this.array = b.array;
         this.arrayComponentType = b.arrayComponentType;
+        this.oneofCases = b.oneofCases == null ? java.util.List.of() : java.util.List.copyOf(b.oneofCases);
     }
 
     public boolean packable() {
@@ -132,6 +134,7 @@ public final class FieldModel {
         private Element origin;
         private boolean array;
         private String arrayComponentType;
+        private java.util.List<OneofCaseModel> oneofCases;
 
         public Builder number(int number) {
             this.number = number;
@@ -261,6 +264,11 @@ public final class FieldModel {
 
         public Builder arrayComponentType(String arrayComponentType) {
             this.arrayComponentType = arrayComponentType;
+            return this;
+        }
+
+        public Builder oneofCases(java.util.List<OneofCaseModel> oneofCases) {
+            this.oneofCases = oneofCases;
             return this;
         }
 

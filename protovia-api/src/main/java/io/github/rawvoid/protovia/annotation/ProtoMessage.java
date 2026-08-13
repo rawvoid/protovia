@@ -19,4 +19,10 @@ public @interface ProtoMessage {
      * Protobuf message name. Defaults to the Java simple class name.
      */
     String name() default "";
+
+    /**
+     * Protobuf package for Any {@code type_url} and {@code .proto} export.
+     * Full name is {@code packageName + "." + name} when package is non-empty.
+     */
+    String packageName() default "";
 }

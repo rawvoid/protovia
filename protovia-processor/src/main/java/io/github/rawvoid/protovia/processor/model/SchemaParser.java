@@ -5,6 +5,8 @@ import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import io.github.rawvoid.protovia.annotation.ProtoOneof;
+import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
 import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 import io.github.rawvoid.protovia.wire.WireType;
 
@@ -157,28 +159,38 @@ public final class SchemaParser {
 
         String pkg = Names.packageName(type);
         String typeName = Names.typeName(type, pkg);
+        ProtoMessage meta = type.getAnnotation(ProtoMessage.class);
+        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String protoMessageName = meta == null || meta.name().isBlank()
+                ? type.getSimpleName().toString()
+                : meta.name().trim();
         Map<Integer, FieldModel> byNumber = new LinkedHashMap<>();
+        Set<Integer> taken = new HashSet<>();
         Set<String> claimed = new HashSet<>();
+        List<FieldModel> oneofs = new ArrayList<>();
 
         List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
         MessageModel.UnknownField[] unknown = new MessageModel.UnknownField[1];
         if (record) {
-            parseRecord(type, pkg, byNumber, claimed, recordComponents, unknown);
+            parseRecord(type, pkg, byNumber, taken, claimed, recordComponents, unknown, oneofs);
         } else {
-            parsePojo(type, pkg, byNumber, claimed, unknown);
+            parsePojo(type, pkg, byNumber, taken, claimed, unknown, oneofs);
         }
 
-        if (byNumber.isEmpty()) {
-            error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField members");
+        if (byNumber.isEmpty() && oneofs.isEmpty()) {
+            error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField or @ProtoOneof members");
         }
         if (errors) {
             return null;
         }
         List<FieldModel> fields = new ArrayList<>(byNumber.values());
         fields.sort(java.util.Comparator.comparingInt(f -> f.number));
+        fields.addAll(oneofs);
         return new MessageModel(
                 type,
                 pkg,
+                protoPackage,
+                protoMessageName,
                 typeName,
                 Names.codecSimpleName(elements, type),
                 record,
@@ -191,9 +203,11 @@ public final class SchemaParser {
             TypeElement type,
             String pkg,
             Map<Integer, FieldModel> byNumber,
+            Set<Integer> taken,
             Set<String> claimed,
             List<MessageModel.RecordComponentModel> recordComponents,
-            MessageModel.UnknownField[] unknown) {
+            MessageModel.UnknownField[] unknown,
+            List<FieldModel> oneofs) {
         for (RecordComponentElement component : type.getRecordComponents()) {
             if (component.getAnnotation(ProtoUnknown.class) != null
                     || (component.getAccessor() != null
@@ -210,6 +224,24 @@ public final class SchemaParser {
                             "io.github.rawvoid.protovia.UnknownFields",
                             "io.github.rawvoid.protovia.UnknownFields.EMPTY",
                             null));
+                }
+                continue;
+            }
+            if (component.getAnnotation(ProtoOneof.class) != null
+                    || (component.getAccessor() != null
+                    && component.getAccessor().getAnnotation(ProtoOneof.class) != null)) {
+                if (component.getAnnotation(ProtoField.class) != null) {
+                    error(component, "cannot combine @ProtoOneof with @ProtoField");
+                    continue;
+                }
+                String name = component.getSimpleName().toString();
+                FieldModel oneof = resolveOneof(
+                        component, name, component.asType(), AccessKind.RECORD,
+                        "value." + name + "()", null, name, pkg, taken);
+                if (oneof != null && claimed.add(name)) {
+                    oneofs.add(oneof);
+                    recordComponents.add(new MessageModel.RecordComponentModel(
+                            name, renderType(component.asType(), pkg), "null", oneof));
                 }
                 continue;
             }
@@ -237,7 +269,7 @@ public final class SchemaParser {
                     null,
                     name,
                     pkg);
-            if (field != null && addField(byNumber, claimed, field)) {
+            if (field != null && addField(byNumber, taken, claimed, field)) {
                 recordComponents.add(new MessageModel.RecordComponentModel(
                         name, typeName, defaultExpr(component.asType()), field));
             } else {
@@ -251,8 +283,10 @@ public final class SchemaParser {
             TypeElement type,
             String pkg,
             Map<Integer, FieldModel> byNumber,
+            Set<Integer> taken,
             Set<String> claimed,
-            MessageModel.UnknownField[] unknown) {
+            MessageModel.UnknownField[] unknown,
+            List<FieldModel> oneofs) {
         Map<String, VariableElement> fields = new HashMap<>();
         Map<String, ExecutableElement> methods = new HashMap<>();
         for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
@@ -270,6 +304,23 @@ public final class SchemaParser {
 
         Set<String> annotatedViaField = new HashSet<>();
         for (VariableElement field : fields.values()) {
+            if (field.getAnnotation(ProtoOneof.class) != null) {
+                if (field.getAnnotation(ProtoField.class) != null) {
+                    error(field, "cannot combine @ProtoOneof with @ProtoField");
+                    continue;
+                }
+                String name = field.getSimpleName().toString();
+                Access access = resolvePojoAccess(type, field, name, field.asType(), methods);
+                if (access == null) {
+                    continue;
+                }
+                FieldModel oneof = resolveOneof(
+                        field, name, field.asType(), access.kind, access.readExpr, access.setter, name, pkg, taken);
+                if (oneof != null && claimed.add(name)) {
+                    oneofs.add(oneof);
+                }
+                continue;
+            }
             if (field.getAnnotation(ProtoUnknown.class) != null) {
                 if (field.getAnnotation(ProtoField.class) != null) {
                     error(field, "cannot combine @ProtoUnknown with @ProtoField");
@@ -295,7 +346,7 @@ public final class SchemaParser {
             FieldModel model = resolveField(
                     field, name, field.asType(), ann, access.kind, access.readExpr, access.setter, name, pkg);
             if (model != null) {
-                addField(byNumber, claimed, model);
+                addField(byNumber, taken, claimed, model);
             }
         }
 
@@ -356,7 +407,7 @@ public final class SchemaParser {
                     property,
                     pkg);
             if (model != null) {
-                addField(byNumber, claimed, model);
+                addField(byNumber, taken, claimed, model);
             }
         }
     }
@@ -412,13 +463,14 @@ public final class SchemaParser {
         return null;
     }
 
-    private boolean addField(Map<Integer, FieldModel> byNumber, Set<String> claimed, FieldModel field) {
+    private boolean addField(
+            Map<Integer, FieldModel> byNumber, Set<Integer> taken, Set<String> claimed, FieldModel field) {
         if (!WireType.isValidFieldNumber(field.number)) {
             error(field.origin, "invalid field number " + field.number
                     + " (must be in [1, 536870911] and not in [19000, 19999])");
             return false;
         }
-        if (byNumber.containsKey(field.number)) {
+        if (!taken.add(field.number)) {
             error(field.origin, "duplicate field number " + field.number);
             return false;
         }
@@ -428,6 +480,131 @@ public final class SchemaParser {
         }
         byNumber.put(field.number, field);
         return true;
+    }
+
+    private FieldModel resolveOneof(
+            Element origin,
+            String name,
+            TypeMirror type,
+            AccessKind accessKind,
+            String readExpr,
+            String setter,
+            String fieldName,
+            String pkg,
+            Set<Integer> taken) {
+        TypeElement sealed = asTypeElement(type);
+        if (sealed == null || !sealed.getModifiers().contains(Modifier.SEALED)) {
+            error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
+            return null;
+        }
+        List<? extends TypeMirror> permitted = sealed.getPermittedSubclasses();
+        if (permitted.size() < 2) {
+            error(origin, "oneof '" + name + "' must have at least two @ProtoOneofCase types");
+            return null;
+        }
+        List<OneofCaseModel> cases = new ArrayList<>();
+        for (TypeMirror permittedType : permitted) {
+            TypeElement caseType = asTypeElement(permittedType);
+            if (caseType == null) {
+                error(origin, "oneof '" + name + "' has an unresolved permitted type");
+                continue;
+            }
+            ProtoOneofCase caseAnn = caseType.getAnnotation(ProtoOneofCase.class);
+            if (caseAnn == null) {
+                error(caseType, caseType.getSimpleName() + " must be annotated with @ProtoOneofCase");
+                continue;
+            }
+            int number = caseAnn.value();
+            if (!WireType.isValidFieldNumber(number)) {
+                error(caseType, "invalid field number " + number);
+                continue;
+            }
+            if (!taken.add(number)) {
+                error(caseType, "duplicate field number " + number);
+                continue;
+            }
+            OneofCaseModel parsed = parseOneofCase(caseType, number, name, pkg);
+            if (parsed != null) {
+                cases.add(parsed);
+            }
+        }
+        if (cases.size() < 2) {
+            return null;
+        }
+        return FieldModel.builder()
+                .number(0)
+                .name(name)
+                .localName(Names.safeLocal(name))
+                .kind(FieldKind.ONEOF)
+                .accessKind(accessKind)
+                .readExpr(readExpr)
+                .setterName(setter)
+                .fieldName(fieldName)
+                .javaTypeName(renderType(type, pkg))
+                .oneofCases(cases)
+                .origin(origin)
+                .build();
+    }
+
+    private OneofCaseModel parseOneofCase(TypeElement caseType, int number, String oneofName, String pkg) {
+        String typeName = Names.typeName(caseType, pkg);
+        String tag = Names.tagConstant(caseType.getSimpleName().toString());
+        if (caseType.getAnnotation(ProtoMessage.class) != null) {
+            String codec = Names.codecSimpleName(elements, caseType);
+            String codecPkg = Names.packageName(caseType);
+            if (!codecPkg.equals(pkg) && !codecPkg.isEmpty()) {
+                codec = codecPkg + "." + codec;
+            }
+            FieldModel payload = FieldModel.builder()
+                    .kind(FieldKind.MESSAGE)
+                    .protoType(ProtoType.MESSAGE)
+                    .codecName(codec)
+                    .messageType(caseType)
+                    .javaTypeName(typeName)
+                    .build();
+            return new OneofCaseModel(number, caseType, typeName, tag, payload, null, true);
+        }
+        if (caseType.getKind() != ElementKind.RECORD) {
+            error(caseType, "@ProtoOneofCase " + caseType.getSimpleName()
+                    + " must be a record with 0 or 1 component, or a @ProtoMessage");
+            return null;
+        }
+        List<? extends RecordComponentElement> components = caseType.getRecordComponents();
+        if (components.isEmpty()) {
+            return new OneofCaseModel(number, caseType, typeName, tag, null, null, false);
+        }
+        if (components.size() != 1) {
+            error(caseType, "@ProtoOneofCase record " + caseType.getSimpleName()
+                    + " must have 0 or 1 component");
+            return null;
+        }
+        RecordComponentElement component = components.get(0);
+        TypeMirror payloadType = component.asType();
+        if (isMap(payloadType) || isRepeatedContainer(payloadType)
+                && !(payloadType.getKind() == TypeKind.ARRAY
+                && ((ArrayType) payloadType).getComponentType().getKind() == TypeKind.BYTE)) {
+            error(caseType, "oneof case cannot be repeated or map");
+            return null;
+        }
+        FieldModel payload = resolveSingular(
+                caseType,
+                caseType.getSimpleName() + "Payload",
+                payloadType,
+                ProtoType.AUTO,
+                false,
+                false,
+                AccessKind.RECORD,
+                null,
+                null,
+                null,
+                pkg,
+                false,
+                payloadType);
+        if (payload == null) {
+            return null;
+        }
+        return new OneofCaseModel(
+                number, caseType, typeName, tag, payload, component.getSimpleName() + "()", false);
     }
 
     private FieldModel resolveField(
