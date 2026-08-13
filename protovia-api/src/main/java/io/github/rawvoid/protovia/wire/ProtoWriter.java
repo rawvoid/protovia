@@ -4,7 +4,6 @@ import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Size-preallocated proto3 encoder. Not thread-safe.
@@ -131,8 +130,38 @@ public final class ProtoWriter {
     }
 
     public void writeString(int fieldNumber, String value) {
-        byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
-        writeBytes(fieldNumber, utf8);
+        writeTag(fieldNumber, WireType.LEN);
+        writeStringNoTag(value);
+    }
+
+    /**
+     * Writes a length-delimited UTF-8 string with no field tag. Encodes directly into the
+     * destination buffer (protobuf-java {@code ArrayEncoder.writeStringNoTag}).
+     */
+    public void writeStringNoTag(String value) {
+        int oldPos = pos;
+        int maxUtf8 = value.length() * Utf8.MAX_BYTES_PER_CHAR;
+        if (!exact) {
+            require(CodedSize.uint32(maxUtf8) + maxUtf8);
+        }
+        try {
+            int maxLengthVarIntSize = CodedSize.uint32(maxUtf8);
+            int minLengthVarIntSize = CodedSize.uint32(value.length());
+            if (minLengthVarIntSize == maxLengthVarIntSize) {
+                pos = oldPos + minLengthVarIntSize;
+                int newPos = Utf8.encode(value, buffer, pos, buffer.length - pos);
+                pos = oldPos;
+                int length = newPos - oldPos - minLengthVarIntSize;
+                writeUInt32NoTag(length);
+                pos = newPos;
+            } else {
+                int length = Utf8.encodedLength(value);
+                writeUInt32NoTag(length);
+                pos = Utf8.encode(value, buffer, pos, buffer.length - pos);
+            }
+        } catch (IndexOutOfBoundsException e) {
+            throw new ProtoException("write overflow encoding string at " + oldPos + " of " + buffer.length, e);
+        }
     }
 
     public void writeBytes(int fieldNumber, byte[] value) {

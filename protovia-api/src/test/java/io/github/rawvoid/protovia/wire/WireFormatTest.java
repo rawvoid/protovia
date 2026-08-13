@@ -214,6 +214,19 @@ class WireFormatTest {
     }
 
     @Test
+    void writeStringNoTagMatchesLengthPrefixedUtf8() {
+        String s = "héllo 世界 𝄞";
+        byte[] utf8 = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        ProtoWriter w = ProtoWriter.growing();
+        w.writeStringNoTag(s);
+        byte[] actual = w.toByteArray();
+        int lenSize = CodedSize.uint32(utf8.length);
+        assertEquals(lenSize + utf8.length, actual.length);
+        ProtoReader r = reader(actual);
+        assertEquals(s, r.readString());
+    }
+
+    @Test
     void zigzagRoundTrip() {
         int[] values = {0, -1, 1, -2, 2, Integer.MIN_VALUE, Integer.MAX_VALUE};
         for (int v : values) {
