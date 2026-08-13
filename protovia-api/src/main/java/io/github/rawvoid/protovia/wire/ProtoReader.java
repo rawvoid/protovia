@@ -64,7 +64,7 @@ public final class ProtoReader {
         }
         int tag = readRawVarint32();
         if (WireType.fieldNumber(tag) == 0) {
-            throw new ProtoException("invalid tag " + tag);
+            throw ProtoException.invalidTag(tag);
         }
         lastTag = tag;
         return tag;
@@ -170,7 +170,7 @@ public final class ProtoReader {
             return "";
         }
         checkLength(length);
-        throw new ProtoException("truncated message, needed " + length + " bytes");
+        throw ProtoException.truncated(length);
     }
 
     public byte[] readBytes() {
@@ -186,7 +186,7 @@ public final class ProtoReader {
             return EMPTY_BYTES;
         }
         checkLength(length);
-        throw new ProtoException("truncated message, needed " + length + " bytes");
+        throw ProtoException.truncated(length);
     }
 
     public ByteBuffer readByteBuffer() {
@@ -197,7 +197,7 @@ public final class ProtoReader {
         checkLength(byteLength);
         int next = pos + byteLength;
         if (next < pos || next > currentLimit) {
-            throw new ProtoException("truncated message: nested length " + byteLength);
+            throw ProtoException.truncated("nested length " + byteLength);
         }
         int old = currentLimit;
         currentLimit = next;
@@ -249,7 +249,7 @@ public final class ProtoReader {
         int tempPos = pos;
         int limit = currentLimit;
         if (tempPos == limit) {
-            throw new ProtoException("truncated varint");
+            throw ProtoException.truncatedVarint();
         }
         byte[] buf = buffer;
         int x;
@@ -276,7 +276,7 @@ public final class ProtoReader {
                     && buf[tempPos++] < 0
                     && buf[tempPos++] < 0
                     && buf[tempPos++] < 0) {
-                throw new ProtoException("malformed varint");
+                throw ProtoException.malformedVarint();
             }
         }
         pos = tempPos;
@@ -287,7 +287,7 @@ public final class ProtoReader {
         int tempPos = pos;
         int limit = currentLimit;
         if (tempPos == limit) {
-            throw new ProtoException("truncated varint");
+            throw ProtoException.truncatedVarint();
         }
         byte[] buf = buffer;
         long x;
@@ -339,7 +339,7 @@ public final class ProtoReader {
                     ^ (~0L << 56)
                     ^ (~0L << 63);
         } else {
-            throw new ProtoException("malformed varint");
+            throw ProtoException.malformedVarint();
         }
         pos = tempPos;
         return x;
@@ -348,7 +348,7 @@ public final class ProtoReader {
     public int readRawLittleEndian32() {
         int tempPos = pos;
         if (currentLimit - tempPos < 4) {
-            throw new ProtoException("truncated message, needed 4 bytes");
+            throw ProtoException.truncated(4);
         }
         byte[] buf = buffer;
         pos = tempPos + 4;
@@ -361,7 +361,7 @@ public final class ProtoReader {
     public long readRawLittleEndian64() {
         int tempPos = pos;
         if (currentLimit - tempPos < 8) {
-            throw new ProtoException("truncated message, needed 8 bytes");
+            throw ProtoException.truncated(8);
         }
         byte[] buf = buffer;
         pos = tempPos + 8;
@@ -383,7 +383,7 @@ public final class ProtoReader {
                     return;
                 }
             }
-            throw new ProtoException("malformed varint");
+            throw ProtoException.malformedVarint();
         }
         readRawVarint64SlowPath();
     }
@@ -392,7 +392,7 @@ public final class ProtoReader {
         long result = 0L;
         for (int shift = 0; shift < 64; shift += 7) {
             if (pos >= currentLimit) {
-                throw new ProtoException("truncated varint");
+                throw ProtoException.truncatedVarint();
             }
             byte b = buffer[pos++];
             result |= (long) (b & 0x7F) << shift;
@@ -400,7 +400,7 @@ public final class ProtoReader {
                 return result;
             }
         }
-        throw new ProtoException("malformed varint");
+        throw ProtoException.malformedVarint();
     }
 
     private void skipGroup(int fieldNumber) {
@@ -431,13 +431,13 @@ public final class ProtoReader {
 
     private void require(int n) {
         if (n < 0 || pos + n > currentLimit) {
-            throw new ProtoException("truncated message, needed " + n + " bytes");
+            throw ProtoException.truncated(n);
         }
     }
 
     private void checkLength(int length) {
         if (length < 0) {
-            throw new ProtoException("negative length-delimited size");
+            throw ProtoException.negativeSize();
         }
         if (length > maxMessageSize) {
             throw new ProtoException("length-delimited field exceeds max size " + maxMessageSize);
