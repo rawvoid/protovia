@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.bench;
 
 import io.github.rawvoid.protovia.bench.model.Address;
 import io.github.rawvoid.protovia.bench.model.User;
+import io.github.rawvoid.protovia.collect.IntArrayList;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,7 +47,7 @@ final class Samples {
         user.tags = List.of("dev", "java", "protobuf");
         user.address = new Address("Paris", "Rue");
         user.scores = scores();
-        user.ranks = packed ? packedRanks() : List.of(1, 2, 3);
+        user.ranks = packed ? packedRanksUnboxed() : List.of(1, 2, 3);
         user.bio = bio;
         return user;
     }
@@ -77,6 +78,15 @@ final class Samples {
         List<Integer> ranks = new ArrayList<>(256);
         for (int i = 0; i < 256; i++) {
             ranks.add(i);
+        }
+        return ranks;
+    }
+
+    /** Same numbers as {@link #packedRanks()}, stored unboxed like official {@code IntList}. */
+    private static IntArrayList packedRanksUnboxed() {
+        IntArrayList ranks = new IntArrayList(256);
+        for (int i = 0; i < 256; i++) {
+            ranks.addInt(i);
         }
         return ranks;
     }

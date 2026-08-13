@@ -203,7 +203,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
                 .generatedSourceFile("demo.ContactProtoCodec")
                 .contentsAsUtf8String()
-                .contains("instanceof Email");
+                .contains("else if (target instanceof Home");
     }
 
     @Test
@@ -295,6 +295,31 @@ class ProtoviaProcessorTest {
                 .generatedSourceFile("demo.BoxProtoCodec")
                 .contentsAsUtf8String()
                 .contains("io.github.rawvoid.protovia.wkt.TimestampCodec.INSTANCE");
+    }
+
+    @Test
+    void packedIntegerListWritesViaIntArrayList() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Nums",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "import java.util.List;",
+                        "@ProtoMessage",
+                        "public class Nums {",
+                        "  @ProtoField(number = 1) public List<Integer> ranks;",
+                        "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.NumsProtoCodec")
+                .contentsAsUtf8String()
+                .contains("instanceof io.github.rawvoid.protovia.collect.IntArrayList");
+        assertThat(compilation)
+                .generatedSourceFile("demo.NumsProtoCodec")
+                .contentsAsUtf8String()
+                .contains("getInt(_i)");
     }
 
     @Test

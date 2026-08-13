@@ -277,14 +277,7 @@ public final class CodecGenerator {
                     + packedSizeHelper(field) + "(" + field.localName + "));");
             w.line("writer.writeUInt32NoTag(" + tag + "_PACKED);");
             w.line("writer.writeUInt32NoTag(" + field.localName + "Packed);");
-            w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
-            emitNullElementCheck(w, field.element, "item", field.name);
-            if (field.element.kind == FieldKind.ENUM) {
-                w.line("writer.writeInt32NoTag(" + enumNumberHelper(field.element.enumModel) + "(item));");
-            } else {
-                w.line(writeNoTag("writer", field.element, "item") + ";");
-            }
-            w.close();
+            emitPackedElements(w, field, true);
         } else {
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
             emitNullElementCheck(w, field.element, "item", field.name);
@@ -301,10 +294,66 @@ public final class CodecGenerator {
         w.close();
     }
 
+    private void emitPackedElements(JavaWriter w, FieldModel field, boolean write) {
+        String list = write ? field.localName : "values";
+        PrimitiveListSpec spec = primitiveListSpec(field);
+        int width = packedFixedWidth(field.element);
+        if (spec != null && !field.array && (write || width == 0)) {
+            String prim = field.localName + "Prim";
+            w.open("if (" + list + " instanceof " + spec.listType() + " " + prim + ")");
+            emitPrimitivePackedLoop(w, field, spec, prim, write);
+            w.close();
+            w.open("else");
+            emitBoxedPackedLoop(w, field, list, write);
+            w.close();
+            return;
+        }
+        if (spec != null && !field.array && !write && width > 0) {
+            w.open("if (!(" + list + " instanceof " + spec.listType() + "))");
+            emitBoxedPackedLoop(w, field, list, false);
+            w.close();
+            return;
+        }
+        emitBoxedPackedLoop(w, field, list, write);
+    }
+
+    private void emitPrimitivePackedLoop(
+            JavaWriter w, FieldModel field, PrimitiveListSpec spec, String prim, boolean write) {
+        w.open("for (int _i = 0, _n = " + prim + ".size(); _i < _n; _i++)");
+        String access = prim + "." + spec.get() + "(_i)";
+        if (write) {
+            w.line(writeNoTag("writer", field.element, access) + ";");
+        } else {
+            w.line("packed += " + sizeNoTag(field.element, access) + ";");
+        }
+        w.close();
+    }
+
+    private void emitBoxedPackedLoop(JavaWriter w, FieldModel field, String list, boolean write) {
+        w.open("for (" + field.element.javaTypeName + " item : " + list + ")");
+        emitNullElementCheck(w, field.element, "item", field.name);
+        if (write) {
+            if (field.element.kind == FieldKind.ENUM) {
+                w.line("writer.writeInt32NoTag(" + enumNumberHelper(field.element.enumModel) + "(item));");
+            } else {
+                w.line(writeNoTag("writer", field.element, "item") + ";");
+            }
+        } else if (packedFixedWidth(field.element) == 0) {
+            if (field.element.kind == FieldKind.ENUM) {
+                w.line("packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel) + "(item));");
+            } else {
+                w.line("packed += " + sizeNoTag(field.element, "item") + ";");
+            }
+        }
+        w.close();
+    }
+
     private void emitComputeOneof(JavaWriter w, FieldModel field) {
         w.open("if (" + field.localName + " != null)");
+        boolean first = true;
         for (OneofCaseModel c : field.oneofCases) {
-            w.open("if (" + field.localName + " instanceof " + c.typeName + " _c)");
+            w.open((first ? "if" : "else if") + " (" + field.localName + " instanceof " + c.typeName + " _c)");
+            first = false;
             if (c.empty()) {
                 w.line("size += CodedSize.lengthDelimited(" + c.number + ", 0);");
             } else if (c.selfMessage) {
@@ -333,8 +382,10 @@ public final class CodecGenerator {
 
     private void emitWriteOneof(JavaWriter w, FieldModel field) {
         w.open("if (" + field.localName + " != null)");
+        boolean first = true;
         for (OneofCaseModel c : field.oneofCases) {
-            w.open("if (" + field.localName + " instanceof " + c.typeName + " _c)");
+            w.open((first ? "if" : "else if") + " (" + field.localName + " instanceof " + c.typeName + " _c)");
+            first = false;
             if (c.empty()) {
                 w.line("writer.writeUInt32NoTag(" + c.tagConstant + ");");
                 w.line("writer.writeUInt32NoTag(0);");
@@ -862,22 +913,13 @@ public final class CodecGenerator {
             int width = packedFixedWidth(field.element);
             if (width > 0) {
                 if (!field.element.primitive) {
-                    w.open("for (" + field.element.javaTypeName + " item : values)");
-                    emitNullElementCheck(w, field.element, "item", field.name);
-                    w.close();
+                    emitPackedElements(w, field, false);
                 }
                 String count = field.array ? "values.length" : "values.size()";
                 w.line("return " + count + " * " + width + ";");
             } else {
                 w.line("int packed = 0;");
-                w.open("for (" + field.element.javaTypeName + " item : values)");
-                emitNullElementCheck(w, field.element, "item", field.name);
-                if (field.element.kind == FieldKind.ENUM) {
-                    w.line("packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel) + "(item));");
-                } else {
-                    w.line("packed += " + sizeNoTag(field.element, "item") + ";");
-                }
-                w.close();
+                emitPackedElements(w, field, false);
                 w.line("return packed;");
             }
             w.close();
@@ -1129,22 +1171,24 @@ public final class CodecGenerator {
     }
 
     private enum PrimitiveListSpec {
-        INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray"),
-        LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray"),
-        FLOAT("FloatArrayList", "addFloat", "ensureFloatCapacity", "toFloatArray"),
-        DOUBLE("DoubleArrayList", "addDouble", "ensureDoubleCapacity", "toDoubleArray"),
-        BOOLEAN("BooleanArrayList", "addBoolean", "ensureBooleanCapacity", "toBooleanArray");
+        INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray", "getInt"),
+        LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray", "getLong"),
+        FLOAT("FloatArrayList", "addFloat", "ensureFloatCapacity", "toFloatArray", "getFloat"),
+        DOUBLE("DoubleArrayList", "addDouble", "ensureDoubleCapacity", "toDoubleArray", "getDouble"),
+        BOOLEAN("BooleanArrayList", "addBoolean", "ensureBooleanCapacity", "toBooleanArray", "getBoolean");
 
         private final String simpleName;
         private final String add;
         private final String ensure;
         private final String toArray;
+        private final String get;
 
-        PrimitiveListSpec(String simpleName, String add, String ensure, String toArray) {
+        PrimitiveListSpec(String simpleName, String add, String ensure, String toArray, String get) {
             this.simpleName = simpleName;
             this.add = add;
             this.ensure = ensure;
             this.toArray = toArray;
+            this.get = get;
         }
 
         String simpleName() {
@@ -1165,6 +1209,10 @@ public final class CodecGenerator {
 
         String toArray() {
             return toArray;
+        }
+
+        String get() {
+            return get;
         }
     }
 
