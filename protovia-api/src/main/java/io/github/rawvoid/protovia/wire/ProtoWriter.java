@@ -4,6 +4,7 @@ import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 
 import java.nio.ByteBuffer;
+import java.util.function.IntSupplier;
 
 /**
  * Size-preallocated proto3 encoder. Not thread-safe.
@@ -45,6 +46,10 @@ public final class ProtoWriter {
 
     public int takeSize() {
         return sizes.take();
+    }
+
+    public int takeSize(IntSupplier fallback) {
+        return sizes.take(fallback);
     }
 
     public int position() {
@@ -220,7 +225,9 @@ public final class ProtoWriter {
     }
 
     public <T> void writeMessageNoTag(ProtoCodec<T> codec, T value) {
-        int size = hasCachedSize() ? takeSize() : codec.computeSize(value);
+        int size = codec.cachesNestedSizes()
+                ? takeSize(() -> codec.computeSize(value))
+                : codec.computeSize(value);
         writeUInt32NoTag(size);
         codec.writeTo(this, value);
     }

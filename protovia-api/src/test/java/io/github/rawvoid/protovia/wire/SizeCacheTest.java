@@ -50,6 +50,24 @@ class SizeCacheTest {
         assertEquals(size, writer.capacity());
     }
 
+    @Test
+    void handwrittenWriteMessageDoesNotStealSiblingSlot() {
+        HandwrittenNested handwritten = new HandwrittenNested();
+        Nested grand = new Nested(9);
+        Nested mid = new Nested(3);
+        mid.child = grand;
+
+        SizeCache cache = new SizeCache();
+        int slot = cache.reserve();
+        cache.set(slot, handwritten.computeSize(mid));
+        cache.push(99);
+
+        ProtoWriter writer = new ProtoWriter(64, cache);
+        writer.writeMessage(1, handwritten, mid);
+        assertEquals(handwritten.computeSize(mid), writer.takeSize());
+        assertEquals(99, writer.takeSize());
+    }
+
     static final class Nested {
         final int a;
         Nested child;
@@ -86,6 +104,40 @@ class SizeCacheTest {
         public void writeTo(ProtoWriter writer, Nested value) {
             if (value.a != 0) {
                 writer.writeInt32(1, value.a);
+            }
+        }
+
+        @Override
+        public Nested readFrom(ProtoReader reader) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    static final class HandwrittenNested implements ProtoCodec<Nested> {
+        @Override
+        public Class<Nested> type() {
+            return Nested.class;
+        }
+
+        @Override
+        public int computeSize(Nested value) {
+            int size = 0;
+            if (value.a != 0) {
+                size += CodedSize.int32(1, value.a);
+            }
+            if (value.child != null) {
+                size += CodedSize.message(2, this, value.child);
+            }
+            return size;
+        }
+
+        @Override
+        public void writeTo(ProtoWriter writer, Nested value) {
+            if (value.a != 0) {
+                writer.writeInt32(1, value.a);
+            }
+            if (value.child != null) {
+                writer.writeMessage(2, this, value.child);
             }
         }
 
@@ -133,7 +185,10 @@ class SizeCacheTest {
                 writer.writeInt32(1, value.a);
             }
             if (value.child != null) {
-                writer.writeMessage(2, child, value.child);
+                writer.writeTag(2, WireType.LEN);
+                int childSize = writer.takeSize(() -> child.computeSize(value.child));
+                writer.writeUInt32NoTag(childSize);
+                child.writeTo(writer, value.child);
             }
         }
 

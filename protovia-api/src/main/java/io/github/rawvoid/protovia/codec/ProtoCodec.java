@@ -23,6 +23,14 @@ public interface ProtoCodec<T> {
         return computeSize(value);
     }
 
+    /**
+     * Generated codecs that fill {@link SizeCache} return true so {@code writeMessage} consumes
+     * reserved slots. Hand-written codecs stay false and never steal a sibling length.
+     */
+    default boolean cachesNestedSizes() {
+        return false;
+    }
+
     void writeTo(ProtoWriter writer, T value);
 
     T readFrom(ProtoReader reader);

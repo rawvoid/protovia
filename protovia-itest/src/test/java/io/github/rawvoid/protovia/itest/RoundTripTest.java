@@ -17,9 +17,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.rawvoid.protovia.ProtoException;
+import io.github.rawvoid.protovia.wire.ProtoWriter;
+
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoundTripTest {
@@ -143,6 +149,14 @@ class RoundTripTest {
         Address back = ProtoVia.fromBytes(Address.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
         assertEquals("Paris", back.city());
         assertEquals("Rue", back.street());
+    }
+
+    @Test
+    void packedWriteRejectsNullElement() {
+        User user = new User();
+        user.setRanks(Arrays.asList(1, null, 3));
+        ProtoWriter writer = ProtoWriter.growing();
+        assertThrows(ProtoException.class, () -> UserProtoCodec.INSTANCE.writeTo(writer, user));
     }
 
     @Test

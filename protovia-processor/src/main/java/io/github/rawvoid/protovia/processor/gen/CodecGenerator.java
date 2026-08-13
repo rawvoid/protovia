@@ -40,6 +40,11 @@ public final class CodecGenerator {
         w.line("return " + model.typeName + ".class;");
         w.close();
         w.line("");
+        w.line("@Override");
+        w.open("public boolean cachesNestedSizes()");
+        w.line("return true;");
+        w.close();
+        w.line("");
         emitComputeSize(w, model);
         w.line("");
         emitWriteTo(w, model);
@@ -221,7 +226,7 @@ public final class CodecGenerator {
             case MESSAGE -> {
                 w.open("if (" + field.localName + " != null)");
                 w.line("writer.writeUInt32NoTag(" + tag + ");");
-                w.line("writer.writeMessageNoTag(" + field.codecName + ".INSTANCE, " + field.localName + ");");
+                emitWriteCachedMessage(w, field.codecName + ".INSTANCE", field.localName, field.localName + "Size");
                 w.close();
             }
             case REPEATED -> emitWriteRepeated(w, field);
@@ -233,12 +238,12 @@ public final class CodecGenerator {
         w.open("if (" + presentRepeated(field) + ")");
         String tag = Names.tagConstant(field.name);
         if (field.packed && field.packable()) {
-            w.line("int " + field.localName + "Packed = writer.hasCachedSize()");
-            w.line("        ? writer.takeSize()");
-            w.line("        : " + packedSizeHelper(field) + "(" + field.localName + ");");
+            w.line("int " + field.localName + "Packed = writer.takeSize(() -> "
+                    + packedSizeHelper(field) + "(" + field.localName + "));");
             w.line("writer.writeUInt32NoTag(" + tag + "_PACKED);");
             w.line("writer.writeUInt32NoTag(" + field.localName + "Packed);");
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
+            emitNullElementCheck(w, field.element, "item", field.name);
             if (field.element.kind == FieldKind.ENUM) {
                 w.line("writer.writeInt32NoTag(" + enumNumberHelper(field.element.enumModel) + "(item));");
             } else {
@@ -252,7 +257,7 @@ public final class CodecGenerator {
             if (field.element.kind == FieldKind.ENUM) {
                 w.line("writer.writeInt32NoTag(" + enumNumberHelper(field.element.enumModel) + "(item));");
             } else if (field.element.kind == FieldKind.MESSAGE) {
-                w.line("writer.writeMessageNoTag(" + field.element.codecName + ".INSTANCE, item);");
+                emitWriteCachedMessage(w, field.element.codecName + ".INSTANCE", "item", "itemSize");
             } else {
                 w.line(writeNoTag("writer", field.element, "item") + ";");
             }
@@ -719,9 +724,8 @@ public final class CodecGenerator {
             w.open("if (k == null || v == null)");
             w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
             w.close();
-            w.line("int entrySize = writer.hasCachedSize()");
-            w.line("        ? writer.takeSize()");
-            w.line("        : " + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP);");
+            w.line("int entrySize = writer.takeSize(() -> "
+                    + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP));");
             w.line("writer.writeUInt32NoTag(" + Names.tagConstant(field.name) + ");");
             w.line("writer.writeUInt32NoTag(entrySize);");
             emitMapEntryWrite(w, field.mapKey, "k", 1);
@@ -755,7 +759,7 @@ public final class CodecGenerator {
         int tag = WireType.tag(number, unpackedWire(part));
         if (part.kind == FieldKind.MESSAGE) {
             w.line("writer.writeUInt32NoTag(" + tag + ");");
-            w.line("writer.writeMessageNoTag(" + part.codecName + ".INSTANCE, " + var + ");");
+            emitWriteCachedMessage(w, part.codecName + ".INSTANCE", var, var + "Size");
             return;
         }
         if (part.kind == FieldKind.ENUM) {
@@ -864,6 +868,12 @@ public final class CodecGenerator {
             return "java.util.Optional.of(" + expr + ")";
         }
         return expr;
+    }
+
+    private void emitWriteCachedMessage(JavaWriter w, String codec, String value, String sizeLocal) {
+        w.line("int " + sizeLocal + " = writer.takeSize(() -> " + codec + ".computeSize(" + value + "));");
+        w.line("writer.writeUInt32NoTag(" + sizeLocal + ");");
+        w.line(codec + ".writeTo(writer, " + value + ");");
     }
 
     private String presentRepeated(FieldModel field) {
