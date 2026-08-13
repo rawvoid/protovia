@@ -207,6 +207,150 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void oneofOnGetterIsAccepted() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(
+                        JavaFileObjects.forSourceLines(
+                                "demo.Target",
+                                "package demo;",
+                                "public sealed interface Target permits Email, Home {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Email",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Addr",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Home",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Contact",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                                "@ProtoMessage public class Contact {",
+                                "  private String name;",
+                                "  private Target target;",
+                                "  @ProtoField(number = 1) public String getName() { return name; }",
+                                "  public void setName(String name) { this.name = name; }",
+                                "  @ProtoOneof public Target getTarget() { return target; }",
+                                "  public void setTarget(Target target) { this.target = target; }",
+                                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.ContactProtoCodec")
+                .contentsAsUtf8String()
+                .contains("value.getTarget()");
+    }
+
+    @Test
+    void fieldAndOneofCaseSharingANameStillCompile() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(
+                        JavaFileObjects.forSourceLines(
+                                "demo.Target",
+                                "package demo;",
+                                "public sealed interface Target permits Email, Home {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Email",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Home",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(11) public record Home(String city) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Mail",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                                "@ProtoMessage public class Mail {",
+                                "  @ProtoField(number = 1) public String email;",
+                                "  @ProtoOneof public Target target;",
+                                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.MailProtoCodec")
+                .contentsAsUtf8String()
+                .contains("TAG_1");
+        assertThat(compilation)
+                .generatedSourceFile("demo.MailProtoCodec")
+                .contentsAsUtf8String()
+                .contains("TAG_10");
+    }
+
+    @Test
+    void oneofPayloadCodecUsesParentPackage() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(
+                        JavaFileObjects.forSourceLines(
+                                "other.Target",
+                                "package other;",
+                                "public sealed interface Target permits Email, Home {}"),
+                        JavaFileObjects.forSourceLines(
+                                "other.Email",
+                                "package other;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "other.Addr",
+                                "package other;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                        JavaFileObjects.forSourceLines(
+                                "other.Home",
+                                "package other;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                                "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                        JavaFileObjects.forSourceLines(
+                                "demo.Contact",
+                                "package demo;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                                "@ProtoMessage public class Contact {",
+                                "  @ProtoField(number = 1) public String name;",
+                                "  @ProtoOneof public other.Target target;",
+                                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+                .generatedSourceFile("demo.ContactProtoCodec")
+                .contentsAsUtf8String()
+                .contains("other.AddrProtoCodec.INSTANCE");
+    }
+
+    @Test
+    void stringCannotBeBytes() {
+        Compilation compilation = javac()
+                .withProcessors(new ProtoviaProcessor())
+                .compile(JavaFileObjects.forSourceLines(
+                        "demo.Bad",
+                        "package demo;",
+                        "import io.github.rawvoid.protovia.ProtoType;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                        "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                        "@ProtoMessage public class Bad {",
+                        "  @ProtoField(number = 1, type = ProtoType.BYTES) public String name;",
+                        "}"));
+        assertThat(compilation).hadErrorContaining("ProtoType.BYTES");
+    }
+
+    @Test
     void oneofRejectsNonSealed() {
         Compilation compilation = javac()
                 .withProcessors(new ProtoviaProcessor())

@@ -8,6 +8,7 @@ import io.github.rawvoid.protovia.itest.model.Contact;
 import io.github.rawvoid.protovia.itest.model.Email;
 import io.github.rawvoid.protovia.itest.model.Home;
 import io.github.rawvoid.protovia.itest.model.Envelope;
+import io.github.rawvoid.protovia.itest.model.Flags;
 import io.github.rawvoid.protovia.itest.model.NodeA;
 import io.github.rawvoid.protovia.itest.model.NodeB;
 import io.github.rawvoid.protovia.itest.model.Status;
@@ -90,6 +91,19 @@ class RoundTripTest {
         assertArrayEquals(new byte[]{0x40, 0x00}, bytes);
         User back = ProtoVia.fromBytes(User.class, bytes);
         assertEquals(0, back.getLevel());
+    }
+
+    @Test
+    void repeatedUnknownEnumDoesNotThrowOnRewrite() {
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeEnum(1, 1);
+        extra.writeEnum(1, 99);
+        extra.writeEnum(1, 2);
+        Flags back = ProtoVia.fromBytes(Flags.class, extra.toByteArray());
+        assertEquals(List.of(Status.ACTIVE, Status.BANNED), back.flags);
+        Flags again = ProtoVia.fromBytes(Flags.class, ProtoVia.toBytes(back));
+        assertEquals(List.of(Status.ACTIVE, Status.BANNED), again.flags);
+        assertTrue(again.unknownFields.serializedSize() > 0);
     }
 
     @Test

@@ -99,15 +99,7 @@ public final class Names {
         return "set" + capitalize(property);
     }
 
-    public static String tagConstant(String name) {
-        StringBuilder sb = new StringBuilder("TAG_");
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (Character.isUpperCase(c) && i > 0) {
-                sb.append('_');
-            }
-            sb.append(Character.toUpperCase(c));
-        }
-        return sb.toString();
+    public static String tagConstant(int fieldNumber) {
+        return "TAG_" + fieldNumber;
     }
 }

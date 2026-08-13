@@ -167,13 +167,6 @@ public final class SchemaParser {
         if (type.getModifiers().contains(Modifier.ABSTRACT)) {
             error(type, "@ProtoMessage type cannot be abstract");
         }
-        if (type.getNestingKind().isNested() && !type.getModifiers().contains(Modifier.STATIC)
-                && type.getKind() != ElementKind.RECORD) {
-            if (type.getEnclosingElement().getKind() != ElementKind.PACKAGE
-                    && !type.getModifiers().contains(Modifier.STATIC)) {
-                error(type, "@ProtoMessage nested type must be static");
-            }
-        }
         if (type.getEnclosingElement().getKind() != ElementKind.PACKAGE
                 && type.getKind() == ElementKind.CLASS
                 && !type.getModifiers().contains(Modifier.STATIC)) {
@@ -346,6 +339,7 @@ public final class SchemaParser {
                 FieldModel oneof = resolveOneof(
                         field, name, field.asType(), access.kind, access.readExpr, access.setter, name, pkg, taken);
                 if (oneof != null && claimed.add(name)) {
+                    annotatedViaField.add(name);
                     oneofs.add(oneof);
                 }
                 continue;
@@ -380,6 +374,43 @@ public final class SchemaParser {
         }
 
         for (ExecutableElement method : methods.values()) {
+            if (method.getAnnotation(ProtoOneof.class) != null) {
+                if (method.getAnnotation(ProtoField.class) != null) {
+                    error(method, "cannot combine @ProtoOneof with @ProtoField");
+                    continue;
+                }
+                String property = Names.propertyFromGetter(method.getSimpleName().toString());
+                if (property == null || !method.getParameters().isEmpty()
+                        || method.getReturnType().getKind() == TypeKind.VOID) {
+                    error(method, "@ProtoOneof on a method must be a JavaBean getter");
+                    continue;
+                }
+                if (annotatedViaField.contains(property)) {
+                    error(method, "field '" + property + "' is already annotated; do not also annotate the getter");
+                    continue;
+                }
+                String setter = Names.setterName(property);
+                ExecutableElement set = methods.get(setter);
+                if (set == null || set.getParameters().size() != 1) {
+                    error(method, "annotated getter '" + method.getSimpleName() + "' has no matching setter " + setter);
+                    continue;
+                }
+                FieldModel oneof = resolveOneof(
+                        method,
+                        property,
+                        method.getReturnType(),
+                        AccessKind.GETTER_SETTER,
+                        "value." + method.getSimpleName() + "()",
+                        setter,
+                        property,
+                        pkg,
+                        taken);
+                if (oneof != null && claimed.add(property)) {
+                    annotatedViaField.add(property);
+                    oneofs.add(oneof);
+                }
+                continue;
+            }
             if (method.getAnnotation(ProtoUnknown.class) != null) {
                 if (method.getAnnotation(ProtoField.class) != null) {
                     error(method, "cannot combine @ProtoUnknown with @ProtoField");
@@ -577,7 +608,7 @@ public final class SchemaParser {
 
     private OneofCaseModel parseOneofCase(TypeElement caseType, int number, String oneofName, String pkg) {
         String typeName = Names.typeName(caseType, pkg);
-        String tag = Names.tagConstant(caseType.getSimpleName().toString());
+        String tag = Names.tagConstant(number);
         if (caseType.getAnnotation(ProtoMessage.class) != null) {
             String codec = Names.codecSimpleName(elements, caseType);
             String codecPkg = Names.packageName(caseType);
@@ -801,7 +832,7 @@ public final class SchemaParser {
             error(origin, "optional field '" + name + "' cannot be a primitive; use a boxed type or Optional");
             return null;
         }
-        Resolved resolved = classify(origin, name, type, declared);
+        Resolved resolved = classify(origin, name, type, declared, pkg);
         if (resolved == null) {
             return null;
         }
@@ -829,7 +860,7 @@ public final class SchemaParser {
                 .build();
     }
 
-    private Resolved classify(Element origin, String name, TypeMirror type, ProtoType declared) {
+    private Resolved classify(Element origin, String name, TypeMirror type, ProtoType declared, String currentPkg) {
         TypeKind kind = type.getKind();
         if (kind == TypeKind.INT || isSame(type, integerType)) {
             return scalar(origin, name, declared, ProtoType.INT32, intFamily());
@@ -847,7 +878,7 @@ public final class SchemaParser {
             return scalar(origin, name, declared, ProtoType.BOOL, Set.of(ProtoType.AUTO, ProtoType.BOOL));
         }
         if (isSame(type, stringType)) {
-            return scalar(origin, name, declared, ProtoType.STRING, Set.of(ProtoType.AUTO, ProtoType.STRING, ProtoType.BYTES));
+            return scalar(origin, name, declared, ProtoType.STRING, Set.of(ProtoType.AUTO, ProtoType.STRING));
         }
         if (kind == TypeKind.ARRAY && ((ArrayType) type).getComponentType().getKind() == TypeKind.BYTE) {
             Resolved r = scalar(origin, name, declared, ProtoType.BYTES, Set.of(ProtoType.AUTO, ProtoType.BYTES));
@@ -902,7 +933,6 @@ public final class SchemaParser {
             r.messageType = element;
             r.codecName = Names.codecSimpleName(elements, element);
             String codecPkg = Names.packageName(element);
-            String currentPkg = Names.packageName(enclosingType(origin));
             if (!codecPkg.equals(currentPkg) && !codecPkg.isEmpty()) {
                 r.codecName = codecPkg + "." + r.codecName;
             }
@@ -911,14 +941,6 @@ public final class SchemaParser {
         error(origin, "unsupported type for field '" + name + "': " + element.getQualifiedName()
                 + " (annotate with @ProtoMessage / @ProtoEnum)");
         return null;
-    }
-
-    private TypeElement enclosingType(Element origin) {
-        Element e = origin;
-        while (e != null && e.getKind() != ElementKind.CLASS && e.getKind() != ElementKind.RECORD) {
-            e = e.getEnclosingElement();
-        }
-        return e instanceof TypeElement te ? te : null;
     }
 
     private Resolved wellKnown(Element origin, String name, ProtoType declared, String codec) {
@@ -969,8 +991,11 @@ public final class SchemaParser {
                 return;
             }
             for (Element enclosed : superElement.getEnclosedElements()) {
-                if (enclosed.getAnnotation(ProtoField.class) != null) {
-                    error(type, "superclass " + superElement.getSimpleName() + " has @ProtoField; inheritance is not supported");
+                if (enclosed.getAnnotation(ProtoField.class) != null
+                        || enclosed.getAnnotation(ProtoOneof.class) != null
+                        || enclosed.getAnnotation(ProtoUnknown.class) != null) {
+                    error(type, "superclass " + superElement.getSimpleName()
+                            + " has proto members; inheritance is not supported");
                     return;
                 }
             }
