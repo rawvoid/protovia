@@ -102,6 +102,32 @@ public final class ProtoReader {
         }
     }
 
+    /**
+     * Copies the field at {@link #lastTag()} (tag varint + payload) and advances past it.
+     */
+    public byte[] captureField() {
+        int tag = lastTag;
+        int payloadStart = pos;
+        skipField(tag);
+        int payloadLen = pos - payloadStart;
+        int tagSize = CodedSize.uint32(tag);
+        byte[] out = new byte[tagSize + payloadLen];
+        writeRawVarint32(out, tag);
+        if (payloadLen > 0) {
+            System.arraycopy(buffer, payloadStart, out, tagSize, payloadLen);
+        }
+        return out;
+    }
+
+    private static void writeRawVarint32(byte[] out, int value) {
+        int i = 0;
+        while ((value & ~0x7F) != 0) {
+            out[i++] = (byte) (value | 0x80);
+            value >>>= 7;
+        }
+        out[i] = (byte) value;
+    }
+
     public int readInt32() {
         return readRawVarint32();
     }
