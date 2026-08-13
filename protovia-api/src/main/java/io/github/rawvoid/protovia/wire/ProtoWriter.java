@@ -204,25 +204,45 @@ public final class ProtoWriter {
     }
 
     public void writeUInt32NoTag(int value) {
-        while (true) {
-            if ((value & ~0x7F) == 0) {
-                writeRawByte(value);
-                return;
-            }
-            writeRawByte((value & 0x7F) | 0x80);
-            value >>>= 7;
+        int position = pos;
+        if (!exact && position + 5 > buffer.length) {
+            require(5);
+            position = pos;
         }
+        try {
+            while (true) {
+                if ((value & ~0x7F) == 0) {
+                    buffer[position++] = (byte) value;
+                    break;
+                }
+                buffer[position++] = (byte) (value | 0x80);
+                value >>>= 7;
+            }
+        } catch (IndexOutOfBoundsException e) {
+            throw new ProtoException("write overflow: varint32 at " + pos + " of " + buffer.length, e);
+        }
+        pos = position;
     }
 
     public void writeUInt64NoTag(long value) {
-        while (true) {
-            if ((value & ~0x7FL) == 0L) {
-                writeRawByte((int) value);
-                return;
-            }
-            writeRawByte(((int) value & 0x7F) | 0x80);
-            value >>>= 7;
+        int position = pos;
+        if (!exact && position + 10 > buffer.length) {
+            require(10);
+            position = pos;
         }
+        try {
+            while (true) {
+                if ((value & ~0x7FL) == 0L) {
+                    buffer[position++] = (byte) value;
+                    break;
+                }
+                buffer[position++] = (byte) ((int) value | 0x80);
+                value >>>= 7;
+            }
+        } catch (IndexOutOfBoundsException e) {
+            throw new ProtoException("write overflow: varint64 at " + pos + " of " + buffer.length, e);
+        }
+        pos = position;
     }
 
     public void writeSInt32NoTag(int value) {
@@ -238,23 +258,33 @@ public final class ProtoWriter {
     }
 
     public void writeFixed32NoTag(int value) {
-        require(4);
-        buffer[pos++] = (byte) value;
-        buffer[pos++] = (byte) (value >>> 8);
-        buffer[pos++] = (byte) (value >>> 16);
-        buffer[pos++] = (byte) (value >>> 24);
+        int position = pos;
+        if (position + 4 > buffer.length) {
+            require(4);
+            position = pos;
+        }
+        buffer[position] = (byte) value;
+        buffer[position + 1] = (byte) (value >>> 8);
+        buffer[position + 2] = (byte) (value >>> 16);
+        buffer[position + 3] = (byte) (value >>> 24);
+        pos = position + 4;
     }
 
     public void writeFixed64NoTag(long value) {
-        require(8);
-        buffer[pos++] = (byte) value;
-        buffer[pos++] = (byte) (value >>> 8);
-        buffer[pos++] = (byte) (value >>> 16);
-        buffer[pos++] = (byte) (value >>> 24);
-        buffer[pos++] = (byte) (value >>> 32);
-        buffer[pos++] = (byte) (value >>> 40);
-        buffer[pos++] = (byte) (value >>> 48);
-        buffer[pos++] = (byte) (value >>> 56);
+        int position = pos;
+        if (position + 8 > buffer.length) {
+            require(8);
+            position = pos;
+        }
+        buffer[position] = (byte) value;
+        buffer[position + 1] = (byte) (value >>> 8);
+        buffer[position + 2] = (byte) (value >>> 16);
+        buffer[position + 3] = (byte) (value >>> 24);
+        buffer[position + 4] = (byte) (value >>> 32);
+        buffer[position + 5] = (byte) (value >>> 40);
+        buffer[position + 6] = (byte) (value >>> 48);
+        buffer[position + 7] = (byte) (value >>> 56);
+        pos = position + 8;
     }
 
     public void writeFloatNoTag(float value) {

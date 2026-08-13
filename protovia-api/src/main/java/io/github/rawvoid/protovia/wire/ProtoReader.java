@@ -94,7 +94,7 @@ public final class ProtoReader {
 
     public void skipField(int tag) {
         switch (WireType.getWireType(tag)) {
-            case WireType.VARINT -> readRawVarint64();
+            case WireType.VARINT -> skipRawVarint();
             case WireType.I64 -> skipRaw(8);
             case WireType.LEN -> {
                 int length = readRawVarint32();
@@ -232,13 +232,151 @@ public final class ProtoReader {
     }
 
     public int readRawVarint32() {
-        return (int) readRawVarint64();
+        int tempPos = pos;
+        int limit = currentLimit;
+        if (tempPos == limit) {
+            throw new ProtoException("truncated varint");
+        }
+        byte[] buf = buffer;
+        int x;
+        if ((x = buf[tempPos++]) >= 0) {
+            pos = tempPos;
+            return x;
+        }
+        if (limit - tempPos < 9) {
+            return (int) readRawVarint64SlowPath();
+        }
+        if ((x ^= buf[tempPos++] << 7) < 0) {
+            x ^= ~0 << 7;
+        } else if ((x ^= buf[tempPos++] << 14) >= 0) {
+            x ^= (~0 << 7) ^ (~0 << 14);
+        } else if ((x ^= buf[tempPos++] << 21) < 0) {
+            x ^= (~0 << 7) ^ (~0 << 14) ^ (~0 << 21);
+        } else {
+            int y = buf[tempPos++];
+            x ^= y << 28;
+            x ^= (~0 << 7) ^ (~0 << 14) ^ (~0 << 21) ^ (~0 << 28);
+            if (y < 0
+                    && buf[tempPos++] < 0
+                    && buf[tempPos++] < 0
+                    && buf[tempPos++] < 0
+                    && buf[tempPos++] < 0
+                    && buf[tempPos++] < 0) {
+                throw new ProtoException("malformed varint");
+            }
+        }
+        pos = tempPos;
+        return x;
     }
 
     public long readRawVarint64() {
+        int tempPos = pos;
+        int limit = currentLimit;
+        if (tempPos == limit) {
+            throw new ProtoException("truncated varint");
+        }
+        byte[] buf = buffer;
+        long x;
+        int y;
+        if ((y = buf[tempPos++]) >= 0) {
+            pos = tempPos;
+            return y;
+        }
+        if (limit - tempPos < 9) {
+            return readRawVarint64SlowPath();
+        }
+        if ((y ^= buf[tempPos++] << 7) < 0) {
+            x = y ^ (~0 << 7);
+        } else if ((y ^= buf[tempPos++] << 14) >= 0) {
+            x = y ^ ((~0 << 7) ^ (~0 << 14));
+        } else if ((y ^= buf[tempPos++] << 21) < 0) {
+            x = y ^ ((~0 << 7) ^ (~0 << 14) ^ (~0 << 21));
+        } else if ((x = y ^ ((long) buf[tempPos++] << 28)) >= 0L) {
+            x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28);
+        } else if ((x ^= (long) buf[tempPos++] << 35) < 0L) {
+            x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35);
+        } else if ((x ^= (long) buf[tempPos++] << 42) >= 0L) {
+            x ^= (~0L << 7) ^ (~0L << 14) ^ (~0L << 21) ^ (~0L << 28) ^ (~0L << 35) ^ (~0L << 42);
+        } else if ((x ^= (long) buf[tempPos++] << 49) < 0L) {
+            x ^= (~0L << 7)
+                    ^ (~0L << 14)
+                    ^ (~0L << 21)
+                    ^ (~0L << 28)
+                    ^ (~0L << 35)
+                    ^ (~0L << 42)
+                    ^ (~0L << 49);
+        } else if ((x ^= (long) buf[tempPos++] << 56) >= 0L) {
+            x ^= (~0L << 7)
+                    ^ (~0L << 14)
+                    ^ (~0L << 21)
+                    ^ (~0L << 28)
+                    ^ (~0L << 35)
+                    ^ (~0L << 42)
+                    ^ (~0L << 49)
+                    ^ (~0L << 56);
+        } else if ((x ^= (long) buf[tempPos++] << 63) >= 0L) {
+            x ^= (~0L << 7)
+                    ^ (~0L << 14)
+                    ^ (~0L << 21)
+                    ^ (~0L << 28)
+                    ^ (~0L << 35)
+                    ^ (~0L << 42)
+                    ^ (~0L << 49)
+                    ^ (~0L << 56)
+                    ^ (~0L << 63);
+        } else {
+            throw new ProtoException("malformed varint");
+        }
+        pos = tempPos;
+        return x;
+    }
+
+    public int readRawLittleEndian32() {
+        int tempPos = pos;
+        if (currentLimit - tempPos < 4) {
+            throw new ProtoException("truncated message, needed 4 bytes");
+        }
+        byte[] buf = buffer;
+        pos = tempPos + 4;
+        return (buf[tempPos] & 0xFF)
+                | ((buf[tempPos + 1] & 0xFF) << 8)
+                | ((buf[tempPos + 2] & 0xFF) << 16)
+                | ((buf[tempPos + 3] & 0xFF) << 24);
+    }
+
+    public long readRawLittleEndian64() {
+        int tempPos = pos;
+        if (currentLimit - tempPos < 8) {
+            throw new ProtoException("truncated message, needed 8 bytes");
+        }
+        byte[] buf = buffer;
+        pos = tempPos + 8;
+        return (buf[tempPos] & 0xFFL)
+                | ((buf[tempPos + 1] & 0xFFL) << 8)
+                | ((buf[tempPos + 2] & 0xFFL) << 16)
+                | ((buf[tempPos + 3] & 0xFFL) << 24)
+                | ((buf[tempPos + 4] & 0xFFL) << 32)
+                | ((buf[tempPos + 5] & 0xFFL) << 40)
+                | ((buf[tempPos + 6] & 0xFFL) << 48)
+                | ((buf[tempPos + 7] & 0xFFL) << 56);
+    }
+
+    private void skipRawVarint() {
+        if (currentLimit - pos >= 10) {
+            byte[] buf = buffer;
+            for (int i = 0; i < 10; i++) {
+                if (buf[pos++] >= 0) {
+                    return;
+                }
+            }
+            throw new ProtoException("malformed varint");
+        }
+        readRawVarint64SlowPath();
+    }
+
+    private long readRawVarint64SlowPath() {
         long result = 0L;
-        int shift = 0;
-        while (shift < 64) {
+        for (int shift = 0; shift < 64; shift += 7) {
             if (pos >= currentLimit) {
                 throw new ProtoException("truncated varint");
             }
@@ -247,31 +385,8 @@ public final class ProtoReader {
             if ((b & 0x80) == 0) {
                 return result;
             }
-            shift += 7;
         }
         throw new ProtoException("malformed varint");
-    }
-
-    public int readRawLittleEndian32() {
-        require(4);
-        int b1 = buffer[pos++] & 0xFF;
-        int b2 = buffer[pos++] & 0xFF;
-        int b3 = buffer[pos++] & 0xFF;
-        int b4 = buffer[pos++] & 0xFF;
-        return b1 | (b2 << 8) | (b3 << 16) | (b4 << 24);
-    }
-
-    public long readRawLittleEndian64() {
-        require(8);
-        long b1 = buffer[pos++] & 0xFFL;
-        long b2 = buffer[pos++] & 0xFFL;
-        long b3 = buffer[pos++] & 0xFFL;
-        long b4 = buffer[pos++] & 0xFFL;
-        long b5 = buffer[pos++] & 0xFFL;
-        long b6 = buffer[pos++] & 0xFFL;
-        long b7 = buffer[pos++] & 0xFFL;
-        long b8 = buffer[pos++] & 0xFFL;
-        return b1 | (b2 << 8) | (b3 << 16) | (b4 << 24) | (b5 << 32) | (b6 << 40) | (b7 << 48) | (b8 << 56);
     }
 
     private void skipGroup(int fieldNumber) {

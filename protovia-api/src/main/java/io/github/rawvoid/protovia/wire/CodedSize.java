@@ -12,51 +12,22 @@ public final class CodedSize {
     private CodedSize() {
     }
 
+    /**
+     * Varint size via leading-zero count. Same formula as protobuf-java 4.35.1
+     * {@code CodedOutputStream.computeUInt32SizeNoTag}.
+     */
     public static int uint32(int value) {
-        if ((value & ~0x7F) == 0) {
-            return 1;
-        }
-        if ((value & ~0x3FFF) == 0) {
-            return 2;
-        }
-        if ((value & ~0x1FFFFF) == 0) {
-            return 3;
-        }
-        if ((value & ~0xFFFFFFF) == 0) {
-            return 4;
-        }
-        return 5;
+        int clz = Integer.numberOfLeadingZeros(value);
+        return ((Integer.SIZE * 9 + (1 << 6)) - (clz * 9)) >>> 6;
     }
 
+    /**
+     * Varint size via leading-zero count. Same formula as protobuf-java 4.35.1
+     * {@code CodedOutputStream.computeUInt64SizeNoTag}.
+     */
     public static int uint64(long value) {
-        if ((value & ~0x7FL) == 0L) {
-            return 1;
-        }
-        if ((value & ~0x3FFFL) == 0L) {
-            return 2;
-        }
-        if ((value & ~0x1FFFFFL) == 0L) {
-            return 3;
-        }
-        if ((value & ~0xFFFFFFFL) == 0L) {
-            return 4;
-        }
-        if ((value & ~0x7FFFFFFFFL) == 0L) {
-            return 5;
-        }
-        if ((value & ~0x3FFFFFFFFFFL) == 0L) {
-            return 6;
-        }
-        if ((value & ~0x1FFFFFFFFFFFFL) == 0L) {
-            return 7;
-        }
-        if ((value & ~0xFFFFFFFFFFFFFFL) == 0L) {
-            return 8;
-        }
-        if ((value & ~0x7FFFFFFFFFFFFFFFL) == 0L) {
-            return 9;
-        }
-        return 10;
+        int clz = Long.numberOfLeadingZeros(value);
+        return ((Long.SIZE * 9 + (1 << 6)) - (clz * 9)) >>> 6;
     }
 
     public static int int32(int value) {

@@ -59,6 +59,36 @@ class WireFormatTest {
     }
 
     @Test
+    void varintRoundTripAllWidths() {
+        int[] ints = {0, 1, 127, 128, 0x3FFF, 0x4000, 0x1FFFFF, 0x200000, 0x0FFFFFFF, 0x10000000, -1, Integer.MIN_VALUE};
+        for (int value : ints) {
+            byte[] actual = write(w -> w.writeUInt32(1, value));
+            ProtoReader r = reader(actual);
+            r.readTag();
+            assertEquals(value, r.readUInt32(), Integer.toHexString(value));
+        }
+        long[] longs = {0L, 1L, 127L, 128L, 1L << 28, 1L << 35, 1L << 42, 1L << 49, 1L << 56, -1L, Long.MIN_VALUE};
+        for (long value : longs) {
+            byte[] actual = write(w -> w.writeUInt64(1, value));
+            ProtoReader r = reader(actual);
+            r.readTag();
+            assertEquals(value, r.readUInt64(), Long.toHexString(value));
+        }
+    }
+
+    @Test
+    void varintSlowPathNearLimit() {
+        ProtoWriter w = ProtoWriter.growing();
+        w.writeUInt32NoTag(300);
+        byte[] encoded = w.toByteArray();
+        byte[] padded = new byte[encoded.length];
+        System.arraycopy(encoded, 0, padded, 0, encoded.length);
+        ProtoReader r = new ProtoReader(padded, 0, encoded.length);
+        assertEquals(300, r.readUInt32());
+        assertEquals(0, r.remaining());
+    }
+
+    @Test
     void bool_true() {
         assertHex("08 01", write(w -> w.writeBool(1, true)));
         ProtoReader r = reader(bytes(0x08, 0x01));
