@@ -48,7 +48,6 @@ public final class CodecGenerator {
         emitEnumHelpers(w, model);
         emitPackedSizeHelpers(w, model);
         emitMapHelpers(w, model);
-        emitArrayCopyHelpers(w, model);
         w.close();
         return w.toString();
     }
@@ -288,8 +287,7 @@ public final class CodecGenerator {
         w.line(model.typeName + " msg = new " + model.typeName + "();");
         for (FieldModel field : model.fields) {
             if (field.array) {
-                w.line("java.util.ArrayList<" + boxed(field.element) + "> " + field.localName
-                        + "Builder = null;");
+                w.line(arrayBuilderType(field) + " " + field.localName + "Builder = null;");
             }
         }
         w.line("int tag;");
@@ -317,8 +315,7 @@ public final class CodecGenerator {
         }
         for (FieldModel field : model.fields) {
             if (field.array) {
-                w.line("java.util.ArrayList<" + boxed(field.element) + "> " + field.localName
-                        + "Builder = null;");
+                w.line(arrayBuilderType(field) + " " + field.localName + "Builder = null;");
             }
         }
         w.line("int tag;");
@@ -390,15 +387,17 @@ public final class CodecGenerator {
     private void emitReadRepeated(JavaWriter w, FieldModel field, boolean record, String tag) {
         if (field.packable()) {
             w.open("case " + tag + ", " + tag + "_PACKED ->");
-            emitEnsureRepeated(w, field, record);
             w.open("if (reader.wireType() == WireType.LEN)");
             w.line("int oldLimit = reader.beginPacked();");
+            emitEnsureRepeated(w, field, record);
+            emitEnsurePackedCapacity(w, field, record);
             w.open("while (reader.remaining() > 0)");
             emitRepeatedAdd(w, field, record, true);
             w.close();
             w.line("reader.popLimit(oldLimit);");
             w.close();
             w.open("else");
+            emitEnsureRepeated(w, field, record);
             emitRepeatedAdd(w, field, record, false);
             w.close();
             w.close();
@@ -413,26 +412,33 @@ public final class CodecGenerator {
     private void emitEnsureRepeated(JavaWriter w, FieldModel field, boolean record) {
         if (field.array) {
             w.open("if (" + field.localName + "Builder == null)");
-            w.line(field.localName + "Builder = new java.util.ArrayList<>();");
+            w.line(field.localName + "Builder = new " + arrayBuilderType(field) + "();");
             w.close();
             return;
         }
         if (record) {
-            w.open("if (" + field.localName + " == null)");
+            w.open("if (" + field.localName + " == null || " + field.localName + ".isEmpty())");
             w.line(field.localName + " = new " + field.implTypeName + "();");
             w.close();
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
-            w.open("if (msg." + field.fieldName + " == null)");
+            w.open("if (msg." + field.fieldName + " == null || msg." + field.fieldName + ".isEmpty())");
             w.line("msg." + field.fieldName + " = new " + field.implTypeName + "();");
             w.close();
         } else {
             w.line(field.javaTypeName + " " + field.localName + " = " + field.readExpr.replace("value.", "msg.") + ";");
-            w.open("if (" + field.localName + " == null)");
+            w.open("if (" + field.localName + " == null || " + field.localName + ".isEmpty())");
             w.line(field.localName + " = new " + field.implTypeName + "();");
             emitAssign(w, field, "msg", field.localName);
             w.close();
+        }
+    }
+
+    private void emitEnsurePackedCapacity(JavaWriter w, FieldModel field, boolean record) {
+        String ensure = packedEnsureCall(field, repeatedVar(field, record));
+        if (ensure != null) {
+            w.line(ensure + ";");
         }
     }
 
@@ -456,15 +462,23 @@ public final class CodecGenerator {
     }
 
     private void emitRepeatedAddValue(JavaWriter w, FieldModel field, boolean record, String addend) {
-        if (field.array) {
-            w.line(field.localName + "Builder.add(" + addend + ");");
-        } else if (record) {
-            w.line(field.localName + ".add(" + addend + ");");
-        } else if (field.accessKind == AccessKind.FIELD) {
-            w.line("msg." + field.fieldName + ".add(" + addend + ");");
+        String target = repeatedVar(field, record);
+        String add = primitiveAddCall(field, target, addend);
+        if (add != null) {
+            w.line(add + ";");
         } else {
-            w.line(field.localName + ".add(" + addend + ");");
+            w.line(target + ".add(" + addend + ");");
         }
+    }
+
+    private String repeatedVar(FieldModel field, boolean record) {
+        if (field.array) {
+            return field.localName + "Builder";
+        }
+        if (record || field.accessKind != AccessKind.FIELD) {
+            return field.localName;
+        }
+        return "msg." + field.fieldName;
     }
 
     private void emitEnsureMap(JavaWriter w, FieldModel field, boolean record) {
@@ -768,38 +782,80 @@ public final class CodecGenerator {
         return expr;
     }
 
-    private void emitArrayCopyHelpers(JavaWriter w, MessageModel model) {
-        for (FieldModel field : model.fields) {
-            if (!field.array || !isPrimitiveArrayComponent(field.arrayComponentType)) {
-                continue;
-            }
-            String component = field.arrayComponentType;
-            w.line("");
-            w.open("private static " + component + "[] copy" + Names.capitalize(field.name)
-                    + "Array(java.util.List<" + boxed(field.element) + "> values)");
-            w.line(component + "[] array = new " + component + "[values.size()];");
-            w.open("for (int i = 0; i < array.length; i++)");
-            w.line("array[i] = values.get(i);");
-            w.close();
-            w.line("return array;");
-            w.close();
+    private String arrayBuilderType(FieldModel field) {
+        String primitive = field.primitiveListType();
+        if (primitive != null) {
+            return primitive;
         }
+        return "java.util.ArrayList<" + boxed(field.element) + ">";
     }
 
     private String toArray(FieldModel field, String listVar) {
-        String component = field.arrayComponentType;
-        if (isPrimitiveArrayComponent(component)) {
-            return "copy" + Names.capitalize(field.name) + "Array(" + listVar + ")";
+        String primitive = field.primitiveListType();
+        if (primitive != null) {
+            if (primitive.endsWith("IntArrayList")) {
+                return listVar + ".toIntArray()";
+            }
+            if (primitive.endsWith("LongArrayList")) {
+                return listVar + ".toLongArray()";
+            }
+            if (primitive.endsWith("FloatArrayList")) {
+                return listVar + ".toFloatArray()";
+            }
+            if (primitive.endsWith("DoubleArrayList")) {
+                return listVar + ".toDoubleArray()";
+            }
+            if (primitive.endsWith("BooleanArrayList")) {
+                return listVar + ".toBooleanArray()";
+            }
         }
-        return listVar + ".toArray(new " + component + "[0])";
+        return listVar + ".toArray(new " + field.arrayComponentType + "[0])";
     }
 
-    private static boolean isPrimitiveArrayComponent(String component) {
-        return "int".equals(component)
-                || "long".equals(component)
-                || "float".equals(component)
-                || "double".equals(component)
-                || "boolean".equals(component);
+    private String primitiveAddCall(FieldModel field, String list, String value) {
+        String primitive = field.primitiveListType();
+        if (primitive == null) {
+            return null;
+        }
+        if (primitive.endsWith("IntArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.addInt(" + list + ", " + value + ")";
+        }
+        if (primitive.endsWith("LongArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.addLong(" + list + ", " + value + ")";
+        }
+        if (primitive.endsWith("FloatArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.addFloat(" + list + ", " + value + ")";
+        }
+        if (primitive.endsWith("DoubleArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.addDouble(" + list + ", " + value + ")";
+        }
+        if (primitive.endsWith("BooleanArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.addBoolean(" + list + ", " + value + ")";
+        }
+        return null;
+    }
+
+    private String packedEnsureCall(FieldModel field, String list) {
+        String primitive = field.primitiveListType();
+        if (primitive == null) {
+            return null;
+        }
+        if (primitive.endsWith("IntArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureIntCapacity(" + list + ", reader.remaining())";
+        }
+        if (primitive.endsWith("LongArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureLongCapacity(" + list + ", reader.remaining())";
+        }
+        if (primitive.endsWith("FloatArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureFloatCapacity(" + list + ", reader.remaining())";
+        }
+        if (primitive.endsWith("DoubleArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureDoubleCapacity(" + list + ", reader.remaining())";
+        }
+        if (primitive.endsWith("BooleanArrayList")) {
+            return "io.github.rawvoid.protovia.collect.ProtoLists.ensureBooleanCapacity(" + list + ", reader.remaining())";
+        }
+        return null;
     }
 
     private static int packedFixedWidth(FieldModel element) {

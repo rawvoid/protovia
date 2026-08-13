@@ -389,7 +389,6 @@ public final class SchemaParser {
             boolean javaOptional) {
         boolean array = type.getKind() == TypeKind.ARRAY;
         TypeMirror elementType;
-        String impl;
         if (array) {
             elementType = ((ArrayType) type).getComponentType();
             if (elementType.getKind() == TypeKind.BYTE) {
@@ -397,13 +396,11 @@ public final class SchemaParser {
                         origin, name, type, protoOrAuto(ann.type(), ProtoType.BYTES),
                         ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type);
             }
-            impl = null;
         } else {
             elementType = typeArgument(type, 0, origin, "collection");
             if (elementType == null) {
                 return null;
             }
-            impl = collectionImpl(type, pkg);
         }
         FieldModel element = resolveSingular(
                 origin, name + "Element", elementType, protoOrAuto(ann.type(), ProtoType.AUTO),
@@ -411,6 +408,7 @@ public final class SchemaParser {
         if (element == null) {
             return null;
         }
+        String impl = array ? null : collectionImpl(type, pkg, element);
         boolean packed = ann.packed() && isPackable(element);
         FieldModel.Builder b = FieldModel.builder()
                 .number(ann.number())
@@ -714,7 +712,7 @@ public final class SchemaParser {
         return types.isAssignable(types.erasure(type), optionalType);
     }
 
-    private String collectionImpl(TypeMirror type, String pkg) {
+    private String collectionImpl(TypeMirror type, String pkg, FieldModel elementModel) {
         TypeElement element = asTypeElement(type);
         if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
                 && !element.getQualifiedName().contentEquals("java.util.List")
@@ -725,6 +723,10 @@ public final class SchemaParser {
         TypeMirror erased = types.erasure(type);
         if (types.isAssignable(erased, setType)) {
             return "java.util.LinkedHashSet<>";
+        }
+        String primitive = elementModel.primitiveListClass();
+        if (primitive != null) {
+            return primitive;
         }
         return "java.util.ArrayList<>";
     }

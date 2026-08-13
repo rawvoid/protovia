@@ -1,6 +1,7 @@
 package io.github.rawvoid.protovia.itest;
 
 import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.collect.IntArrayList;
 import io.github.rawvoid.protovia.itest.model.Address;
 import io.github.rawvoid.protovia.itest.model.NodeA;
 import io.github.rawvoid.protovia.itest.model.NodeB;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RoundTripTest {
 
@@ -102,6 +104,8 @@ class RoundTripTest {
         User back = ProtoVia.fromBytes(User.class, ProtoVia.toBytes(user));
         assertEquals(List.of(3, 270), back.getRanks());
         assertEquals(List.of(1, 2), back.getUnpacked());
+        assertTrue(back.getRanks() instanceof IntArrayList);
+        assertTrue(back.getUnpacked() instanceof IntArrayList);
     }
 
     private static User sampleUser() {

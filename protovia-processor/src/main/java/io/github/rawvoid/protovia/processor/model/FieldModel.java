@@ -74,6 +74,33 @@ public final class FieldModel {
         };
     }
 
+    public String primitiveListClass() {
+        FieldModel el = kind == FieldKind.REPEATED ? element : this;
+        if (el == null || el.kind != FieldKind.SCALAR || el.protoType == null) {
+            return null;
+        }
+        return switch (el.protoType) {
+            case INT32, UINT32, SINT32, FIXED32, SFIXED32 ->
+                    "io.github.rawvoid.protovia.collect.IntArrayList";
+            case INT64, UINT64, SINT64, FIXED64, SFIXED64 ->
+                    "io.github.rawvoid.protovia.collect.LongArrayList";
+            case FLOAT -> "io.github.rawvoid.protovia.collect.FloatArrayList";
+            case DOUBLE -> "io.github.rawvoid.protovia.collect.DoubleArrayList";
+            case BOOL -> "io.github.rawvoid.protovia.collect.BooleanArrayList";
+            default -> null;
+        };
+    }
+
+    public String primitiveListType() {
+        if (array) {
+            return primitiveListClass();
+        }
+        if (implTypeName != null && implTypeName.contains("protovia.collect.")) {
+            return implTypeName;
+        }
+        return null;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
