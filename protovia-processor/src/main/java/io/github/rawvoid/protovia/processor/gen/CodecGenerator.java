@@ -25,6 +25,7 @@ public final class CodecGenerator {
         w.line("import io.github.rawvoid.protovia.wire.CodedSize;");
         w.line("import io.github.rawvoid.protovia.wire.ProtoReader;");
         w.line("import io.github.rawvoid.protovia.wire.ProtoWriter;");
+        w.line("import io.github.rawvoid.protovia.wire.SizeCache;");
         w.line("import io.github.rawvoid.protovia.wire.WireType;");
         w.line("");
         w.open("public final class " + model.codecSimpleName + " implements ProtoCodec<" + model.typeName + ">");
@@ -45,6 +46,7 @@ public final class CodecGenerator {
         w.line("");
         emitReadFrom(w, model);
         emitEnumHelpers(w, model);
+        emitPackedSizeHelpers(w, model);
         emitMapHelpers(w, model);
         emitArrayCopyHelpers(w, model);
         w.close();
@@ -69,6 +71,11 @@ public final class CodecGenerator {
     private void emitComputeSize(JavaWriter w, MessageModel model) {
         w.line("@Override");
         w.open("public int computeSize(" + model.typeName + " value)");
+        w.line("return computeSize(value, SizeCache.NOOP);");
+        w.close();
+        w.line("");
+        w.line("@Override");
+        w.open("public int computeSize(" + model.typeName + " value, SizeCache cache)");
         w.line("int size = 0;");
         for (FieldModel field : model.fields) {
             emitComputeField(w, field);
@@ -84,8 +91,11 @@ public final class CodecGenerator {
             case ENUM -> emitComputeEnum(w, field, field.localName, field.number, field.optional);
             case MESSAGE -> {
                 w.open("if (" + field.localName + " != null)");
-                w.line("size += CodedSize.message(" + field.number + ", " + field.codecName + ".INSTANCE, "
-                        + field.localName + ");");
+                w.line("int " + field.localName + "Slot = cache.reserve();");
+                w.line("int " + field.localName + "Size = " + field.codecName + ".INSTANCE.computeSize("
+                        + field.localName + ", cache);");
+                w.line("cache.set(" + field.localName + "Slot, " + field.localName + "Size);");
+                w.line("size += CodedSize.message(" + field.number + ", " + field.localName + "Size);");
                 w.close();
             }
             case REPEATED -> emitComputeRepeated(w, field);
@@ -121,16 +131,8 @@ public final class CodecGenerator {
         String empty = field.array ? field.localName + ".length == 0" : field.localName + ".isEmpty()";
         w.open("if (" + field.localName + " != null && !" + empty + ")");
         if (field.packed && field.packable()) {
-            w.line("int " + field.localName + "Packed = 0;");
-            w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
-            emitNullElementCheck(w, field.element, "item", field.name);
-            if (field.element.kind == FieldKind.ENUM) {
-                w.line(field.localName + "Packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel)
-                        + "(item));");
-            } else {
-                w.line(field.localName + "Packed += " + sizeNoTag(field.element, "item") + ";");
-            }
-            w.close();
+            w.line("int " + field.localName + "Packed = " + packedSizeHelper(field) + "(" + field.localName + ");");
+            w.line("cache.push(" + field.localName + "Packed);");
             w.line("size += CodedSize.lengthDelimited(" + field.number + ", " + field.localName + "Packed);");
         } else {
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
@@ -139,8 +141,10 @@ public final class CodecGenerator {
                 w.line("size += CodedSize.enumValue(" + field.number + ", "
                         + enumNumberHelper(field.element.enumModel) + "(item));");
             } else if (field.element.kind == FieldKind.MESSAGE) {
-                w.line("size += CodedSize.message(" + field.number + ", " + field.element.codecName
-                        + ".INSTANCE, item);");
+                w.line("int itemSlot = cache.reserve();");
+                w.line("int itemSize = " + field.element.codecName + ".INSTANCE.computeSize(item, cache);");
+                w.line("cache.set(itemSlot, itemSize);");
+                w.line("size += CodedSize.message(" + field.number + ", itemSize);");
             } else {
                 w.line("size += " + sizeCall(field.element, field.number, "item") + ";");
             }
@@ -153,22 +157,18 @@ public final class CodecGenerator {
         w.open("if (" + field.localName + " != null && !" + field.localName + ".isEmpty())");
         w.open("for (java.util.Map.Entry<" + boxed(field.mapKey) + ", " + boxed(field.mapValue) + "> e : "
                 + field.localName + ".entrySet())");
-        w.line(boxed(field.mapKey) + " k = e.getKey();");
-        w.line(boxed(field.mapValue) + " v = e.getValue();");
-        w.open("if (k == null || v == null)");
-        w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
-        w.close();
-        w.line("int entrySize = 0;");
-        emitMapEntrySizeAdd(w, field.mapKey, "k", 1, "entrySize");
-        emitMapEntrySizeAdd(w, field.mapValue, "v", 2, "entrySize");
-        w.line("size += CodedSize.lengthDelimited(" + field.number + ", entrySize);");
+        w.line("size += CodedSize.lengthDelimited(" + field.number + ", "
+                + mapEntrySizeHelper(field) + "(e.getKey(), e.getValue(), cache));");
         w.close();
         w.close();
     }
 
     private void emitMapEntrySizeAdd(JavaWriter w, FieldModel part, String var, int number, String sizeVar) {
         if (part.kind == FieldKind.MESSAGE) {
-            w.line(sizeVar + " += CodedSize.message(" + number + ", " + part.codecName + ".INSTANCE, " + var + ");");
+            w.line("int " + var + "Slot = cache.reserve();");
+            w.line("int " + var + "Size = " + part.codecName + ".INSTANCE.computeSize(" + var + ", cache);");
+            w.line("cache.set(" + var + "Slot, " + var + "Size);");
+            w.line(sizeVar + " += CodedSize.message(" + number + ", " + var + "Size);");
             return;
         }
         if (part.kind == FieldKind.ENUM) {
@@ -231,16 +231,9 @@ public final class CodecGenerator {
         String empty = field.array ? field.localName + ".length == 0" : field.localName + ".isEmpty()";
         w.open("if (" + field.localName + " != null && !" + empty + ")");
         if (field.packed && field.packable()) {
-            w.line("int " + field.localName + "Packed = 0;");
-            w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
-            emitNullElementCheck(w, field.element, "item", field.name);
-            if (field.element.kind == FieldKind.ENUM) {
-                w.line(field.localName + "Packed += CodedSize.enumValue("
-                        + enumNumberHelper(field.element.enumModel) + "(item));");
-            } else {
-                w.line(field.localName + "Packed += " + sizeNoTag(field.element, "item") + ";");
-            }
-            w.close();
+            w.line("int " + field.localName + "Packed = writer.hasCachedSize()");
+            w.line("        ? writer.takeSize()");
+            w.line("        : " + packedSizeHelper(field) + "(" + field.localName + ");");
             w.line("writer.writeTag(" + field.number + ", WireType.LEN);");
             w.line("writer.writeUInt32NoTag(" + field.localName + "Packed);");
             w.open("for (" + field.element.javaTypeName + " item : " + field.localName + ")");
@@ -567,20 +560,54 @@ public final class CodecGenerator {
         w.close();
     }
 
+    private void emitPackedSizeHelpers(JavaWriter w, MessageModel model) {
+        for (FieldModel field : model.fields) {
+            if (field.kind != FieldKind.REPEATED || !field.packed || !field.packable()) {
+                continue;
+            }
+            w.line("");
+            w.open("private static int " + packedSizeHelper(field) + "(" + field.javaTypeName + " values)");
+            w.line("int packed = 0;");
+            w.open("for (" + field.element.javaTypeName + " item : values)");
+            emitNullElementCheck(w, field.element, "item", field.name);
+            if (field.element.kind == FieldKind.ENUM) {
+                w.line("packed += CodedSize.enumValue(" + enumNumberHelper(field.element.enumModel) + "(item));");
+            } else {
+                w.line("packed += " + sizeNoTag(field.element, "item") + ";");
+            }
+            w.close();
+            w.line("return packed;");
+            w.close();
+        }
+    }
+
     private void emitMapHelpers(JavaWriter w, MessageModel model) {
         for (FieldModel field : model.fields) {
             if (field.kind != FieldKind.MAP) {
                 continue;
             }
             w.line("");
+            w.open("private static int " + mapEntrySizeHelper(field) + "("
+                    + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v, SizeCache cache)");
+            w.open("if (k == null || v == null)");
+            w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
+            w.close();
+            w.line("int entrySlot = cache.reserve();");
+            w.line("int entrySize = 0;");
+            emitMapEntrySizeAdd(w, field.mapKey, "k", 1, "entrySize");
+            emitMapEntrySizeAdd(w, field.mapValue, "v", 2, "entrySize");
+            w.line("cache.set(entrySlot, entrySize);");
+            w.line("return entrySize;");
+            w.close();
+            w.line("");
             w.open("private static void write" + Names.capitalize(field.name) + "Entry(ProtoWriter writer, "
                     + boxed(field.mapKey) + " k, " + boxed(field.mapValue) + " v)");
             w.open("if (k == null || v == null)");
             w.line("throw new ProtoException(\"map entry for field " + field.name + " cannot contain null\");");
             w.close();
-            w.line("int entrySize = 0;");
-            emitMapEntrySizeAdd(w, field.mapKey, "k", 1, "entrySize");
-            emitMapEntrySizeAdd(w, field.mapValue, "v", 2, "entrySize");
+            w.line("int entrySize = writer.hasCachedSize()");
+            w.line("        ? writer.takeSize()");
+            w.line("        : " + mapEntrySizeHelper(field) + "(k, v, SizeCache.NOOP);");
             w.line("writer.writeTag(" + field.number + ", WireType.LEN);");
             w.line("writer.writeUInt32NoTag(entrySize);");
             emitMapEntryWrite(w, field.mapKey, "k", 1);
@@ -774,6 +801,14 @@ public final class CodecGenerator {
             case "boolean" -> "Boolean";
             default -> field.javaTypeName;
         };
+    }
+
+    private String packedSizeHelper(FieldModel field) {
+        return "packedSizeOf" + Names.capitalize(field.name);
+    }
+
+    private String mapEntrySizeHelper(FieldModel field) {
+        return "sizeOf" + Names.capitalize(field.name) + "Entry";
     }
 
     private String enumNumberHelper(EnumModel model) {

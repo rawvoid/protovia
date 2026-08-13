@@ -13,24 +13,38 @@ public final class ProtoWriter {
     private byte[] buffer;
     private int pos;
     private final boolean exact;
+    private final SizeCache sizes;
 
     public ProtoWriter(int size) {
-        this(size, true);
+        this(size, true, SizeCache.NOOP);
+    }
+
+    public ProtoWriter(int size, SizeCache sizes) {
+        this(size, true, sizes);
     }
 
     /**
      * Scratch writer that may grow. {@link #toByteArray()} returns the written prefix.
      */
     public static ProtoWriter growing() {
-        return new ProtoWriter(64, false);
+        return new ProtoWriter(64, false, SizeCache.NOOP);
     }
 
-    private ProtoWriter(int size, boolean exact) {
+    private ProtoWriter(int size, boolean exact, SizeCache sizes) {
         if (size < 0) {
             throw new ProtoException("negative computed size: " + size);
         }
         this.buffer = size == 0 ? new byte[0] : new byte[size];
         this.exact = exact;
+        this.sizes = sizes == null ? SizeCache.NOOP : sizes;
+    }
+
+    public boolean hasCachedSize() {
+        return sizes.hasNext();
+    }
+
+    public int takeSize() {
+        return sizes.take();
     }
 
     public int position() {
@@ -189,7 +203,7 @@ public final class ProtoWriter {
     }
 
     public <T> void writeMessage(int fieldNumber, ProtoCodec<T> codec, T value) {
-        int size = codec.computeSize(value);
+        int size = hasCachedSize() ? takeSize() : codec.computeSize(value);
         writeTag(fieldNumber, WireType.LEN);
         writeUInt32NoTag(size);
         codec.writeTo(this, value);

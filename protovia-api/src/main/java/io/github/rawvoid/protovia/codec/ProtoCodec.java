@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.codec;
 
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
+import io.github.rawvoid.protovia.wire.SizeCache;
 
 /**
  * Stateless, thread-safe binary codec for one message type.
@@ -12,6 +13,15 @@ public interface ProtoCodec<T> {
     Class<T> type();
 
     int computeSize(T value);
+
+    /**
+     * Computes the serialized size and records nested / packed / map-entry lengths in {@code cache}.
+     * Hand-written codecs may ignore the cache; generated codecs fill it so {@link #writeTo}
+     * does not walk the tree again.
+     */
+    default int computeSize(T value, SizeCache cache) {
+        return computeSize(value);
+    }
 
     void writeTo(ProtoWriter writer, T value);
 

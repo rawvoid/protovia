@@ -4,6 +4,7 @@ import io.github.rawvoid.protovia.codec.ProtoCodec;
 import io.github.rawvoid.protovia.runtime.CodecLookup;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
+import io.github.rawvoid.protovia.wire.SizeCache;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,11 +66,12 @@ public final class ProtoVia {
     public static byte[] toBytes(Object message) {
         Objects.requireNonNull(message, "message");
         ProtoCodec<Object> codec = codec((Class<Object>) message.getClass());
-        int size = codec.computeSize(message);
+        SizeCache sizes = new SizeCache();
+        int size = codec.computeSize(message, sizes);
         if (size > maxMessageSize) {
             throw new ProtoException("serialized size " + size + " exceeds max " + maxMessageSize);
         }
-        ProtoWriter writer = new ProtoWriter(size);
+        ProtoWriter writer = new ProtoWriter(size, sizes);
         codec.writeTo(writer, message);
         return writer.finish();
     }
