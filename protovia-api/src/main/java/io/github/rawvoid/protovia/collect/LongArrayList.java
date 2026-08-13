@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.RandomAccess;
 
 public final class LongArrayList extends AbstractList<Long> implements RandomAccess {
@@ -15,6 +16,13 @@ public final class LongArrayList extends AbstractList<Long> implements RandomAcc
 
     public LongArrayList(int capacity) {
         this.values = new long[Math.max(capacity, 1)];
+    }
+
+    public LongArrayList(Collection<? extends Long> values) {
+        this(values.size());
+        for (Long value : values) {
+            addLong(value);
+        }
     }
 
     public void addLong(long value) {

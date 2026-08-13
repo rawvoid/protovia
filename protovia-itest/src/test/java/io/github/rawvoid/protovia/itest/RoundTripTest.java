@@ -97,6 +97,29 @@ class RoundTripTest {
     }
 
     @Test
+    void concatenatedMessagesMergeNestedAndRepeated() {
+        User first = new User();
+        first.setAddress(new Address("Paris", null));
+        first.setRanks(List.of(1, 2));
+        User second = new User();
+        second.setAddress(new Address(null, "Rue"));
+        second.setRanks(List.of(3));
+        User back = ProtoVia.fromBytes(User.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
+        assertEquals("Paris", back.getAddress().city());
+        assertEquals("Rue", back.getAddress().street());
+        assertEquals(List.of(1, 2, 3), back.getRanks());
+    }
+
+    @Test
+    void concatenatedRecordsMergeFields() {
+        Address first = new Address("Paris", null);
+        Address second = new Address(null, "Rue");
+        Address back = ProtoVia.fromBytes(Address.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
+        assertEquals("Paris", back.city());
+        assertEquals("Rue", back.street());
+    }
+
+    @Test
     void packedAndUnpackedInt32() {
         User user = new User();
         user.setRanks(List.of(3, 270));
@@ -122,6 +145,13 @@ class RoundTripTest {
         user.setUnpacked(List.of(8, 9));
         user.setPayload(new byte[]{1, 2, 3});
         return user;
+    }
+
+    private static byte[] concat(byte[] left, byte[] right) {
+        byte[] out = new byte[left.length + right.length];
+        System.arraycopy(left, 0, out, 0, left.length);
+        System.arraycopy(right, 0, out, left.length, right.length);
+        return out;
     }
 
     private static Map<String, Integer> map(Object... kv) {

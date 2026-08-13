@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.RandomAccess;
 
 public final class DoubleArrayList extends AbstractList<Double> implements RandomAccess {
@@ -15,6 +16,13 @@ public final class DoubleArrayList extends AbstractList<Double> implements Rando
 
     public DoubleArrayList(int capacity) {
         this.values = new double[Math.max(capacity, 1)];
+    }
+
+    public DoubleArrayList(Collection<? extends Double> values) {
+        this(values.size());
+        for (Double value : values) {
+            addDouble(value);
+        }
     }
 
     public void addDouble(double value) {

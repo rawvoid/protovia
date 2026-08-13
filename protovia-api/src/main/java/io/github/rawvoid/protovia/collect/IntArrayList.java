@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.RandomAccess;
 
 /**
@@ -19,6 +20,13 @@ public final class IntArrayList extends AbstractList<Integer> implements RandomA
 
     public IntArrayList(int capacity) {
         this.values = new int[Math.max(capacity, 1)];
+    }
+
+    public IntArrayList(Collection<? extends Integer> values) {
+        this(values.size());
+        for (Integer value : values) {
+            addInt(value);
+        }
     }
 
     public void addInt(int value) {

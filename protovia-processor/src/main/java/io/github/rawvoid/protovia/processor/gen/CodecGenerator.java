@@ -276,6 +276,15 @@ public final class CodecGenerator {
         w.line("@Override");
         w.open("public " + model.typeName + " readFrom(ProtoReader reader)");
         if (model.record) {
+            w.line("return mergeFrom(reader, null);");
+        } else {
+            w.line("return mergeFrom(reader, new " + model.typeName + "());");
+        }
+        w.close();
+        w.line("");
+        w.line("@Override");
+        w.open("public " + model.typeName + " mergeFrom(ProtoReader reader, " + model.typeName + " existing)");
+        if (model.record) {
             emitReadRecord(w, model);
         } else {
             emitReadPojo(w, model);
@@ -284,7 +293,7 @@ public final class CodecGenerator {
     }
 
     private void emitReadPojo(JavaWriter w, MessageModel model) {
-        w.line(model.typeName + " msg = new " + model.typeName + "();");
+        w.line(model.typeName + " msg = existing != null ? existing : new " + model.typeName + "();");
         for (FieldModel field : model.fields) {
             if (field.array) {
                 w.line(arrayBuilderType(field) + " " + field.localName + "Builder = null;");
@@ -311,7 +320,7 @@ public final class CodecGenerator {
 
     private void emitReadRecord(JavaWriter w, MessageModel model) {
         for (MessageModel.RecordComponentModel component : model.recordComponents) {
-            w.line(component.typeName() + " " + Names.safeLocal(component.name()) + " = " + component.defaultExpr() + ";");
+            emitRecordComponentInit(w, component);
         }
         for (FieldModel field : model.fields) {
             if (field.array) {
@@ -371,7 +380,7 @@ public final class CodecGenerator {
             }
             case MESSAGE -> {
                 w.open("case " + tag + " ->");
-                emitStore(w, field, record, wrapOptional(field, "reader.readMessage(" + field.codecName + ".INSTANCE)"));
+                emitReadMessage(w, field, record);
                 w.close();
             }
             case REPEATED -> emitReadRepeated(w, field, record, tag);
@@ -413,6 +422,7 @@ public final class CodecGenerator {
         if (field.array) {
             w.open("if (" + field.localName + "Builder == null)");
             w.line(field.localName + "Builder = new " + arrayBuilderType(field) + "();");
+            emitSeedArrayBuilder(w, field, record);
             w.close();
             return;
         }
@@ -433,6 +443,87 @@ public final class CodecGenerator {
             emitAssign(w, field, "msg", field.localName);
             w.close();
         }
+    }
+
+    private void emitRecordComponentInit(JavaWriter w, MessageModel.RecordComponentModel component) {
+        String local = Names.safeLocal(component.name());
+        String fromExisting = "existing." + component.name() + "()";
+        FieldModel field = component.field();
+        if (field != null && (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP)) {
+            w.line(component.typeName() + " " + local + " = existing != null && " + fromExisting + " != null");
+            w.line("        ? new " + field.implTypeName + "(" + fromExisting + ") : " + component.defaultExpr() + ";");
+            return;
+        }
+        w.line(component.typeName() + " " + local + " = existing != null ? " + fromExisting
+                + " : " + component.defaultExpr() + ";");
+    }
+
+    private void emitReadMessage(JavaWriter w, FieldModel field, boolean record) {
+        String codec = field.codecName + ".INSTANCE";
+        if (record) {
+            String current = storeTarget(field);
+            if (field.javaOptional) {
+                w.open("if (" + current + " != null && " + current + ".isPresent())");
+                w.line(current + " = " + wrapOptional(field,
+                        "reader.readMessageMerging(" + codec + ", " + current + ".get())") + ";");
+                w.close();
+                w.open("else");
+                w.line(current + " = " + wrapOptional(field, "reader.readMessage(" + codec + ")") + ";");
+                w.close();
+                return;
+            }
+            w.open("if (" + current + " != null)");
+            w.line(current + " = reader.readMessageMerging(" + codec + ", " + current + ");");
+            w.close();
+            w.open("else");
+            w.line(current + " = reader.readMessage(" + codec + ");");
+            w.close();
+            return;
+        }
+        if (field.javaOptional) {
+            String getter = field.accessKind == AccessKind.FIELD
+                    ? "msg." + field.fieldName
+                    : field.readExpr.replace("value.", "msg.");
+            w.line(field.javaTypeName + " _cur = " + getter + ";");
+            w.open("if (_cur != null && _cur.isPresent())");
+            emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessageMerging(" + codec + ", _cur.get())"));
+            w.close();
+            w.open("else");
+            emitAssign(w, field, "msg", wrapOptional(field, "reader.readMessage(" + codec + ")"));
+            w.close();
+            return;
+        }
+        String current = field.accessKind == AccessKind.FIELD
+                ? "msg." + field.fieldName
+                : field.readExpr.replace("value.", "msg.");
+        w.line(field.javaTypeName + " _cur = " + current + ";");
+        w.open("if (_cur != null)");
+        emitAssign(w, field, "msg", "reader.readMessageMerging(" + codec + ", _cur)");
+        w.close();
+        w.open("else");
+        emitAssign(w, field, "msg", "reader.readMessage(" + codec + ")");
+        w.close();
+    }
+
+    private void emitSeedArrayBuilder(JavaWriter w, FieldModel field, boolean record) {
+        String existing;
+        if (record) {
+            existing = field.localName;
+        } else if (field.accessKind == AccessKind.FIELD) {
+            existing = "msg." + field.fieldName;
+        } else {
+            existing = field.readExpr.replace("value.", "msg.");
+        }
+        w.open("if (" + existing + " != null)");
+        w.open("for (" + field.arrayComponentType + " item : " + existing + ")");
+        String add = primitiveAddCall(field, field.localName + "Builder", "item");
+        if (add != null) {
+            w.line(add + ";");
+        } else {
+            w.line(field.localName + "Builder.add(item);");
+        }
+        w.close();
+        w.close();
     }
 
     private void emitEnsurePackedCapacity(JavaWriter w, FieldModel field, boolean record) {

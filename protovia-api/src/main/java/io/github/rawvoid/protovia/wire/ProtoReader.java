@@ -210,13 +210,21 @@ public final class ProtoReader {
     }
 
     public <T> T readMessage(ProtoCodec<T> codec) {
+        return readMessage(codec, null);
+    }
+
+    public <T> T readMessageMerging(ProtoCodec<T> codec, T existing) {
+        return readMessage(codec, existing);
+    }
+
+    private <T> T readMessage(ProtoCodec<T> codec, T existing) {
         int length = readRawVarint32();
         if (depth >= maxDepth) {
             throw new ProtoException("message nesting exceeds max depth " + maxDepth);
         }
         int old = pushLimit(length);
         depth++;
-        T value = codec.readFrom(this);
+        T value = existing == null ? codec.readFrom(this) : codec.mergeFrom(this, existing);
         depth--;
         popLimit(old);
         return value;

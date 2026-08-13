@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.RandomAccess;
 
 public final class BooleanArrayList extends AbstractList<Boolean> implements RandomAccess {
@@ -15,6 +16,13 @@ public final class BooleanArrayList extends AbstractList<Boolean> implements Ran
 
     public BooleanArrayList(int capacity) {
         this.values = new boolean[Math.max(capacity, 1)];
+    }
+
+    public BooleanArrayList(Collection<? extends Boolean> values) {
+        this(values.size());
+        for (Boolean value : values) {
+            addBoolean(value);
+        }
     }
 
     public void addBoolean(boolean value) {

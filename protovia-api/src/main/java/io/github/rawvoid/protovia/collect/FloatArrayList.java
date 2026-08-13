@@ -2,6 +2,7 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.RandomAccess;
 
 public final class FloatArrayList extends AbstractList<Float> implements RandomAccess {
@@ -15,6 +16,13 @@ public final class FloatArrayList extends AbstractList<Float> implements RandomA
 
     public FloatArrayList(int capacity) {
         this.values = new float[Math.max(capacity, 1)];
+    }
+
+    public FloatArrayList(Collection<? extends Float> values) {
+        this(values.size());
+        for (Float value : values) {
+            addFloat(value);
+        }
     }
 
     public void addFloat(float value) {

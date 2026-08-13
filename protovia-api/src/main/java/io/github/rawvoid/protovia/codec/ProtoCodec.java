@@ -26,4 +26,12 @@ public interface ProtoCodec<T> {
     void writeTo(ProtoWriter writer, T value);
 
     T readFrom(ProtoReader reader);
+
+    /**
+     * Merges one wire message into {@code existing} (proto3: scalars overwrite, repeated append,
+     * nested messages merge). The default last-wins implementation is for hand-written test codecs.
+     */
+    default T mergeFrom(ProtoReader reader, T existing) {
+        return readFrom(reader);
+    }
 }
