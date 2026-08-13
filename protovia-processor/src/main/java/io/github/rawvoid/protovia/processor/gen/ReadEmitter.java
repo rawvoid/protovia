@@ -36,12 +36,18 @@ import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryRead;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.WIRE_TYPE;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.defaultValue;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.messageType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.newImpl;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.collectionEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEnsure;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapReadExpr;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedEnsure;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.primitiveAdd;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.readCall;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.toArray;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wrapOptional;
@@ -65,7 +71,7 @@ final class ReadEmitter {
         if (model.record) {
             readFrom.addStatement("return mergeFrom(reader, null)");
         } else {
-            readFrom.addStatement("return mergeFrom(reader, new $L())", model.typeName);
+            readFrom.addStatement("return mergeFrom(reader, new $T())", messageType(model));
         }
         return List.of(readFrom.build(), mergeFrom(model, msgType));
     }
@@ -88,7 +94,7 @@ final class ReadEmitter {
     }
 
     private static void readPojo(CodeBlock.Builder b, MessageModel model) {
-        b.addStatement("$L msg = existing != null ? existing : new $L()", model.typeName, model.typeName);
+        b.addStatement("$T msg = existing != null ? existing : new $T()", messageType(model), messageType(model));
         initArrayBuilders(b, model);
         if (model.unknown != null) {
             unknownInit(b, model);
@@ -111,7 +117,7 @@ final class ReadEmitter {
         String args = model.recordComponents.stream()
             .map(c -> Names.safeLocal(c.name()))
             .collect(Collectors.joining(", "));
-        b.addStatement("return new $L($L)", model.typeName, args);
+        b.addStatement("return new $T($L)", messageType(model), args);
     }
 
     private static void initArrayBuilders(CodeBlock.Builder b, MessageModel model) {
@@ -181,9 +187,9 @@ final class ReadEmitter {
     private static void readEnumField(
         CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model, String tag) {
         b.addStatement("int _n = reader.readEnum()");
-        b.addStatement("$T _e = $L(_n)", sourceType(field.enumModel.typeName), enumFrom(field.enumModel));
+        b.addStatement("$T _e = $L(_n)", enumType(field.enumModel), enumFrom(field.enumModel));
         if (field.enumModel.unrecognized != null) {
-            b.beginControlFlow("if (_e == $L.$L)", field.enumModel.typeName, field.enumModel.unrecognized);
+            b.beginControlFlow("if (_e == $L)", enumConstant(field.enumModel, field.enumModel.unrecognized));
             mergeUnknownVarint(b, model, tag);
             store(b, field, record, wrapOptional(field, "_e"));
             b.nextControlFlow("else if (_e != null)");
@@ -206,17 +212,17 @@ final class ReadEmitter {
                 b.addStatement("reader.skipField()");
                 b.endControlFlow();
                 b.addStatement("reader.popLimit(_old)");
-                store(b, field, record, CodeBlock.of("new $L()", c.typeName));
+                store(b, field, record, CodeBlock.of("new $T()", oneofCaseType(c)));
             } else if (c.selfMessage) {
-                store(b, field, record, CodeBlock.of("reader.readMessage($L.INSTANCE)", c.payload.codecName));
+                store(b, field, record, CodeBlock.of("reader.readMessage($L)", codecInstance(c.payload)));
             } else if (c.payload.kind == FieldKind.MESSAGE) {
                 store(b, field, record,
-                    CodeBlock.of("new $L(reader.readMessage($L.INSTANCE))", c.typeName, c.payload.codecName));
+                    CodeBlock.of("new $T(reader.readMessage($L))", oneofCaseType(c), codecInstance(c.payload)));
             } else if (c.payload.kind == FieldKind.ENUM) {
                 store(b, field, record,
-                    CodeBlock.of("new $L($L(reader.readEnum()))", c.typeName, enumFrom(c.payload.enumModel)));
+                    CodeBlock.of("new $T($L(reader.readEnum()))", oneofCaseType(c), enumFrom(c.payload.enumModel)));
             } else {
-                store(b, field, record, CodeBlock.of("new $L($L)", c.typeName, readCall(c.payload)));
+                store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), readCall(c.payload)));
             }
             b.endControlFlow();
         }
@@ -256,14 +262,14 @@ final class ReadEmitter {
         }
         if (record) {
             b.beginControlFlow("if ($L == null || $L.isEmpty())", field.localName, field.localName);
-            b.addStatement("$L = new $L()", field.localName, field.implTypeName);
+            b.addStatement("$L = $L", field.localName, newImpl(field));
             b.endControlFlow();
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
             b.addStatement("msg.$L = $L", field.fieldName, collectionEnsure("msg." + field.fieldName, field));
         } else {
-            b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr.replace("value.", "msg."));
             b.addStatement("$L = $L", field.localName, collectionEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -305,16 +311,16 @@ final class ReadEmitter {
         }
         FieldModel field = component.field();
         if (field != null && (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP)) {
-            b.addStatement("$T $L = existing != null && $L != null ? new $L($L) : $L",
-                sourceType(component.typeName()), local, fromExisting, field.implTypeName, fromExisting, component.defaultExpr());
+            b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
+                javaType(component.type()), local, fromExisting, newImpl(field, fromExisting), defaultValue(component.type()));
             return;
         }
         b.addStatement("$T $L = existing != null ? $L : $L",
-            sourceType(component.typeName()), local, fromExisting, component.defaultExpr());
+            javaType(component.type()), local, fromExisting, defaultValue(component.type()));
     }
 
     private static void readMessage(CodeBlock.Builder b, FieldModel field, boolean record) {
-        String codec = field.codecName + ".INSTANCE";
+        CodeBlock codec = codecInstance(field);
         if (record) {
             String current = field.localName;
             if (field.javaOptional) {
@@ -330,7 +336,7 @@ final class ReadEmitter {
             String getter = field.accessKind == AccessKind.FIELD
                 ? "msg." + field.fieldName
                 : field.readExpr.replace("value.", "msg.");
-            b.addStatement("$T _cur = $L", sourceType(field.javaTypeName), getter);
+            b.addStatement("$T _cur = $L", javaType(field), getter);
             assign(b, field, "msg", wrapOptional(field,
                 CodeBlock.of("reader.readMessage($L, _cur != null && _cur.isPresent() ? _cur.get() : null)", codec)));
             return;
@@ -348,7 +354,7 @@ final class ReadEmitter {
                 ? "msg." + field.fieldName
                 : field.readExpr.replace("value.", "msg.");
         b.beginControlFlow("if ($L != null)", existing);
-        b.beginControlFlow("for ($T item : $L)", sourceType(field.arrayComponentType), existing);
+        b.beginControlFlow("for ($T item : $L)", javaType(field.element), existing);
         CodeBlock add = primitiveAdd(field, field.localName + "Builder", CodeBlock.of("item"));
         if (add != null) {
             b.addStatement("$L", add);
@@ -370,10 +376,10 @@ final class ReadEmitter {
         if (field.element.kind == FieldKind.ENUM) {
             EnumModel enums = field.element.enumModel;
             b.addStatement("int _n = reader.readEnum()");
-            b.addStatement("$T _item = $L(_n)", sourceType(enums.typeName), enumFrom(enums));
+            b.addStatement("$T _item = $L(_n)", enumType(enums), enumFrom(enums));
             String tag = Names.tagConstant(field.number);
             if (enums.unrecognized != null) {
-                b.beginControlFlow("if (_item == $L.$L)", enums.typeName, enums.unrecognized);
+                b.beginControlFlow("if (_item == $L)", enumConstant(enums, enums.unrecognized));
                 mergeUnknownVarint(b, model, tag);
                 b.nextControlFlow("else if (_item != null)");
             } else {
@@ -385,7 +391,7 @@ final class ReadEmitter {
             return;
         }
         CodeBlock addend = field.element.kind == FieldKind.MESSAGE
-            ? CodeBlock.of("reader.readMessage($L.INSTANCE)", field.element.codecName)
+            ? CodeBlock.of("reader.readMessage($L)", codecInstance(field.element))
             : readCall(field.element);
         repeatedAddValue(b, field, record, addend);
     }
@@ -413,14 +419,14 @@ final class ReadEmitter {
     private static void ensureMap(CodeBlock.Builder b, FieldModel field, boolean record) {
         if (record) {
             b.beginControlFlow("if ($L == null)", field.localName);
-            b.addStatement("$L = new $L()", field.localName, field.implTypeName);
+            b.addStatement("$L = $L", field.localName, newImpl(field));
             b.endControlFlow();
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
             b.addStatement("msg.$L = $L", field.fieldName, mapEnsure("msg." + field.fieldName, field));
         } else {
-            b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr.replace("value.", "msg."));
             b.addStatement("$L = $L", field.localName, mapEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -468,20 +474,4 @@ final class ReadEmitter {
         }
     }
 
-    static void mapPartAssign(CodeBlock.Builder b, FieldModel part, String var) {
-        if (part.kind == FieldKind.ENUM) {
-            b.addStatement("int $LN = reader.readEnum()", var);
-            b.addStatement("$T $LE = $L($LN)", sourceType(part.enumModel.typeName), var, enumFrom(part.enumModel), var);
-            if (part.enumModel.unrecognized != null) {
-                b.beginControlFlow("if ($LE != null && $LE != $L.$L)",
-                    var, var, part.enumModel.typeName, part.enumModel.unrecognized);
-            } else {
-                b.beginControlFlow("if ($LE != null)", var);
-            }
-            b.addStatement("$L = $LE", var, var);
-            b.endControlFlow();
-            return;
-        }
-        b.addStatement("$L = $L", var, mapReadExpr(part));
-    }
 }

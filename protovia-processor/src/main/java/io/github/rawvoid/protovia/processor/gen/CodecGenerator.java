@@ -92,7 +92,17 @@ public final class CodecGenerator {
             .skipJavaLangImports(true)
             .indent("    ")
             .build();
-        return file.toString();
+        return compactTagConstants(file.toString());
+    }
+
+    /**
+     * JavaPoet inserts a blank line after every field. TAG_* constants are
+     * denser without it.
+     */
+    private static String compactTagConstants(String source) {
+        return source.replaceAll(
+            "(private static final int TAG_\\w+ = \\d+;)\n\n(?=    private static final int TAG_)",
+            "$1\n");
     }
 
     private static void emitTags(TypeSpec.Builder type, MessageModel model) {

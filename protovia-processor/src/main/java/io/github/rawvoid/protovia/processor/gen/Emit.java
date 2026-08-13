@@ -23,7 +23,9 @@ import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import java.util.function.BiConsumer;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
 
 /**
  * Shared emission patterns used across size / write / read emitters.
@@ -36,14 +38,15 @@ final class Emit {
     }
 
     static void loadField(CodeBlock.Builder b, FieldModel field) {
-        b.addStatement("$T $L = $L", sourceType(field.javaTypeName), field.localName, field.readExpr);
+        b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr);
     }
 
     static void writeTag(CodeBlock.Builder b, Object tag) {
         b.addStatement("writer.writeUInt32NoTag($L)", tag);
     }
 
-    static void writeCachedMessage(CodeBlock.Builder b, String codec, String value, String sizeLocal) {
+    static void writeCachedMessage(CodeBlock.Builder b, FieldModel field, String value, String sizeLocal) {
+        CodeBlock codec = codecInstance(field);
         b.addStatement("int $L = writer.hasCachedSize() ? writer.takeSize() : $L.computeSize($L)",
             sizeLocal, codec, value);
         b.addStatement("writer.writeUInt32NoTag($L)", sizeLocal);
@@ -65,12 +68,10 @@ final class Emit {
         b.beginControlFlow("if ($L != null)", field.localName);
         boolean first = true;
         for (OneofCaseModel c : field.oneofCases) {
-            String header = (first ? "if" : "else if")
-                + " (" + field.localName + " instanceof " + c.typeName + " _c)";
             if (first) {
-                b.beginControlFlow(header);
+                b.beginControlFlow("if ($L instanceof $T _c)", field.localName, oneofCaseType(c));
             } else {
-                b.nextControlFlow(header);
+                b.nextControlFlow("else if ($L instanceof $T _c)", field.localName, oneofCaseType(c));
             }
             first = false;
             caseBody.accept(b, c);

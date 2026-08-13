@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.ProtoType;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * One {@code @ProtoField} or {@code @ProtoOneof} member of a message.
@@ -44,7 +45,9 @@ public final class FieldModel {
     public final String setterName;
     public final String fieldName;
     public final String javaTypeName;
+    public final TypeMirror javaType;
     public final String implTypeName;
+    public final TypeElement implType;
     public final String codecName;
     public final EnumModel enumModel;
     public final TypeElement messageType;
@@ -73,7 +76,9 @@ public final class FieldModel {
         this.setterName = b.setterName;
         this.fieldName = b.fieldName;
         this.javaTypeName = b.javaTypeName;
+        this.javaType = b.javaType;
         this.implTypeName = b.implTypeName;
+        this.implType = b.implType;
         this.codecName = b.codecName;
         this.enumModel = b.enumModel;
         this.messageType = b.messageType;
@@ -116,8 +121,11 @@ public final class FieldModel {
         if (array) {
             return element != null && element.primitive ? primitiveListClass() : null;
         }
-        if (implTypeName != null && implTypeName.contains("protovia.collect.")) {
-            return implTypeName;
+        if (implType != null) {
+            String qn = implType.getQualifiedName().toString();
+            if (qn.startsWith("io.github.rawvoid.protovia.collect.")) {
+                return qn;
+            }
         }
         return null;
     }
@@ -143,7 +151,9 @@ public final class FieldModel {
         private String setterName;
         private String fieldName;
         private String javaTypeName;
+        private TypeMirror javaType;
         private String implTypeName;
+        private TypeElement implType;
         private String codecName;
         private EnumModel enumModel;
         private TypeElement messageType;
@@ -236,8 +246,18 @@ public final class FieldModel {
             return this;
         }
 
+        public Builder javaType(TypeMirror javaType) {
+            this.javaType = javaType;
+            return this;
+        }
+
         public Builder implTypeName(String implTypeName) {
             this.implTypeName = implTypeName;
+            return this;
+        }
+
+        public Builder implType(TypeElement implType) {
+            this.implType = implType;
             return this;
         }
 

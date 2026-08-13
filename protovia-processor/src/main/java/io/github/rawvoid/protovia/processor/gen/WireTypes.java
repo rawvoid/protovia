@@ -16,12 +16,14 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
-import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.CodeBlock;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.wire.WireType;
+
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
 
 /**
  * Wire-format metadata and presence predicates for generated codecs.
@@ -81,23 +83,6 @@ final class WireTypes {
         return null;
     }
 
-    static String boxed(FieldModel field) {
-        if (field.kind == FieldKind.MESSAGE || field.kind == FieldKind.ENUM) {
-            return field.kind == FieldKind.ENUM ? field.enumModel.typeName : field.javaTypeName;
-        }
-        if (!field.primitive) {
-            return field.javaTypeName;
-        }
-        return switch (field.javaTypeName) {
-            case "int" -> "Integer";
-            case "long" -> "Long";
-            case "float" -> "Float";
-            case "double" -> "Double";
-            case "boolean" -> "Boolean";
-            default -> field.javaTypeName;
-        };
-    }
-
     static String presentCondition(FieldModel field, String var, boolean optional, boolean javaOptional) {
         if (javaOptional) {
             return var + " != null && " + var + ".isPresent()";
@@ -154,14 +139,10 @@ final class WireTypes {
         };
     }
 
-    static TypeName boxedType(FieldModel field) {
-        return GenTypes.sourceType(boxed(field));
-    }
-
-    static String enumPresent(FieldModel field, String var) {
+    static CodeBlock enumPresent(FieldModel field, String var) {
         if (field.enumModel.unrecognized == null) {
-            return var + " != null";
+            return CodeBlock.of("$L != null", var);
         }
-        return var + " != null && " + var + " != " + field.enumModel.typeName + "." + field.enumModel.unrecognized;
+        return CodeBlock.of("$L != null && $L != $L", var, var, enumConstant(field.enumModel, field.enumModel.unrecognized));
     }
 }

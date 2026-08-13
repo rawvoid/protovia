@@ -16,14 +16,17 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
-import com.palantir.javapoet.ArrayTypeName;
 import com.palantir.javapoet.ClassName;
+import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
+import io.github.rawvoid.protovia.processor.model.EnumModel;
+import io.github.rawvoid.protovia.processor.model.FieldKind;
+import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
+import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 
-import java.util.ArrayList;
-import java.util.List;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * JavaPoet type names used by the codec generator.
@@ -49,104 +52,101 @@ final class GenTypes {
     }
 
     static ClassName messageType(MessageModel model) {
-        return ClassName.bestGuess(fqcn(model));
+        return ClassName.get(model.type);
     }
 
-    static String fqcn(MessageModel model) {
-        if (!model.typeName.isEmpty()
-            && model.typeName.contains(".")
-            && Character.isLowerCase(model.typeName.charAt(0))) {
-            return model.typeName;
+    static ClassName enumType(EnumModel model) {
+        return ClassName.get(model.type);
+    }
+
+    static ClassName oneofCaseType(OneofCaseModel c) {
+        return ClassName.get(c.type);
+    }
+
+    static TypeName javaType(FieldModel field) {
+        return TypeName.get(field.javaType);
+    }
+
+    static TypeName javaType(TypeMirror type) {
+        return TypeName.get(type);
+    }
+
+    static TypeName boxedType(FieldModel field) {
+        if (field.kind == FieldKind.ENUM && field.enumModel != null) {
+            return enumType(field.enumModel);
         }
-        return model.packageName.isEmpty() ? model.typeName : model.packageName + "." + model.typeName;
+        return javaType(field).box();
     }
 
-    /**
-     * Parses a {@link MessageModel} / {@link io.github.rawvoid.protovia.processor.model.FieldModel}
-     * type string into a JavaPoet {@link TypeName} so generated sources use imports
-     * instead of {@code java.lang.String} literals.
-     */
-    static TypeName sourceType(String name) {
-        return parseSourceType(name.strip());
+    static ClassName codecType(FieldModel field) {
+        return className(field.codecName);
     }
 
-    /** Alias for method signatures built from model type strings. */
-    static TypeName rawType(String name) {
-        return sourceType(name);
+    static CodeBlock codecInstance(FieldModel field) {
+        return CodeBlock.of("$T.INSTANCE", codecType(field));
     }
 
-    private static TypeName parseSourceType(String name) {
-        return switch (name) {
-            case "int" -> TypeName.INT;
-            case "long" -> TypeName.LONG;
-            case "float" -> TypeName.FLOAT;
-            case "double" -> TypeName.DOUBLE;
-            case "boolean" -> TypeName.BOOLEAN;
-            case "byte" -> TypeName.BYTE;
-            case "short" -> TypeName.SHORT;
-            case "char" -> TypeName.CHAR;
-            case "void" -> TypeName.VOID;
-            default -> {
-                if (name.endsWith("[]")) {
-                    yield ArrayTypeName.of(parseSourceType(name.substring(0, name.length() - 2)));
-                }
-                int genericStart = indexOfGenericStart(name);
-                if (genericStart > 0) {
-                    String raw = name.substring(0, genericStart).strip();
-                    String args = name.substring(genericStart + 1, name.length() - 1).strip();
-                    List<TypeName> typeArgs = splitGenericArgs(args).stream()
-                        .map(GenTypes::parseSourceType)
-                        .toList();
-                    yield ParameterizedTypeName.get(
-                        resolveClassName(raw),
-                        typeArgs.toArray(TypeName[]::new));
-                }
-                yield resolveClassName(name);
-            }
+    static ClassName implType(FieldModel field) {
+        return ClassName.get(field.implType);
+    }
+
+    static CodeBlock implConstructorRef(FieldModel field) {
+        return CodeBlock.of("$T::new", implType(field));
+    }
+
+    static CodeBlock newImpl(FieldModel field) {
+        return newImpl(field, null);
+    }
+
+    static CodeBlock newImpl(FieldModel field, String copyFrom) {
+        ClassName impl = implType(field);
+        boolean diamond = !field.implType.getTypeParameters().isEmpty();
+        if (copyFrom == null) {
+            return diamond ? CodeBlock.of("new $T<>()", impl) : CodeBlock.of("new $T()", impl);
+        }
+        return diamond
+            ? CodeBlock.of("new $T<>($L)", impl, copyFrom)
+            : CodeBlock.of("new $T($L)", impl, copyFrom);
+    }
+
+    static CodeBlock defaultValue(TypeMirror type) {
+        TypeName name = TypeName.get(type);
+        if (UNKNOWN_FIELDS.equals(name)) {
+            return CodeBlock.of("$T.EMPTY", UNKNOWN_FIELDS);
+        }
+        if (isOptional(name)) {
+            return CodeBlock.of("$T.empty()", OPTIONAL);
+        }
+        return switch (type.getKind()) {
+            case BOOLEAN -> CodeBlock.of("false");
+            case BYTE, SHORT, INT, CHAR -> CodeBlock.of("0");
+            case LONG -> CodeBlock.of("0L");
+            case FLOAT -> CodeBlock.of("0F");
+            case DOUBLE -> CodeBlock.of("0D");
+            default -> CodeBlock.of("null");
         };
     }
 
-    private static int indexOfGenericStart(String name) {
-        int depth = 0;
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (c == '<' && depth == 0) {
-                return i;
-            }
-            if (c == '<') {
-                depth++;
-            } else if (c == '>') {
-                depth--;
-            }
-        }
-        return -1;
+    static CodeBlock enumConstant(EnumModel model, String name) {
+        return CodeBlock.of("$T.$L", enumType(model), name);
     }
 
-    private static List<String> splitGenericArgs(String args) {
-        List<String> parts = new ArrayList<>();
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < args.length(); i++) {
-            char c = args.charAt(i);
-            if (c == '<') {
-                depth++;
-            } else if (c == '>') {
-                depth--;
-            } else if (c == ',' && depth == 0) {
-                parts.add(args.substring(start, i).strip());
-                start = i + 1;
-            }
+    private static boolean isOptional(TypeName name) {
+        if (OPTIONAL.equals(name)) {
+            return true;
         }
-        if (start <= args.length()) {
-            parts.add(args.substring(start).strip());
-        }
-        return parts;
+        return name instanceof ParameterizedTypeName parameterized && OPTIONAL.equals(parameterized.rawType());
     }
 
-    private static ClassName resolveClassName(String name) {
-        if (!name.contains(".")) {
+    /**
+     * Package/simple split for codec names. Same-package codecs are stored as a
+     * bare simple name; well-known codecs are stored as a fully-qualified name.
+     */
+    private static ClassName className(String name) {
+        int dot = name.lastIndexOf('.');
+        if (dot < 0) {
             return ClassName.get("", name);
         }
-        return ClassName.bestGuess(name);
+        return ClassName.get(name.substring(0, dot), name.substring(dot + 1));
     }
 }

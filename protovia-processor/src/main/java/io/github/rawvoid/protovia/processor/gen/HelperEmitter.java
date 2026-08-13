@@ -33,8 +33,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumFrom;
-import static io.github.rawvoid.protovia.processor.gen.GenNames.enumNumberOf;
 import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryRead;
 import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntrySizeOf;
 import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryWrite;
@@ -43,9 +41,15 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.rawType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntryPartWrite;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntrySizeAdd;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapMissingDefault;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapPartAssign;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
 
@@ -123,7 +127,7 @@ final class HelperEmitter {
         return MethodSpec.methodBuilder(GenNames.enumNumberOf(model))
             .addModifiers(Modifier.STATIC)
             .returns(TypeName.INT)
-            .addParameter(rawType(model.typeName), "value")
+            .addParameter(enumType(model), "value")
             .addCode(body.build())
             .build();
     }
@@ -133,10 +137,10 @@ final class HelperEmitter {
         body.add("return switch (number) {\n");
         body.indent();
         for (EnumModel.Constant c : model.constants) {
-            body.addStatement("case $L -> $L.$L", c.number(), model.typeName, c.name());
+            body.addStatement("case $L -> $L", c.number(), enumConstant(model, c.name()));
         }
         if (model.unrecognized != null) {
-            body.addStatement("default -> $L.$L", model.typeName, model.unrecognized);
+            body.addStatement("default -> $L", enumConstant(model, model.unrecognized));
         } else {
             body.addStatement("default -> null");
         }
@@ -144,7 +148,7 @@ final class HelperEmitter {
         body.add("};\n");
         return MethodSpec.methodBuilder(GenNames.enumFrom(model))
             .addModifiers(Modifier.STATIC)
-            .returns(rawType(model.typeName))
+            .returns(enumType(model))
             .addParameter(TypeName.INT, "number")
             .addCode(body.build())
             .build();
@@ -159,19 +163,19 @@ final class HelperEmitter {
             int width = packedFixedWidth(field.element);
             if (width > 0) {
                 if (!field.element.primitive) {
-                    WriteEmitter.packedElements(body, field, false);
+                    packedElements(body, field, false);
                 }
                 String count = field.array ? "values.length" : "values.size()";
                 body.addStatement("return $L * $L", count, width);
             } else {
                 body.addStatement("int packed = 0");
-                WriteEmitter.packedElements(body, field, false);
+                packedElements(body, field, false);
                 body.addStatement("return packed");
             }
             methods.add(MethodSpec.methodBuilder(packedSizeOf(field))
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                 .returns(TypeName.INT)
-                .addParameter(rawType(field.javaTypeName), "values")
+                .addParameter(javaType(field), "values")
                 .addCode(body.build())
                 .build());
         }
@@ -195,8 +199,8 @@ final class HelperEmitter {
         body.endControlFlow();
         body.addStatement("int entrySlot = cache.reserve()");
         body.addStatement("int entrySize = 0");
-        SizeEmitter.mapEntrySizeAdd(body, field.mapKey, "k", 1, "entrySize");
-        SizeEmitter.mapEntrySizeAdd(body, field.mapValue, "v", 2, "entrySize");
+        mapEntrySizeAdd(body, field.mapKey, "k", 1, "entrySize");
+        mapEntrySizeAdd(body, field.mapValue, "v", 2, "entrySize");
         body.addStatement("cache.set(entrySlot, entrySize)");
         body.addStatement("return entrySize");
         return MethodSpec.methodBuilder(mapEntrySizeOf(field))
@@ -218,8 +222,8 @@ final class HelperEmitter {
             mapEntrySizeOf(field), SIZE_CACHE);
         body.addStatement("writer.writeUInt32NoTag($L)", Names.tagConstant(field.number));
         body.addStatement("writer.writeUInt32NoTag(entrySize)");
-        WriteEmitter.mapEntryPartWrite(body, field.mapKey, "k", 1);
-        WriteEmitter.mapEntryPartWrite(body, field.mapValue, "v", 2);
+        mapEntryPartWrite(body, field.mapKey, "k", 1);
+        mapEntryPartWrite(body, field.mapValue, "v", 2);
         return MethodSpec.methodBuilder(mapEntryWrite(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)
@@ -243,10 +247,10 @@ final class HelperEmitter {
         body.beginControlFlow("while ((tag = reader.readTag()) != 0)");
         body.beginControlFlow("switch (tag)");
         body.beginControlFlow("case $L ->", WireType.tag(1, unpackedWire(field.mapKey)));
-        ReadEmitter.mapPartAssign(body, field.mapKey, "k");
+        mapPartAssign(body, field.mapKey, "k");
         body.endControlFlow();
         body.beginControlFlow("case $L ->", WireType.tag(2, unpackedWire(field.mapValue)));
-        ReadEmitter.mapPartAssign(body, field.mapValue, "v");
+        mapPartAssign(body, field.mapValue, "v");
         body.endControlFlow();
         body.addStatement("default -> reader.skipField()");
         body.endControlFlow();
@@ -262,7 +266,7 @@ final class HelperEmitter {
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)
             .addParameter(PROTO_READER, "reader")
-            .addParameter(rawType(field.javaTypeName), "target")
+            .addParameter(javaType(field), "target")
             .addCode(body.build())
             .build();
     }

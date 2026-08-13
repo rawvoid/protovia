@@ -255,10 +255,7 @@ public final class SchemaParser {
                 if (bindUnknown(component, component.asType(), AccessKind.RECORD,
                     "value." + name + "()", null, name, unknown)) {
                     recordComponents.add(new MessageModel.RecordComponentModel(
-                        name,
-                        "io.github.rawvoid.protovia.UnknownFields",
-                        "io.github.rawvoid.protovia.UnknownFields.EMPTY",
-                        null));
+                        name, component.asType(), null));
                 }
                 continue;
             }
@@ -276,7 +273,7 @@ public final class SchemaParser {
                 if (oneof != null && claimed.add(name)) {
                     oneofs.add(oneof);
                     recordComponents.add(new MessageModel.RecordComponentModel(
-                        name, renderType(component.asType(), pkg), "null", oneof));
+                        name, component.asType(), oneof));
                 }
                 continue;
             }
@@ -288,10 +285,9 @@ public final class SchemaParser {
                 }
             }
             String name = component.getSimpleName().toString();
-            String typeName = renderType(component.asType(), pkg);
             if (ann == null) {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                    name, typeName, defaultExpr(component.asType()), null));
+                    name, component.asType(), null));
                 continue;
             }
             FieldModel field = resolveField(
@@ -306,10 +302,10 @@ public final class SchemaParser {
                 pkg);
             if (field != null && addField(byNumber, taken, claimed, field)) {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                    name, typeName, defaultExpr(component.asType()), field));
+                    name, component.asType(), field));
             } else {
                 recordComponents.add(new MessageModel.RecordComponentModel(
-                    name, typeName, defaultExpr(component.asType()), null));
+                    name, component.asType(), null));
             }
         }
     }
@@ -614,6 +610,7 @@ public final class SchemaParser {
             .setterName(setter)
             .fieldName(fieldName)
             .javaTypeName(renderType(type, pkg))
+            .javaType(type)
             .oneofCases(cases)
             .origin(origin)
             .build();
@@ -634,6 +631,7 @@ public final class SchemaParser {
                 .codecName(codec)
                 .messageType(caseType)
                 .javaTypeName(typeName)
+                .javaType(caseType.asType())
                 .build();
             return new OneofCaseModel(number, caseType, typeName, tag, payload, null, true);
         }
@@ -750,7 +748,7 @@ public final class SchemaParser {
         if (element == null) {
             return null;
         }
-        String impl = array ? null : collectionImpl(type, pkg, element);
+        TypeElement impl = array ? null : collectionImpl(type, element);
         boolean packed = ann.packed() && isPackable(element);
         FieldModel.Builder b = FieldModel.builder()
             .number(ann.number())
@@ -766,7 +764,9 @@ public final class SchemaParser {
             .setterName(setter)
             .fieldName(fieldName)
             .javaTypeName(renderType(type, pkg))
-            .implTypeName(impl)
+            .javaType(type)
+            .implTypeName(impl == null ? null : impl.getQualifiedName().toString())
+            .implType(impl)
             .element(element)
             .origin(origin)
             .array(array);
@@ -809,6 +809,7 @@ public final class SchemaParser {
             error(origin, "map key of field '" + name + "' must be an integral type, bool, or string");
             return null;
         }
+        TypeElement impl = mapImpl(type);
         return FieldModel.builder()
             .number(ann.number())
             .name(name)
@@ -820,7 +821,9 @@ public final class SchemaParser {
             .setterName(setter)
             .fieldName(fieldName)
             .javaTypeName(renderType(type, pkg))
-            .implTypeName(mapImpl(type, pkg))
+            .javaType(type)
+            .implTypeName(impl.getQualifiedName().toString())
+            .implType(impl)
             .mapKey(key)
             .mapValue(value)
             .origin(origin)
@@ -866,6 +869,7 @@ public final class SchemaParser {
             .setterName(setter)
             .fieldName(fieldName)
             .javaTypeName(renderType(declaredJavaType, pkg))
+            .javaType(declaredJavaType)
             .codecName(resolved.codecName)
             .enumModel(resolved.enumModel)
             .messageType(resolved.messageType)
@@ -1040,32 +1044,32 @@ public final class SchemaParser {
         return types.isAssignable(types.erasure(type), optionalType);
     }
 
-    private String collectionImpl(TypeMirror type, String pkg, FieldModel elementModel) {
+    private TypeElement collectionImpl(TypeMirror type, FieldModel elementModel) {
         TypeElement element = asTypeElement(type);
         if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
             && !element.getQualifiedName().contentEquals("java.util.List")
             && !element.getQualifiedName().contentEquals("java.util.Set")
             && !element.getQualifiedName().contentEquals("java.util.Collection")) {
-            return renderType(type, pkg).replace("<?>", "").replaceAll("<.*>", "<>");
+            return element;
         }
         TypeMirror erased = types.erasure(type);
         if (types.isAssignable(erased, setType)) {
-            return "java.util.LinkedHashSet<>";
+            return elements.getTypeElement("java.util.LinkedHashSet");
         }
         String primitive = elementModel.primitiveListClass();
         if (primitive != null) {
-            return primitive;
+            return elements.getTypeElement(primitive);
         }
-        return "java.util.ArrayList<>";
+        return elements.getTypeElement("java.util.ArrayList");
     }
 
-    private String mapImpl(TypeMirror type, String pkg) {
+    private TypeElement mapImpl(TypeMirror type) {
         TypeElement element = asTypeElement(type);
         if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
             && !element.getQualifiedName().contentEquals("java.util.Map")) {
-            return renderType(type, pkg).replaceAll("<.*>", "<>");
+            return element;
         }
-        return "java.util.LinkedHashMap<>";
+        return elements.getTypeElement("java.util.LinkedHashMap");
     }
 
     private TypeMirror typeArgument(TypeMirror type, int index, Element origin, String what) {
@@ -1117,20 +1121,6 @@ public final class SchemaParser {
             sb.append(renderType(args.get(i), pkg));
         }
         return sb.append('>').toString();
-    }
-
-    private String defaultExpr(TypeMirror type) {
-        if (isOptional(type)) {
-            return "java.util.Optional.empty()";
-        }
-        return switch (type.getKind()) {
-            case BOOLEAN -> "false";
-            case BYTE, SHORT, INT, CHAR -> "0";
-            case LONG -> "0L";
-            case FLOAT -> "0F";
-            case DOUBLE -> "0D";
-            default -> "null";
-        };
     }
 
     private TypeMirror erasure(String fqcn) {

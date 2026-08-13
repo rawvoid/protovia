@@ -347,7 +347,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.ContactProtoCodec")
             .contentsAsUtf8String()
-            .contains("other.AddrProtoCodec.INSTANCE");
+            .contains("import other.AddrProtoCodec");
+        assertThat(compilation)
+            .generatedSourceFile("demo.ContactProtoCodec")
+            .contentsAsUtf8String()
+            .contains("AddrProtoCodec.INSTANCE");
     }
 
     @Test
@@ -446,15 +450,15 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.BoxProtoCodec")
             .contentsAsUtf8String()
-            .contains("io.github.rawvoid.protovia.wkt.AnyCodec.INSTANCE");
+            .contains("AnyCodec.INSTANCE");
         assertThat(compilation)
             .generatedSourceFile("demo.BoxProtoCodec")
             .contentsAsUtf8String()
-            .contains("io.github.rawvoid.protovia.wkt.Int32Value.INSTANCE");
+            .contains("Int32Value.INSTANCE");
         assertThat(compilation)
             .generatedSourceFile("demo.BoxProtoCodec")
             .contentsAsUtf8String()
-            .contains("io.github.rawvoid.protovia.wkt.TimestampCodec.INSTANCE");
+            .contains("TimestampCodec.INSTANCE");
     }
 
     @Test
@@ -480,6 +484,10 @@ class ProtoviaProcessorTest {
             .generatedSourceFile("demo.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof IntArrayList");
+        assertThat(compilation)
+            .generatedSourceFile("demo.NumsProtoCodec")
+            .contentsAsUtf8String()
+            .contains("IntArrayList::new");
         assertThat(compilation)
             .generatedSourceFile("demo.NumsProtoCodec")
             .contentsAsUtf8String()

@@ -24,31 +24,25 @@ import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
-import io.github.rawvoid.protovia.wire.WireType;
 
 import javax.lang.model.element.Modifier;
 
 import static io.github.rawvoid.protovia.processor.gen.GenNames.enumNumberOf;
 import static io.github.rawvoid.protovia.processor.gen.GenNames.mapEntryWrite;
 import static io.github.rawvoid.protovia.processor.gen.GenNames.packedSizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeNoTag;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeNoTag;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.primitiveListSpec;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
 
 /**
- * Emits {@code writeTo} and related field-write logic, including packed loops.
+ * Emits {@code writeTo} and related field-write logic.
  *
  * @author Rawvoid
  */
@@ -93,7 +87,7 @@ final class WriteEmitter {
             case MESSAGE -> {
                 b.beginControlFlow("if ($L != null)", field.localName);
                 Emit.writeTag(b, tag);
-                Emit.writeCachedMessage(b, field.codecName + ".INSTANCE", field.localName, field.localName + "Size");
+                Emit.writeCachedMessage(b, field, field.localName, field.localName + "Size");
                 b.endControlFlow();
             }
             case REPEATED -> writeRepeated(b, field);
@@ -130,71 +124,17 @@ final class WriteEmitter {
             b.addStatement("writer.writeUInt32NoTag($LPacked)", field.localName);
             packedElements(b, field, true);
         } else {
-            b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), field.localName);
+            b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
             Emit.nullElementCheck(b, field.element, "item", field.name);
             Emit.writeTag(b, tag);
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
             } else if (field.element.kind == FieldKind.MESSAGE) {
-                Emit.writeCachedMessage(b, field.element.codecName + ".INSTANCE", "item", "itemSize");
+                Emit.writeCachedMessage(b, field.element, "item", "itemSize");
             } else {
                 b.addStatement("$L", writeNoTag("writer", field.element, "item"));
             }
             b.endControlFlow();
-        }
-        b.endControlFlow();
-    }
-
-    static void packedElements(CodeBlock.Builder b, FieldModel field, boolean write) {
-        String list = write ? field.localName : "values";
-        PrimitiveListSpec spec = primitiveListSpec(field);
-        int width = packedFixedWidth(field.element);
-        if (spec != null && !field.array && (write || width == 0)) {
-            String prim = field.localName + "Prim";
-            b.beginControlFlow("if ($L instanceof $T $L)", list, spec.listType(), prim);
-            primitivePackedLoop(b, field, spec, prim, write);
-            b.nextControlFlow("else");
-            boxedPackedLoop(b, field, list, write);
-            b.endControlFlow();
-            return;
-        }
-        if (spec != null && !field.array && !write && width > 0) {
-            b.beginControlFlow("if (!($L instanceof $T))", list, spec.listType());
-            boxedPackedLoop(b, field, list, false);
-            b.endControlFlow();
-            return;
-        }
-        boxedPackedLoop(b, field, list, write);
-    }
-
-    private static void primitivePackedLoop(
-        CodeBlock.Builder b, FieldModel field, PrimitiveListSpec spec, String prim, boolean write) {
-        b.beginControlFlow("for (int _i = 0, _n = $L.size(); _i < _n; _i++)", prim);
-        String access = prim + "." + spec.get() + "(_i)";
-        if (write) {
-            b.addStatement("$L", writeNoTag("writer", field.element, access));
-        } else {
-            b.addStatement("packed += $L", sizeNoTag(field.element, access));
-        }
-        b.endControlFlow();
-    }
-
-    private static void boxedPackedLoop(CodeBlock.Builder b, FieldModel field, String list, boolean write) {
-        b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), list);
-        Emit.nullElementCheck(b, field.element, "item", field.name);
-        if (write) {
-            if (field.element.kind == FieldKind.ENUM) {
-                b.addStatement("writer.writeInt32NoTag($L(item))", enumNumberOf(field.element.enumModel));
-            } else {
-                b.addStatement("$L", writeNoTag("writer", field.element, "item"));
-            }
-        } else if (packedFixedWidth(field.element) == 0) {
-            if (field.element.kind == FieldKind.ENUM) {
-                b.addStatement("packed += $T.enumValue($L(item))",
-                    CODED_SIZE, enumNumberOf(field.element.enumModel));
-            } else {
-                b.addStatement("packed += $L", sizeNoTag(field.element, "item"));
-            }
         }
         b.endControlFlow();
     }
@@ -209,12 +149,12 @@ final class WriteEmitter {
             b.addStatement("writer.writeUInt32NoTag(0)");
         } else if (c.selfMessage) {
             Emit.writeTag(b, c.tagConstant);
-            Emit.writeCachedMessage(b, c.payload.codecName + ".INSTANCE", "_c", c.tagConstant + "_sz");
+            Emit.writeCachedMessage(b, c.payload, "_c", c.tagConstant + "_sz");
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$T _p = _c.$L", sourceType(c.payload.javaTypeName), c.accessor);
+            b.addStatement("$T _p = _c.$L", javaType(c.payload), c.accessor);
             b.beginControlFlow("if (_p != null)");
             Emit.writeTag(b, c.tagConstant);
-            Emit.writeCachedMessage(b, c.payload.codecName + ".INSTANCE", "_p", c.tagConstant + "_sz");
+            Emit.writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
             Emit.writeTag(b, c.tagConstant);
@@ -228,30 +168,9 @@ final class WriteEmitter {
     private static void writeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
         b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
-            MAP, WireTypes.boxedType(field.mapKey), WireTypes.boxedType(field.mapValue), field.localName);
+            MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
         b.addStatement("$L(writer, e.getKey(), e.getValue())", mapEntryWrite(field));
         b.endControlFlow();
-        b.endControlFlow();
-    }
-
-    static void mapEntryPartWrite(CodeBlock.Builder b, FieldModel part, String var, int number) {
-        int tag = WireType.tag(number, unpackedWire(part));
-        if (part.kind == FieldKind.MESSAGE) {
-            Emit.writeTag(b, tag);
-            Emit.writeCachedMessage(b, part.codecName + ".INSTANCE", var, var + "Size");
-            return;
-        }
-        if (part.kind == FieldKind.ENUM) {
-            b.addStatement("int $LN = $L($L)", var, enumNumberOf(part.enumModel), var);
-            b.beginControlFlow("if ($LN != 0)", var);
-            Emit.writeTag(b, tag);
-            b.addStatement("writer.writeInt32NoTag($LN)", var);
-            b.endControlFlow();
-            return;
-        }
-        b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
-        Emit.writeTag(b, tag);
-        b.addStatement("$L", writeNoTag("writer", part, var));
         b.endControlFlow();
     }
 }

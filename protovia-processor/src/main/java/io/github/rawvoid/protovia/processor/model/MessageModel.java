@@ -17,6 +17,7 @@
 package io.github.rawvoid.protovia.processor.model;
 
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 import java.util.List;
 
 /**
@@ -67,7 +68,7 @@ public final class MessageModel {
         return protoPackage.isEmpty() ? protoMessageName : protoPackage + "." + protoMessageName;
     }
 
-    public record RecordComponentModel(String name, String typeName, String defaultExpr, FieldModel field) {
+    public record RecordComponentModel(String name, TypeMirror type, FieldModel field) {
     }
 
     public record UnknownField(

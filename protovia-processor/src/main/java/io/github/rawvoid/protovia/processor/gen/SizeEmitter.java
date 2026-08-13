@@ -34,11 +34,11 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.sourceType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.boxedType;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
 
@@ -94,8 +94,8 @@ final class SizeEmitter {
             case MESSAGE -> {
                 b.beginControlFlow("if ($L != null)", field.localName);
                 b.addStatement("int $LSlot = cache.reserve()", field.localName);
-                b.addStatement("int $LSize = $L.INSTANCE.computeSize($L, cache)",
-                    field.localName, field.codecName, field.localName);
+                b.addStatement("int $LSize = $L.computeSize($L, cache)",
+                    field.localName, codecInstance(field), field.localName);
                 b.addStatement("cache.set($LSlot, $LSize)", field.localName, field.localName);
                 b.addStatement("size += $T.message($L, $LSize)", CODED_SIZE, field.number, field.localName);
                 b.endControlFlow();
@@ -137,14 +137,14 @@ final class SizeEmitter {
             b.addStatement("cache.push($LPacked)", field.localName);
             b.addStatement("size += $T.lengthDelimited($L, $LPacked)", CODED_SIZE, field.number, field.localName);
         } else {
-            b.beginControlFlow("for ($T item : $L)", sourceType(field.element.javaTypeName), field.localName);
+            b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
             Emit.nullElementCheck(b, field.element, "item", field.name);
             if (field.element.kind == FieldKind.ENUM) {
                 b.addStatement("size += $T.enumValue($L, $L(item))",
                     CODED_SIZE, field.number, enumNumberOf(field.element.enumModel));
             } else if (field.element.kind == FieldKind.MESSAGE) {
                 b.addStatement("int itemSlot = cache.reserve()");
-                b.addStatement("int itemSize = $L.INSTANCE.computeSize(item, cache)", field.element.codecName);
+                b.addStatement("int itemSize = $L.computeSize(item, cache)", codecInstance(field.element));
                 b.addStatement("cache.set(itemSlot, itemSize)");
                 b.addStatement("size += $T.message($L, itemSize)", CODED_SIZE, field.number);
             } else {
@@ -158,30 +158,10 @@ final class SizeEmitter {
     private static void computeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
         b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
-            MAP, WireTypes.boxedType(field.mapKey), WireTypes.boxedType(field.mapValue), field.localName);
+            MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
         b.addStatement("size += $T.lengthDelimited($L, $L(e.getKey(), e.getValue(), cache))",
             CODED_SIZE, field.number, mapEntrySizeOf(field));
         b.endControlFlow();
-        b.endControlFlow();
-    }
-
-    static void mapEntrySizeAdd(CodeBlock.Builder b, FieldModel part, String var, int number, String sizeVar) {
-        if (part.kind == FieldKind.MESSAGE) {
-            b.addStatement("int $LSlot = cache.reserve()", var);
-            b.addStatement("int $LSize = $L.INSTANCE.computeSize($L, cache)", var, part.codecName, var);
-            b.addStatement("cache.set($LSlot, $LSize)", var, var);
-            b.addStatement("$L += $T.message($L, $LSize)", sizeVar, CODED_SIZE, number, var);
-            return;
-        }
-        if (part.kind == FieldKind.ENUM) {
-            b.addStatement("int $LN = $L($L)", var, enumNumberOf(part.enumModel), var);
-            b.beginControlFlow("if ($LN != 0)", var);
-            b.addStatement("$L += $T.enumValue($L, $LN)", sizeVar, CODED_SIZE, number, var);
-            b.endControlFlow();
-            return;
-        }
-        b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
-        b.addStatement("$L += $L", sizeVar, sizeCall(part, number, var));
         b.endControlFlow();
     }
 
@@ -194,14 +174,14 @@ final class SizeEmitter {
             b.addStatement("size += $T.lengthDelimited($L, 0)", CODED_SIZE, c.number);
         } else if (c.selfMessage) {
             b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
-            b.addStatement("int $L_sz = $L.INSTANCE.computeSize(_c, cache)", c.tagConstant, c.payload.codecName);
+            b.addStatement("int $L_sz = $L.computeSize(_c, cache)", c.tagConstant, codecInstance(c.payload));
             b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$T _p = _c.$L", sourceType(c.payload.javaTypeName), c.accessor);
+            b.addStatement("$T _p = _c.$L", javaType(c.payload), c.accessor);
             b.beginControlFlow("if (_p != null)");
             b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
-            b.addStatement("int $L_sz = $L.INSTANCE.computeSize(_p, cache)", c.tagConstant, c.payload.codecName);
+            b.addStatement("int $L_sz = $L.computeSize(_p, cache)", c.tagConstant, codecInstance(c.payload));
             b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
             b.endControlFlow();
