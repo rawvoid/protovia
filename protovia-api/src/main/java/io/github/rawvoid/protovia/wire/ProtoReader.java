@@ -12,6 +12,7 @@ public final class ProtoReader {
 
     public static final int DEFAULT_MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
     public static final int DEFAULT_MAX_DEPTH = 100;
+    private static final byte[] EMPTY_BYTES = new byte[0];
 
     private final byte[] buffer;
     private final int end;
@@ -159,21 +160,33 @@ public final class ProtoReader {
 
     public String readString() {
         int length = readRawVarint32();
+        if (length > 0 && length <= currentLimit - pos) {
+            checkLength(length);
+            String value = Utf8.decode(buffer, pos, length);
+            pos += length;
+            return value;
+        }
+        if (length == 0) {
+            return "";
+        }
         checkLength(length);
-        require(length);
-        String value = Utf8.decode(buffer, pos, length);
-        pos += length;
-        return value;
+        throw new ProtoException("truncated message, needed " + length + " bytes");
     }
 
     public byte[] readBytes() {
         int length = readRawVarint32();
+        if (length > 0 && length <= currentLimit - pos) {
+            checkLength(length);
+            byte[] copy = new byte[length];
+            System.arraycopy(buffer, pos, copy, 0, length);
+            pos += length;
+            return copy;
+        }
+        if (length == 0) {
+            return EMPTY_BYTES;
+        }
         checkLength(length);
-        require(length);
-        byte[] copy = new byte[length];
-        System.arraycopy(buffer, pos, copy, 0, length);
-        pos += length;
-        return copy;
+        throw new ProtoException("truncated message, needed " + length + " bytes");
     }
 
     public ByteBuffer readByteBuffer() {
