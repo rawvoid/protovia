@@ -185,7 +185,7 @@ final class ReadEmitter {
                 b.addStatement("$L(reader, $L)", mapEntryRead(field), mapVar(field, record));
                 b.endControlFlow();
             }
-            case ONEOF -> readOneof(b, field, record);
+            case ONEOF -> readOneof(b, field, record, model);
         }
     }
 
@@ -208,7 +208,7 @@ final class ReadEmitter {
         }
     }
 
-    private static void readOneof(CodeBlock.Builder b, FieldModel field, boolean record) {
+    private static void readOneof(CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model) {
         for (OneofCaseModel c : field.oneofCases) {
             b.beginControlFlow("case $L ->", c.tagConstant);
             if (c.empty()) {
@@ -224,8 +224,7 @@ final class ReadEmitter {
                 store(b, field, record,
                     CodeBlock.of("new $T(reader.readMessage($L))", oneofCaseType(c), codecInstance(c.payload)));
             } else if (c.payload.kind == FieldKind.ENUM) {
-                store(b, field, record,
-                    CodeBlock.of("new $T($L(reader.readEnum()))", oneofCaseType(c), enumFrom(c.payload.enumModel)));
+                readOneofEnum(b, field, record, model, c);
             } else {
                 CodeBlock read = readCall(c.payload);
                 if (c.payload.adapterType != null) {
@@ -233,6 +232,27 @@ final class ReadEmitter {
                 }
                 store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
             }
+            b.endControlFlow();
+        }
+    }
+
+    private static void readOneofEnum(
+        CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model, OneofCaseModel c) {
+        EnumModel enums = c.payload.enumModel;
+        b.addStatement("int _n = reader.readEnum()");
+        b.addStatement("$T _e = $L(_n)", enumType(enums), enumFrom(enums));
+        CodeBlock constructed = CodeBlock.of("new $T(_e)", oneofCaseType(c));
+        if (enums.unrecognized != null) {
+            b.beginControlFlow("if (_e == $L)", enumConstant(enums, enums.unrecognized));
+            mergeUnknownVarint(b, model, c.tagConstant);
+            store(b, field, record, constructed);
+            b.nextControlFlow("else if (_e != null)");
+            store(b, field, record, constructed);
+            b.endControlFlow();
+        } else {
+            mergeUnknownVarintIfNull(b, model, c.tagConstant, "_e");
+            b.beginControlFlow("if (_e != null)");
+            store(b, field, record, constructed);
             b.endControlFlow();
         }
     }

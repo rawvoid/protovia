@@ -198,8 +198,11 @@ final class SizeEmitter {
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
-            b.addStatement("size += $T.enumValue($L, $L(_c.$L))",
-                CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), c.accessor);
+            String payload = "_c." + c.accessor;
+            b.beginControlFlow("if ($L)", enumPresent(c.payload, payload));
+            b.addStatement("size += $T.enumValue($L, $L($L))",
+                CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), payload);
+            b.endControlFlow();
         } else if (c.payload.adapterType != null) {
             String w = oneofWireLocal(c);
             assignToWire(b, c.payload, "_c." + c.accessor, w);

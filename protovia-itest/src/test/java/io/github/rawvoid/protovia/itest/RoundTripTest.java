@@ -246,6 +246,80 @@ class RoundTripTest {
     }
 
     @Test
+    void oneofKnownEnumRoundTrip() {
+        Picker picker = new Picker();
+        picker.name = "Ada";
+        picker.choice = new Picker.StatusPick(Status.ACTIVE);
+        Picker back = ProtoVia.fromBytes(Picker.class, ProtoVia.toBytes(picker));
+        assertEquals("Ada", back.name);
+        assertEquals(new Picker.StatusPick(Status.ACTIVE), back.choice);
+    }
+
+    @Test
+    void oneofUnknownEnumWithSentinelRewrittenViaUnknownFields() {
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeString(1, "n");
+        extra.writeInt32(10, 99);
+        PickerEnvelope back = ProtoVia.fromBytes(PickerEnvelope.class, extra.toByteArray());
+        assertEquals("n", back.name);
+        assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), back.choice);
+        assertFalse(back.unknownFields.isEmpty());
+
+        PickerEnvelope again = ProtoVia.fromBytes(PickerEnvelope.class, ProtoVia.toBytes(back));
+        assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), again.choice);
+        assertEquals(99, readEnumAt(ProtoVia.toBytes(again), 10));
+    }
+
+    @Test
+    void oneofUnknownEnumWithSentinelWithoutUnknownFieldsDoesNotThrow() {
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeString(1, "n");
+        extra.writeInt32(10, 99);
+        Picker back = ProtoVia.fromBytes(Picker.class, extra.toByteArray());
+        assertEquals("n", back.name);
+        assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), back.choice);
+
+        byte[] rewritten = ProtoVia.toBytes(back);
+        assertEquals(-1, readEnumAt(rewritten, 10));
+        Picker again = ProtoVia.fromBytes(Picker.class, rewritten);
+        assertEquals("n", again.name);
+        assertNull(again.choice);
+    }
+
+    @Test
+    void oneofUnknownEnumClosedRewrittenViaUnknownFields() {
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeInt32(10, 99);
+        KindPicker back = ProtoVia.fromBytes(KindPicker.class, extra.toByteArray());
+        assertNull(back.choice);
+        assertFalse(back.unknownFields.isEmpty());
+
+        KindPicker again = ProtoVia.fromBytes(KindPicker.class, ProtoVia.toBytes(back));
+        assertNull(again.choice);
+        assertEquals(99, readEnumAt(ProtoVia.toBytes(again), 10));
+    }
+
+    @Test
+    void oneofUnknownEnumClosedWithoutUnknownFieldsIsDropped() {
+        ProtoWriter extra = ProtoWriter.growing();
+        extra.writeInt32(10, 99);
+        KindPickerBare back = ProtoVia.fromBytes(KindPickerBare.class, extra.toByteArray());
+        assertNull(back.choice);
+        assertEquals(0, ProtoVia.toBytes(back).length);
+    }
+
+    @Test
+    void oneofUnrecognizedSentinelConstructedByUserIsNotWritten() {
+        Picker picker = new Picker();
+        picker.choice = new Picker.StatusPick(Status.UNRECOGNIZED);
+        assertEquals(0, ProtoVia.toBytes(picker).length);
+
+        PickerEnvelope env = new PickerEnvelope();
+        env.choice = new Picker.StatusPick(null);
+        assertEquals(0, ProtoVia.toBytes(env).length);
+    }
+
+    @Test
     void unknownFieldsRoundTrip() {
         Envelope env = new Envelope();
         env.name = "keep";
@@ -318,6 +392,19 @@ class RoundTripTest {
         user.setUnpacked(List.of(8, 9));
         user.setPayload(new byte[]{1, 2, 3});
         return user;
+    }
+
+    private static int readEnumAt(byte[] bytes, int fieldNumber) {
+        ProtoReader r = new ProtoReader(bytes);
+        int tag;
+        int expected = fieldNumber << 3;
+        while ((tag = r.readTag()) != 0) {
+            if (tag == expected) {
+                return r.readEnum();
+            }
+            r.skipField();
+        }
+        return -1;
     }
 
     private static byte[] concat(byte[] left, byte[] right) {

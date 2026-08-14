@@ -1,0 +1,44 @@
+/*
+ * Copyright 2026 Rawvoid(https://github.com/rawvoid)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.rawvoid.protovia.itest.model;
+
+import io.github.rawvoid.protovia.UnknownFields;
+import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import io.github.rawvoid.protovia.annotation.ProtoOneof;
+import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
+import io.github.rawvoid.protovia.annotation.ProtoUnknown;
+
+@ProtoMessage
+public class KindPicker {
+
+    @ProtoOneof
+    public Choice choice;
+
+    @ProtoUnknown
+    public UnknownFields unknownFields;
+
+    public sealed interface Choice permits KindPick, KindLabel {
+    }
+
+    @ProtoOneofCase(10)
+    public record KindPick(Kind value) implements Choice {
+    }
+
+    @ProtoOneofCase(11)
+    public record KindLabel(String value) implements Choice {
+    }
+}

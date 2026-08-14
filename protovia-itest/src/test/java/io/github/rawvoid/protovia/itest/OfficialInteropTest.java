@@ -176,6 +176,43 @@ class OfficialInteropTest {
     }
 
     @Test
+    void oneofUnknownEnumInteropsWithDynamicMessage() throws Exception {
+        DescriptorProtos.EnumDescriptorProto kind = DescriptorProtos.EnumDescriptorProto.newBuilder()
+            .setName("Kind")
+            .addValue(DescriptorProtos.EnumValueDescriptorProto.newBuilder().setName("UNSPECIFIED").setNumber(0))
+            .addValue(DescriptorProtos.EnumValueDescriptorProto.newBuilder().setName("ALPHA").setNumber(1))
+            .addValue(DescriptorProtos.EnumValueDescriptorProto.newBuilder().setName("BETA").setNumber(99))
+            .build();
+        DescriptorProtos.DescriptorProto picker = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("KindPicker")
+            .addOneofDecl(DescriptorProtos.OneofDescriptorProto.newBuilder().setName("choice"))
+            .addField(field("kind", 10, DescriptorProtos.FieldDescriptorProto.Type.TYPE_ENUM)
+                .setTypeName(".Kind")
+                .setOneofIndex(0))
+            .addField(field("label", 11, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING)
+                .setOneofIndex(0))
+            .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+            DescriptorProtos.FileDescriptorProto.newBuilder()
+                .setName("kind.proto")
+                .setSyntax("proto3")
+                .addEnumType(kind)
+                .addMessageType(picker)
+                .build(),
+            new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("KindPicker");
+        Descriptors.EnumDescriptor kindDesc = fd.findEnumTypeByName("Kind");
+
+        DynamicMessage official = DynamicMessage.newBuilder(desc)
+            .setField(desc.findFieldByName("kind"), kindDesc.findValueByNumber(99))
+            .build();
+        KindPicker captured = ProtoVia.fromBytes(KindPicker.class, official.toByteArray());
+        assertNull(captured.choice);
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(captured));
+        assertEquals(99, ((Descriptors.EnumValueDescriptor) parsed.getField(desc.findFieldByName("kind"))).getNumber());
+    }
+
+    @Test
     void unknownFieldsSurviveDynamicMessage() throws Exception {
         Envelope env = new Envelope();
         env.name = "Ada";

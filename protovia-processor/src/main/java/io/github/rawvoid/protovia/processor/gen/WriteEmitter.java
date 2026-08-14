@@ -174,8 +174,11 @@ final class WriteEmitter {
             writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
+            String payload = "_c." + c.accessor;
+            b.beginControlFlow("if ($L)", enumPresent(c.payload, payload));
             writeTag(b, c.tagConstant);
-            b.addStatement("writer.writeInt32NoTag($L(_c.$L))", enumNumberOf(c.payload.enumModel), c.accessor);
+            b.addStatement("writer.writeInt32NoTag($L($L))", enumNumberOf(c.payload.enumModel), payload);
+            b.endControlFlow();
         } else if (c.payload.adapterType != null) {
             String w = oneofWireLocal(c);
             assignToWire(b, c.payload, "_c." + c.accessor, w);
