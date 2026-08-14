@@ -24,6 +24,8 @@ import java.util.Arrays;
 /**
  * Opaque, ordered capture of unrecognized protobuf fields (tag + payload).
  * Immutable. {@link #EMPTY} is the unset slot.
+ * Unknown enum numbers on map values, and unknown enums when the message has
+ * no {@code @ProtoUnknown} slot, are not captured.
  *
  * @author Rawvoid
  */

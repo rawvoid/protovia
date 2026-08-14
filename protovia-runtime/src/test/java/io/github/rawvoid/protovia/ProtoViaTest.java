@@ -92,6 +92,13 @@ class ProtoViaTest {
     }
 
     @Test
+    void readBoundedAtIntegerMaxValueReadsTheStream() throws Exception {
+        byte[] payload = {0x0A, 0x01, 'n'};
+        assertArrayEquals(payload,
+            ProtoVia.readBounded(new ByteArrayInputStream(payload), Integer.MAX_VALUE));
+    }
+
+    @Test
     void packUnpackUserAndInstant() {
         User user = sample();
         ProtoAny packed = ProtoVia.pack(user);

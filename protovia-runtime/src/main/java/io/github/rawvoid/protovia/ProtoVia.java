@@ -152,7 +152,9 @@ public final class ProtoVia {
     }
 
     /**
-     * Writes {@link #toBytes(Object)} to {@code out}.
+     * Writes one message as {@link #toBytes(Object)} to {@code out}.
+     * There is no length prefix — this matches official {@code toByteArray}
+     * followed by a stream write, not {@code writeDelimitedTo}.
      *
      * @param out     destination
      * @param message entity to encode
@@ -168,7 +170,9 @@ public final class ProtoVia {
     }
 
     /**
-     * Reads at most the configured max message size from {@code in} and decodes it.
+     * Reads the remainder of {@code in} (capped at {@link #maxMessageSize()}) as
+     * one message. Same boundary as official {@code parseFrom(InputStream)};
+     * there is no delimited / multi-message variant.
      *
      * @param type entity class
      * @param in   source
@@ -231,6 +235,9 @@ public final class ProtoVia {
     }
 
     static byte[] readBounded(InputStream in, int max) throws IOException {
+        if (max == Integer.MAX_VALUE) {
+            return in.readAllBytes();
+        }
         byte[] buf = in.readNBytes(max + 1);
         if (buf.length > max) {
             throw new ProtoException("input exceeds max message size " + max);

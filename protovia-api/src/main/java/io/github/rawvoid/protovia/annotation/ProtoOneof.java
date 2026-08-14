@@ -22,6 +22,8 @@ import java.lang.annotation.*;
  * Marks a field, getter, or record component as a proto3 oneof.
  * The Java type must be a {@code sealed} interface (or class) whose permitted
  * subtypes each have {@link ProtoOneofCase}. The member has no field number.
+ * A message-case payload of {@code null} is omitted on the wire and cannot be
+ * distinguished from an unset oneof.
  *
  * @author Rawvoid
  */
