@@ -916,19 +916,19 @@ public final class SchemaParser {
             } else {
                 return applyAdapter(
                     adapter, origin, name, declaredJavaType, declared, optional, packed,
-                    accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+                    accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
             }
         }
         if (discovered != null) {
             return applyAdapter(
                 discovered, origin, name, declaredJavaType, declared, optional, packed,
-                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
         }
         TypeElement javaType = asTypeElement(type);
         if (javaType != null && findAnnotation(javaType, PROTO_ADAPTED_ANN) != null) {
             return resolveProtoAdapted(
                 javaType, origin, name, type, declaredJavaType, declared, optional, packed,
-                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+                accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
         }
         Resolved resolved = classify(origin, name, type, declared, pkg);
         if (resolved == null) {
@@ -1010,12 +1010,7 @@ public final class SchemaParser {
         String fieldName,
         String pkg,
         boolean javaOptional,
-        int number,
-        AdapterSite site) {
-        if (!adaptersEnabled(site)) {
-            error(origin, "adapters on repeated/map/oneof are not enabled yet");
-            return null;
-        }
+        int number) {
         ProtoType protoType = bindAdapterProtoType(adapter, declared, origin, name);
         if (protoType == null) {
             return null;
@@ -1040,8 +1035,7 @@ public final class SchemaParser {
         String fieldName,
         String pkg,
         boolean javaOptional,
-        int number,
-        AdapterSite site) {
+        int number) {
         TypeElement adaptedType = adaptedFrom(javaType);
         if (adaptedType == null) {
             return null;
@@ -1071,12 +1065,12 @@ public final class SchemaParser {
         }
         return applyAdapter(
             adapter, origin, name, declaredJavaType, declared, optional, packed,
-            accessKind, readExpr, setter, fieldName, pkg, javaOptional, number, site);
+            accessKind, readExpr, setter, fieldName, pkg, javaOptional, number);
     }
 
     private void rejectOneofAdapter(Element origin, TypeElement fieldAdapter) {
         if (fieldAdapter != null) {
-            error(origin, "adapters on repeated/map/oneof are not enabled yet");
+            error(origin, "@ProtoOneofCase without a scalar payload cannot declare adapter");
         }
     }
 
@@ -1719,13 +1713,6 @@ public final class SchemaParser {
         REPEATED,
         MAP,
         ONEOF
-    }
-
-    private static boolean adaptersEnabled(AdapterSite site) {
-        return site == AdapterSite.SINGULAR
-            || site == AdapterSite.REPEATED
-            || site == AdapterSite.MAP
-            || site == AdapterSite.ONEOF;
     }
 
     private static final class Access {

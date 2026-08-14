@@ -774,7 +774,8 @@ class ProtoviaProcessorTest {
                     "@ProtoMessage public class Holder {",
                     "  @ProtoOneof public Event event;",
                     "}"));
-        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+        assertThat(compilation).hadErrorContaining(
+            "@ProtoOneofCase without a scalar payload cannot declare adapter");
     }
 
     @Test
@@ -809,7 +810,8 @@ class ProtoviaProcessorTest {
                     "@ProtoMessage public class Holder {",
                     "  @ProtoOneof public Target target;",
                     "}"));
-        assertThat(compilation).hadErrorContaining("adapters on repeated/map/oneof are not enabled yet");
+        assertThat(compilation).hadErrorContaining(
+            "@ProtoOneofCase without a scalar payload cannot declare adapter");
     }
 
     @Test
