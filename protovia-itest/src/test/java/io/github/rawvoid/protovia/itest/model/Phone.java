@@ -16,5 +16,6 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-public interface Target {
+/** Assignable to {@link Target} but not listed on any oneof Case. */
+public record Phone(String value) implements Target {
 }

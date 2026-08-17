@@ -276,6 +276,29 @@ class RoundTripTest {
     }
 
     @Test
+    void aliasReusesEmailAndHomeAtNumbersOneAndTwo() {
+        Alias email = new Alias();
+        email.target = new Email("ada@example.com");
+        Alias emailBack = ProtoVia.fromBytes(Alias.class, ProtoVia.toBytes(email));
+        assertEquals(new Email("ada@example.com"), emailBack.target);
+
+        Alias home = new Alias();
+        home.target = new Home(new Address("Paris", "Rue"));
+        Alias homeBack = ProtoVia.fromBytes(Alias.class, ProtoVia.toBytes(home));
+        assertEquals(new Home(new Address("Paris", "Rue")), homeBack.target);
+    }
+
+    @Test
+    void oneofUnexpectedRuntimeTypeIsRejected() {
+        Contact c = new Contact();
+        c.target = new Phone("1");
+        ProtoException toBytes = assertThrows(ProtoException.class, () -> ProtoVia.toBytes(c));
+        assertTrue(toBytes.getMessage().contains("unexpected type"));
+        ProtoException size = assertThrows(ProtoException.class, () -> ProtoVia.sizeOf(c));
+        assertTrue(size.getMessage().contains("unexpected type"));
+    }
+
+    @Test
     void oneofEmptyEmailIsWritten() {
         Contact c = new Contact();
         c.target = new Email("");

@@ -176,6 +176,50 @@ class OfficialInteropTest {
     }
 
     @Test
+    void aliasOneofInteropsWithDynamicMessageAtNumbersOneAndTwo() throws Exception {
+        DescriptorProtos.DescriptorProto address = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("Address")
+            .addField(field("city", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+            .addField(field("street", 2, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+            .build();
+        DescriptorProtos.DescriptorProto alias = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("Alias")
+            .addOneofDecl(DescriptorProtos.OneofDescriptorProto.newBuilder().setName("target"))
+            .addField(field("email", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING)
+                .setOneofIndex(0))
+            .addField(field("address", 2, DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
+                .setTypeName(".Address")
+                .setOneofIndex(0))
+            .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+            DescriptorProtos.FileDescriptorProto.newBuilder()
+                .setName("alias.proto")
+                .setSyntax("proto3")
+                .addMessageType(address)
+                .addMessageType(alias)
+                .build(),
+            new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("Alias");
+        Descriptors.Descriptor addrDesc = fd.findMessageTypeByName("Address");
+
+        Alias sent = new Alias();
+        sent.target = new Email("ada@example.com");
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(sent));
+        assertEquals("ada@example.com", parsed.getField(desc.findFieldByName("email")));
+        assertFalse(parsed.hasField(desc.findFieldByName("address")));
+
+        DynamicMessage official = DynamicMessage.newBuilder(desc)
+            .setField(desc.findFieldByName("address"),
+                DynamicMessage.newBuilder(addrDesc)
+                    .setField(addrDesc.findFieldByName("city"), "Paris")
+                    .setField(addrDesc.findFieldByName("street"), "Rue")
+                    .build())
+            .build();
+        Alias back = ProtoVia.fromBytes(Alias.class, official.toByteArray());
+        assertEquals(new Home(new Address("Paris", "Rue")), back.target);
+    }
+
+    @Test
     void genericOneofInteropsWithDynamicMessage() throws Exception {
         DescriptorProtos.DescriptorProto address = DescriptorProtos.DescriptorProto.newBuilder()
             .setName("Address")

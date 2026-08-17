@@ -16,5 +16,23 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-public interface Target {
+import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import io.github.rawvoid.protovia.annotation.ProtoOneof;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@ProtoMessage
+public class Alias {
+
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 1, of = Email.class),
+        @ProtoOneof.Case(number = 2, of = Home.class)
+    })
+    public Target target;
 }
