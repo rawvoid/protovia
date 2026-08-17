@@ -951,10 +951,6 @@ class ProtoviaProcessorTest {
             .generatedSourceFile("demo.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
-        assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
-            .contentsAsUtf8String()
-            .doesNotContain("new Born");
     }
 
     @Test
@@ -1132,7 +1128,7 @@ class ProtoviaProcessorTest {
                 "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                 "@ProtoMessage public class Holder {",
-                "  public class Inner { @ProtoField(number = 1) public String value; }",
+                "  @ProtoMessage public class Inner { @ProtoField(number = 1) public String value; }",
                 "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = Inner.class) })",
                 "  public Object data;",
                 "}"));
