@@ -28,7 +28,10 @@ public class PickerEnvelope {
     @ProtoField(number = 1)
     public String name;
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = Picker.StatusPick.class),
+        @ProtoOneof.Case(number = 11, of = Picker.NamePick.class)
+    })
     public Picker.Choice choice;
 
     @ProtoUnknown

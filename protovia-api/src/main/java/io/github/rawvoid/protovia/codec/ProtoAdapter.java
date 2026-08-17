@@ -43,7 +43,7 @@ public interface ProtoAdapter<J, W> {
     J fromWire(W wire);
 
     /**
-     * Annotation default for {@code @ProtoField.adapter} / {@code @ProtoOneofCase.adapter}.
+     * Annotation default for {@code @ProtoField.adapter} / {@code @ProtoOneof.Case.adapter}.
      * Not a real adapter.
      */
     interface Unset extends ProtoAdapter<Void, Void> {}

@@ -23,7 +23,7 @@ import lombok.Getter;
 import javax.lang.model.element.TypeElement;
 
 /**
- * One permitted subtype of a {@code @ProtoOneof} sealed type.
+ * One {@code @ProtoOneof.Case} of a parent message.
  *
  * @author Rawvoid
  */
@@ -33,6 +33,9 @@ import javax.lang.model.element.TypeElement;
 public final class OneofCaseModel {
 
     public final int number;
+    /**
+     * Case Java type, or {@code null} for a naked {@code byte[]} case.
+     */
     public final TypeElement type;
     public final String typeName;
     public final String tagConstant;

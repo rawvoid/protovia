@@ -18,7 +18,6 @@ package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
-import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
@@ -26,11 +25,13 @@ import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.wire.WireType;
 
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.IntersectionType;
 import javax.lang.model.type.TypeKind;
@@ -42,7 +43,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Resolves a {@code @ProtoOneof} sealed type and its {@code @ProtoOneofCase}s.
+ * Resolves a field-level {@code @ProtoOneof} and its {@code @ProtoOneof.Case}s.
  */
 final class OneofParser {
 
@@ -62,54 +63,53 @@ final class OneofParser {
         Element origin,
         String name,
         TypeMirror type,
+        AnnotationMirror protoOneof,
         AccessKind accessKind,
         String readExpr,
         String setter,
         String fieldName,
         String pkg,
         Set<Integer> taken) {
-        TypeMirror oneofType = resolveSealedType(origin, name, type);
-        if (oneofType == null) {
+        AnnotationMirror oneofAnn = protoOneof != null
+            ? protoOneof
+            : adapters.findAnnotation(origin, AdapterResolver.PROTO_ONEOF_ANN);
+        AnnotationValue rawValue = oneofAnn == null ? null : adapters.annotationMember(oneofAnn, "value");
+        if (oneofAnn == null || rawValue == null || !(rawValue.getValue() instanceof List<?> items)) {
+            diag.error(origin, "oneof '" + name + "' has an unreadable @ProtoOneof value");
             return null;
         }
-        TypeElement sealed = env.asTypeElement(oneofType);
-        if (sealed == null) {
-            diag.error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
-            return null;
+
+        boolean carrierOk = isNonContainerReference(type);
+        if (!carrierOk) {
+            diag.error(origin, "@ProtoOneof field '" + name
+                + "' must be a reference type (not primitive, array, List, Set, Collection, Map, or Optional)");
         }
-        List<? extends TypeMirror> permitted = sealed.getPermittedSubclasses();
-        if (permitted.size() < 2) {
-            diag.error(origin, "oneof '" + name + "' must have at least two @ProtoOneofCase types");
-            return null;
+
+        if (items.isEmpty()) {
+            diag.error(origin, "oneof '" + name + "' must declare at least one @ProtoOneof.Case");
         }
-        List<OneofCaseModel> cases = new ArrayList<>();
-        for (TypeMirror permittedType : permitted) {
-            TypeElement caseType = env.asTypeElement(permittedType);
-            if (caseType == null) {
-                diag.error(origin, "oneof '" + name + "' has an unresolved permitted type");
-                continue;
+
+        List<ParsedCase> parsed = new ArrayList<>();
+        for (Object item : items) {
+            AnnotationMirror caseMirror = caseMirror(item);
+            if (caseMirror == null) {
+                diag.error(origin, "oneof '" + name + "' has an unreadable @ProtoOneof value");
+                return null;
             }
-            ProtoOneofCase caseAnn = caseType.getAnnotation(ProtoOneofCase.class);
-            if (caseAnn == null) {
-                diag.error(caseType, caseType.getSimpleName() + " must be annotated with @ProtoOneofCase");
-                continue;
-            }
-            int number = caseAnn.value();
-            if (!WireType.isValidFieldNumber(number)) {
-                diag.error(caseType, "invalid field number " + number);
-                continue;
-            }
-            if (!taken.add(number)) {
-                diag.error(caseType, "duplicate field number " + number);
-                continue;
-            }
-            OneofCaseModel parsed = parseCase(caseType, number, pkg);
-            if (parsed != null) {
-                cases.add(parsed);
+            ParsedCase parsedCase = parseCase(origin, name, type, caseMirror, pkg, taken, carrierOk);
+            if (parsedCase != null) {
+                parsed.add(parsedCase);
             }
         }
-        if (cases.size() < 2) {
+
+        if (!carrierOk || parsed.isEmpty() || overlapping(origin, parsed)) {
             return null;
+        }
+
+        TypeMirror erased = env.types.erasure(type);
+        List<OneofCaseModel> cases = new ArrayList<>(parsed.size());
+        for (ParsedCase parsedCase : parsed) {
+            cases.add(parsedCase.model);
         }
         return FieldModel.builder()
             .number(0)
@@ -120,111 +120,160 @@ final class OneofParser {
             .readExpr(readExpr)
             .setterName(setter)
             .fieldName(fieldName)
-            .javaTypeName(env.renderType(oneofType, pkg))
-            .javaType(oneofType)
+            .javaTypeName(env.renderType(erased, pkg))
+            .javaType(erased)
             .oneofCases(cases)
             .origin(origin)
             .build();
     }
 
-    /**
-     * Resolves a {@code @ProtoOneof} Java type to its sealed bound.
-     * A type variable is treated as that bound so generic wrappers can reuse
-     * the permitted {@code @ProtoOneofCase} types.
-     */
-    private TypeMirror resolveSealedType(Element origin, String name, TypeMirror type) {
-        List<TypeMirror> sealed = new ArrayList<>();
-        collectSealedBounds(type, sealed, new HashSet<>());
-        if (sealed.size() > 1) {
-            diag.error(origin, "@ProtoOneof field '" + name + "' type variable has more than one sealed bound");
+    private ParsedCase parseCase(
+        Element origin,
+        String fieldName,
+        TypeMirror fieldType,
+        AnnotationMirror caseMirror,
+        String pkg,
+        Set<Integer> taken,
+        boolean checkAssignability) {
+        TypeMirror ofType = ofType(caseMirror, origin);
+        if (ofType == null) {
             return null;
         }
-        if (sealed.isEmpty()) {
-            if (type.getKind() == TypeKind.TYPEVAR) {
-                diag.error(origin, "@ProtoOneof field '" + name
-                    + "' type variable must be bounded by a sealed interface or class");
-            } else {
-                diag.error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
+        TypeKind kind = ofType.getKind();
+        if (kind.isPrimitive()) {
+            diag.error(origin, "oneof case of() must be a reference type (use Integer for int32)");
+            return null;
+        }
+        if (kind == TypeKind.TYPEVAR || kind == TypeKind.WILDCARD) {
+            diag.error(origin, "oneof case of() must be a class or interface type");
+            return null;
+        }
+        if (kind == TypeKind.ARRAY) {
+            if (!isByteArray(ofType)) {
+                diag.error(origin, "oneof case cannot be repeated or map");
+                return null;
             }
+        }
+        TypeElement caseType = env.asTypeElement(ofType);
+        if (kind == TypeKind.DECLARED && caseType != null && !caseType.getTypeParameters().isEmpty()) {
+            diag.error(origin, "oneof case " + caseType.getSimpleName() + " cannot declare type parameters");
             return null;
         }
-        return sealed.get(0);
+        if (caseType != null && !env.isAccessibleFromCodec(caseType, pkg)) {
+            diag.error(origin, "oneof case " + caseType.getSimpleName() + " is not accessible from " + pkg);
+            return null;
+        }
+
+        ProtoType declared = protoType(caseMirror);
+        TypeElement fieldAdapter = adapters.adapterFrom(caseMirror, origin);
+        OneofCaseModel model = shape(
+            origin, fieldName, ofType, caseType, declared, fieldAdapter, pkg);
+        if (model == null) {
+            return null;
+        }
+
+        int number = number(caseMirror);
+        if (!WireType.isValidFieldNumber(number)) {
+            diag.error(origin, "invalid field number " + number);
+            return null;
+        }
+        if (checkAssignability && !assignable(origin, ofType, caseType, fieldType)) {
+            return null;
+        }
+        if (!taken.add(number)) {
+            diag.error(origin, "duplicate field number " + number);
+            return null;
+        }
+        return new ParsedCase(model.toBuilder().number(number).tagConstant(Names.tagConstant(number)).build(), ofType);
     }
 
-    private void collectSealedBounds(TypeMirror type, List<TypeMirror> sealed, Set<Element> seen) {
-        if (type == null) {
-            return;
+    private OneofCaseModel shape(
+        Element origin,
+        String fieldName,
+        TypeMirror ofType,
+        TypeElement caseType,
+        ProtoType declared,
+        TypeElement fieldAdapter,
+        String pkg) {
+        if (caseType != null && caseType.getKind() == ElementKind.RECORD) {
+            return recordShape(origin, fieldName, ofType, caseType, declared, fieldAdapter, pkg);
         }
-        TypeKind kind = type.getKind();
-        if (kind == TypeKind.TYPEVAR) {
-            Element element = env.types.asElement(type);
-            if (element != null && !seen.add(element)) {
-                return;
+        if (caseType != null && caseType.getAnnotation(ProtoMessage.class) != null) {
+            if (!rejectNonScalarOverrides(origin, declared, fieldAdapter)) {
+                return null;
             }
-            collectSealedBounds(((TypeVariable) type).getUpperBound(), sealed, seen);
-            return;
+            return selfMessage(caseType, pkg);
         }
-        if (kind == TypeKind.INTERSECTION) {
-            for (TypeMirror bound : ((IntersectionType) type).getBounds()) {
-                collectSealedBounds(bound, sealed, seen);
-            }
-            return;
-        }
-        TypeElement declared = env.asTypeElement(type);
-        if (declared != null && declared.getModifiers().contains(Modifier.SEALED)) {
-            sealed.add(type);
-        }
-    }
-
-    private OneofCaseModel parseCase(TypeElement caseType, int number, String pkg) {
-        String typeName = Names.typeName(caseType, pkg);
-        String tag = Names.tagConstant(number);
-        TypeElement fieldAdapter = adapters.adapterFrom(caseType, AdapterResolver.PROTO_ONEOF_CASE_ANN);
-        if (caseType.getAnnotation(ProtoMessage.class) != null) {
-            adapters.rejectOneofAdapter(caseType, fieldAdapter);
-            String codec = Names.codecSimpleName(env.elements, caseType);
-            String codecPkg = Names.packageName(caseType);
-            if (!codecPkg.equals(pkg) && !codecPkg.isEmpty()) {
-                codec = codecPkg + "." + codec;
-            }
-            FieldModel payload = FieldModel.builder()
-                .kind(FieldKind.MESSAGE)
-                .protoType(ProtoType.MESSAGE)
-                .codecName(codec)
-                .messageType(caseType)
-                .javaTypeName(typeName)
-                .javaType(caseType.asType())
-                .build();
-            return new OneofCaseModel(number, caseType, typeName, tag, payload, null, true);
-        }
-        if (caseType.getKind() != ElementKind.RECORD) {
-            diag.error(caseType, "@ProtoOneofCase " + caseType.getSimpleName()
-                + " must be a record with 0 or 1 component, or a @ProtoMessage");
+        if (env.isMap(ofType) || env.isOptional(ofType)
+            || (env.isRepeatedContainer(ofType) && !isByteArray(ofType))
+            || !looksLikeSingular(ofType, fieldAdapter)) {
+            diag.error(origin, shapeMessage(caseType, ofType));
             return null;
         }
+        FieldModel payload = resolvePayload(origin, fieldName, ofType, caseType, declared, fieldAdapter, pkg);
+        if (payload == null) {
+            return null;
+        }
+        boolean message = payload.kind == FieldKind.MESSAGE;
+        return new OneofCaseModel(
+            0, caseType, typeName(caseType, ofType, pkg), null, payload, null, message);
+    }
+
+    private OneofCaseModel recordShape(
+        Element origin,
+        String fieldName,
+        TypeMirror ofType,
+        TypeElement caseType,
+        ProtoType declared,
+        TypeElement fieldAdapter,
+        String pkg) {
         List<? extends RecordComponentElement> components = caseType.getRecordComponents();
         if (components.isEmpty()) {
-            adapters.rejectOneofAdapter(caseType, fieldAdapter);
-            return new OneofCaseModel(number, caseType, typeName, tag, null, null, false);
+            if (!rejectNonScalarOverrides(origin, declared, fieldAdapter)) {
+                return null;
+            }
+            return new OneofCaseModel(0, caseType, Names.typeName(caseType, pkg), null, null, null, false);
         }
         if (components.size() != 1) {
-            diag.error(caseType, "@ProtoOneofCase record " + caseType.getSimpleName()
-                + " must have 0 or 1 component");
+            diag.error(origin, "oneof case record " + caseType.getSimpleName() + " must have 0 or 1 component");
             return null;
         }
         RecordComponentElement component = components.get(0);
         TypeMirror payloadType = component.asType();
-        if (env.isMap(payloadType) || env.isRepeatedContainer(payloadType)
-            && !(payloadType.getKind() == TypeKind.ARRAY
-            && ((ArrayType) payloadType).getComponentType().getKind() == TypeKind.BYTE)) {
-            diag.error(caseType, "oneof case cannot be repeated or map");
+        if (payloadType.getKind() == TypeKind.TYPEVAR || payloadType.getKind() == TypeKind.WILDCARD) {
+            diag.error(origin, "oneof case " + caseType.getSimpleName() + " cannot declare type parameters");
             return null;
         }
-        ProtoOneofCase caseAnn = caseType.getAnnotation(ProtoOneofCase.class);
-        ProtoType declared = caseAnn == null ? ProtoType.AUTO : caseAnn.type();
-        FieldModel payload = fields.resolveSingular(new FieldRequest(
-            caseType,
-            caseType.getSimpleName() + "Payload",
+        if (env.isMap(payloadType) || env.isRepeatedContainer(payloadType) && !isByteArray(payloadType)) {
+            diag.error(origin, "oneof case cannot be repeated or map");
+            return null;
+        }
+        TypeElement payloadElement = env.asTypeElement(payloadType);
+        boolean messagePayload = payloadElement != null && payloadElement.getAnnotation(ProtoMessage.class) != null;
+        if (messagePayload && !rejectNonScalarOverrides(origin, declared, fieldAdapter)) {
+            return null;
+        }
+        FieldModel payload = resolvePayload(
+            origin, fieldName, payloadType, caseType, declared, fieldAdapter, pkg);
+        if (payload == null) {
+            return null;
+        }
+        return new OneofCaseModel(
+            0, caseType, Names.typeName(caseType, pkg), null, payload, component.getSimpleName() + "()", false);
+    }
+
+    private FieldModel resolvePayload(
+        Element origin,
+        String fieldName,
+        TypeMirror payloadType,
+        TypeElement caseType,
+        ProtoType declared,
+        TypeElement fieldAdapter,
+        String pkg) {
+        String payloadName = (caseType != null ? caseType.getSimpleName() : fieldName) + "Payload";
+        return fields.resolveSingular(new FieldRequest(
+            origin,
+            payloadName,
             payloadType,
             declared,
             false,
@@ -237,12 +286,210 @@ final class OneofParser {
             false,
             payloadType,
             fieldAdapter,
-            number,
+            0,
             AdapterSite.ONEOF));
-        if (payload == null) {
+    }
+
+    private OneofCaseModel selfMessage(TypeElement caseType, String pkg) {
+        String typeName = Names.typeName(caseType, pkg);
+        String codec = Names.codecSimpleName(env.elements, caseType);
+        String codecPkg = Names.packageName(caseType);
+        if (!codecPkg.equals(pkg) && !codecPkg.isEmpty()) {
+            codec = codecPkg + "." + codec;
+        }
+        FieldModel payload = FieldModel.builder()
+            .kind(FieldKind.MESSAGE)
+            .protoType(ProtoType.MESSAGE)
+            .codecName(codec)
+            .messageType(caseType)
+            .javaTypeName(typeName)
+            .javaType(caseType.asType())
+            .build();
+        return new OneofCaseModel(0, caseType, typeName, null, payload, null, true);
+    }
+
+    private boolean rejectNonScalarOverrides(Element origin, ProtoType declared, TypeElement fieldAdapter) {
+        boolean ok = true;
+        if (fieldAdapter != null) {
+            diag.error(origin, "@ProtoOneof.Case without a scalar payload cannot declare adapter");
+            ok = false;
+        }
+        if (declared != ProtoType.AUTO) {
+            diag.error(origin, "@ProtoOneof.Case without a scalar payload cannot declare type");
+            ok = false;
+        }
+        return ok;
+    }
+
+    private boolean assignable(Element origin, TypeMirror ofType, TypeElement caseType, TypeMirror fieldType) {
+        List<TypeMirror> bounds = new ArrayList<>();
+        flatten(fieldType, bounds, new HashSet<>());
+        for (TypeMirror bound : bounds) {
+            if (!env.types.isAssignable(ofType, bound)) {
+                diag.error(origin, "oneof case " + caseName(caseType, ofType)
+                    + " is not assignable to " + env.simpleTypeName(bound));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void flatten(TypeMirror type, List<TypeMirror> out, Set<Element> seen) {
+        if (type == null) {
+            return;
+        }
+        TypeKind kind = type.getKind();
+        if (kind == TypeKind.TYPEVAR) {
+            Element element = env.types.asElement(type);
+            if (element != null && !seen.add(element)) {
+                return;
+            }
+            flatten(((TypeVariable) type).getUpperBound(), out, seen);
+            return;
+        }
+        if (kind == TypeKind.INTERSECTION) {
+            for (TypeMirror bound : ((IntersectionType) type).getBounds()) {
+                flatten(bound, out, seen);
+            }
+            return;
+        }
+        if (env.types.isSameType(env.types.erasure(type), env.types.erasure(env.objectType))) {
+            return;
+        }
+        out.add(type);
+    }
+
+    private boolean overlapping(Element origin, List<ParsedCase> cases) {
+        boolean overlap = false;
+        for (int i = 0; i < cases.size(); i++) {
+            for (int j = i + 1; j < cases.size(); j++) {
+                TypeMirror a = cases.get(i).ofType;
+                TypeMirror b = cases.get(j).ofType;
+                String aName = caseName(cases.get(i).model.type, a);
+                String bName = caseName(cases.get(j).model.type, b);
+                if (env.types.isAssignable(a, b)) {
+                    diag.error(origin, "oneof cases " + aName + " and " + bName
+                        + " overlap: " + bName + " is assignable from " + aName);
+                    overlap = true;
+                } else if (env.types.isAssignable(b, a)) {
+                    diag.error(origin, "oneof cases " + aName + " and " + bName
+                        + " overlap: " + aName + " is assignable from " + bName);
+                    overlap = true;
+                }
+            }
+        }
+        return overlap;
+    }
+
+    private boolean isNonContainerReference(TypeMirror type) {
+        TypeKind kind = type.getKind();
+        if (kind == TypeKind.TYPEVAR) {
+            return true;
+        }
+        if (kind.isPrimitive() || kind == TypeKind.ARRAY) {
+            return false;
+        }
+        return !env.isMap(type) && !env.isRepeatedContainer(type) && !env.isOptional(type);
+    }
+
+    private TypeMirror ofType(AnnotationMirror caseMirror, Element origin) {
+        AnnotationValue value = adapters.annotationMember(caseMirror, "of");
+        if (value == null || !(value.getValue() instanceof TypeMirror type)) {
+            diag.error(origin, "oneof case type cannot be resolved");
             return null;
         }
-        return new OneofCaseModel(
-            number, caseType, typeName, tag, payload, component.getSimpleName() + "()", false);
+        if (type.getKind() == TypeKind.ERROR) {
+            diag.error(origin, "oneof case type " + type + " cannot be resolved");
+            return null;
+        }
+        return type;
+    }
+
+    private static AnnotationMirror caseMirror(Object item) {
+        if (item instanceof AnnotationMirror mirror) {
+            return mirror;
+        }
+        if (item instanceof AnnotationValue value && value.getValue() instanceof AnnotationMirror mirror) {
+            return mirror;
+        }
+        return null;
+    }
+
+    private ProtoType protoType(AnnotationMirror caseMirror) {
+        AnnotationValue value = adapters.annotationMember(caseMirror, "type");
+        if (value == null) {
+            return ProtoType.AUTO;
+        }
+        Object raw = value.getValue();
+        if (raw instanceof VariableElement ve) {
+            return ProtoType.valueOf(ve.getSimpleName().toString());
+        }
+        if (raw instanceof ProtoType type) {
+            return type;
+        }
+        return ProtoType.AUTO;
+    }
+
+    private int number(AnnotationMirror caseMirror) {
+        AnnotationValue value = adapters.annotationMember(caseMirror, "number");
+        if (value != null && value.getValue() instanceof Number n) {
+            return n.intValue();
+        }
+        return 0;
+    }
+
+    private String typeName(TypeElement caseType, TypeMirror ofType, String pkg) {
+        if (caseType != null) {
+            return Names.typeName(caseType, pkg);
+        }
+        return env.renderType(ofType, pkg);
+    }
+
+    private static String caseName(TypeElement caseType, TypeMirror ofType) {
+        if (caseType != null) {
+            return caseType.getSimpleName().toString();
+        }
+        if (ofType.getKind() == TypeKind.ARRAY) {
+            return "byte[]";
+        }
+        return ofType.toString();
+    }
+
+    private String shapeMessage(TypeElement caseType, TypeMirror ofType) {
+        return "oneof case " + caseName(caseType, ofType)
+            + " must be a record, a @ProtoMessage, or a scalar/enum type";
+    }
+
+    private boolean looksLikeSingular(TypeMirror type, TypeElement fieldAdapter) {
+        if (fieldAdapter != null || adapters.findDiscovered(type) != null) {
+            return true;
+        }
+        TypeKind kind = type.getKind();
+        if (kind.isPrimitive()
+            || isByteArray(type)
+            || env.isSame(type, env.stringType)
+            || env.isSame(type, env.integerType)
+            || env.isSame(type, env.longType)
+            || env.isSame(type, env.floatType)
+            || env.isSame(type, env.doubleType)
+            || env.isSame(type, env.booleanType)
+            || env.isAssignable(type, env.byteBufferType)) {
+            return true;
+        }
+        TypeElement element = env.asTypeElement(type);
+        if (element == null) {
+            return false;
+        }
+        return element.getKind() == ElementKind.ENUM
+            || TypeClassifier.WELL_KNOWN_CODECS.containsKey(element.getQualifiedName().toString())
+            || adapters.findAnnotation(element, AdapterResolver.PROTO_ADAPTED_ANN) != null;
+    }
+
+    private static boolean isByteArray(TypeMirror type) {
+        return type.getKind() == TypeKind.ARRAY
+            && ((ArrayType) type).getComponentType().getKind() == TypeKind.BYTE;
+    }
+
+    private record ParsedCase(OneofCaseModel model, TypeMirror ofType) {
     }
 }

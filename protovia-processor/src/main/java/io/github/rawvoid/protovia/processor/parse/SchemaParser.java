@@ -203,6 +203,7 @@ public final class SchemaParser {
             member.origin(),
             member.name(),
             member.type(),
+            member.protoOneofAnn(),
             access.kind(),
             access.readExpr(),
             access.setter(),

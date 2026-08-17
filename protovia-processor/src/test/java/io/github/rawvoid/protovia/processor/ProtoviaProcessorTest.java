@@ -192,8 +192,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Email",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                    "public record Email(String value) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Addr",
                     "package demo;",
@@ -203,8 +202,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Home",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                    "public record Home(Addr address) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Contact",
                     "package demo;",
@@ -213,7 +211,11 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Contact {",
                     "  @ProtoField(number = 1) public String name;",
-                    "  @ProtoOneof public Target target;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public Target target;",
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -242,8 +244,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Email",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                    "public record Email(String value) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Addr",
                     "package demo;",
@@ -253,8 +254,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Home",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                    "public record Home(Addr address) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Contact",
                     "package demo;",
@@ -266,7 +266,11 @@ class ProtoviaProcessorTest {
                     "  private Target target;",
                     "  @ProtoField(number = 1) public String getName() { return name; }",
                     "  public void setName(String name) { this.name = name; }",
-                    "  @ProtoOneof public Target getTarget() { return target; }",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public Target getTarget() { return target; }",
                     "  public void setTarget(Target target) { this.target = target; }",
                     "}"));
         assertThat(compilation).succeeded();
@@ -288,13 +292,11 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Email",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                    "public record Email(String value) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Home",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Home(String city) implements Target {}"),
+                    "public record Home(String city) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Mail",
                     "package demo;",
@@ -303,7 +305,11 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Mail {",
                     "  @ProtoField(number = 1) public String email;",
-                    "  @ProtoOneof public Target target;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public Target target;",
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -328,8 +334,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "other.Email",
                     "package other;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                    "public record Email(String value) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "other.Addr",
                     "package other;",
@@ -339,8 +344,7 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "other.Home",
                     "package other;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                    "public record Home(Addr address) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Contact",
                     "package demo;",
@@ -349,7 +353,11 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Contact {",
                     "  @ProtoField(number = 1) public String name;",
-                    "  @ProtoOneof public other.Target target;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = other.Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = other.Home.class)",
+                    "  })",
+                    "  public other.Target target;",
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -379,20 +387,29 @@ class ProtoviaProcessorTest {
     }
 
     @Test
-    void oneofRejectsNonSealed() {
+    void oneofRejectsUnassignableCases() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(JavaFileObjects.forSourceLines(
-                "demo.Bad",
-                "package demo;",
-                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
-                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
-                "@ProtoMessage public class Bad { @ProtoOneof public String target; }"));
-        assertThat(compilation).hadErrorContaining("sealed");
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.Bad",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Bad {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public String target;",
+                    "}")));
+        assertThat(compilation).hadErrorContaining("is not assignable");
+        org.junit.jupiter.api.Assertions.assertTrue(compilation.errors().stream().noneMatch(d ->
+            d.getSource() != null && d.getSource().getName().contains("Email")));
     }
 
     @Test
-    void oneofAcceptsTypeVariableBoundedBySealed() {
+    void oneofErasesTypeVariableBound() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(withOneofTarget(
@@ -404,7 +421,11 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Box<T extends Target> {",
                     "  @ProtoField(number = 1) public boolean success;",
-                    "  @ProtoOneof public T data;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public T data;",
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -430,7 +451,10 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public record BoxRecord<T extends Target>(",
                     "  @ProtoField(number = 1) boolean success,",
-                    "  @ProtoOneof T data) {}")));
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  }) T data) {}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
             .generatedSourceFile("demo.BoxRecordProtoCodec")
@@ -458,7 +482,11 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Box<T extends Target> {",
                     "  private T data;",
-                    "  @ProtoOneof public T getData() { return data; }",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public T getData() { return data; }",
                     "  public void setData(T data) { this.data = data; }",
                     "}")));
         assertThat(compilation).succeeded();
@@ -476,7 +504,27 @@ class ProtoviaProcessorTest {
     void oneofAcceptsIntersectionBoundWithOneSealed() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Target",
+                    "package demo;",
+                    "public sealed interface Target permits Email, Home {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Email",
+                    "package demo;",
+                    "import java.io.Serializable;",
+                    "public record Email(String value) implements Target, Serializable {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Addr",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Home",
+                    "package demo;",
+                    "import java.io.Serializable;",
+                    "public record Home(Addr address) implements Target, Serializable {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Box",
                     "package demo;",
@@ -484,17 +532,53 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "import java.io.Serializable;",
                     "@ProtoMessage public class Box<T extends Target & Serializable> {",
-                    "  @ProtoOneof public T data;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public T data;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof Email");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain(" T ");
+    }
+
+    @Test
+    void oneofErasesUnboundedTypeVariable() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Box<T> {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Home.class)",
+                    "  })",
+                    "  public T data;",
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
             .generatedSourceFile("demo.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain(" T ");
     }
 
     @Test
-    void oneofRejectsUnboundedTypeVariable() {
+    void oneofEmptyCasesRejected() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(JavaFileObjects.forSourceLines(
@@ -502,61 +586,217 @@ class ProtoviaProcessorTest {
                 "package demo;",
                 "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
-                "@ProtoMessage public class Bad<T> { @ProtoOneof public T data; }"));
-        assertThat(compilation).hadErrorContaining(
-            "type variable must be bounded by a sealed interface or class");
+                "@ProtoMessage public class Bad { @ProtoOneof({}) public Object target; }"));
+        assertThat(compilation).hadErrorContaining("at least one @ProtoOneof.Case");
     }
 
     @Test
-    void oneofRejectsNonSealedTypeVariableBound() {
-        Compilation compilation = javac()
-            .withProcessors(new ProtoviaProcessor())
-            .compile(JavaFileObjects.forSourceLines(
-                "demo.Bad",
-                "package demo;",
-                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
-                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
-                "@ProtoMessage public class Bad<T extends CharSequence> { @ProtoOneof public T data; }"));
-        assertThat(compilation).hadErrorContaining(
-            "type variable must be bounded by a sealed interface or class");
-    }
-
-    @Test
-    void oneofRejectsTypeVariableWithTwoSealedBounds() {
+    void oneofAcceptsSingleWrapperCase() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(
                 JavaFileObjects.forSourceLines(
-                    "demo.Left",
+                    "demo.Email",
                     "package demo;",
-                    "public sealed interface Left permits LeftA, LeftB {}"),
+                    "public record Email(String value) {}"),
                 JavaFileObjects.forSourceLines(
-                    "demo.LeftA",
-                    "package demo;",
-                    "public record LeftA() implements Left {}"),
-                JavaFileObjects.forSourceLines(
-                    "demo.LeftB",
-                    "package demo;",
-                    "public record LeftB() implements Left {}"),
-                JavaFileObjects.forSourceLines(
-                    "demo.Right",
-                    "package demo;",
-                    "public sealed interface Right permits RightA, RightB {}"),
-                JavaFileObjects.forSourceLines(
-                    "demo.RightA",
-                    "package demo;",
-                    "public record RightA() implements Right {}"),
-                JavaFileObjects.forSourceLines(
-                    "demo.RightB",
-                    "package demo;",
-                    "public record RightB() implements Right {}"),
-                JavaFileObjects.forSourceLines(
-                    "demo.Bad",
+                    "demo.Holder",
                     "package demo;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
-                    "@ProtoMessage public class Bad<T extends Left & Right> { @ProtoOneof public T data; }"));
-        assertThat(compilation).hadErrorContaining("more than one sealed bound");
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = Email.class) })",
+                    "  public Email target;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof Email");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("unexpected type");
+    }
+
+    @Test
+    void oneofAcceptsNakedStringCase() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Holder",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage public class Holder {",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) })",
+                "  public Object data;",
+                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof String");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("readString()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeStringNoTag(_c)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("new String(");
+    }
+
+    @Test
+    void oneofRejectsOverlappingCases() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Animal",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class Animal { @ProtoField(number = 1) public String name; }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Dog",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class Dog extends Animal { @ProtoField(number = 2) public int age; }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Animal.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Dog.class)",
+                    "  })",
+                    "  public Animal target;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("overlap");
+    }
+
+    @Test
+    void oneofRejectsDuplicateOf() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Holder",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage public class Holder {",
+                "  @ProtoOneof({",
+                "    @ProtoOneof.Case(number = 10, of = String.class),",
+                "    @ProtoOneof.Case(number = 11, of = String.class)",
+                "  })",
+                "  public Object data;",
+                "}"));
+        assertThat(compilation).hadErrorContaining("overlap");
+    }
+
+    @Test
+    void oneofCaseNumberCollidesWithField() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Email",
+                    "package demo;",
+                    "public record Email(String value) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoField(number = 10) public String name;",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = Email.class) })",
+                    "  public Email target;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("duplicate field number");
+    }
+
+    @Test
+    void oneofRejectsContainerFieldTypes() {
+        String message = "must be a reference type (not primitive, array, List, Set, Collection, Map, or Optional)";
+        assertThat(compileOneofOn("java.util.List<String> target")).hadErrorContaining(message);
+        assertThat(compileOneofOn("java.util.Set<String> target")).hadErrorContaining(message);
+        assertThat(compileOneofOn("int target")).hadErrorContaining(message);
+        assertThat(compileOneofOn("java.util.Optional<String> target")).hadErrorContaining(message);
+        assertThat(compileOneofOn("String[] target")).hadErrorContaining(message);
+    }
+
+    @Test
+    void oneofEmptyRecordCannotDeclareType() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Empty",
+                    "package demo;",
+                    "public record Empty() {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "public record Label(String s) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Empty.class, type = ProtoType.SINT32),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Object event;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("cannot declare type");
+    }
+
+    @Test
+    void oneofMessageWrapperCannotDeclareAdapter() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Addr",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Home",
+                    "package demo;",
+                    "public record Home(Addr address) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Label",
+                    "package demo;",
+                    "public record Label(String s) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Holder {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Home.class, adapter = LocalDateEpochDay.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Object target;",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("cannot declare adapter");
     }
 
     @Test
@@ -934,24 +1174,25 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Empty",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
                     "public record Empty() implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Label",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                    "public record Label(String s) implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Holder",
                     "package demo;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Holder {",
-                    "  @ProtoOneof public Event event;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Empty.class, adapter = LocalDateEpochDay.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Event event;",
                     "}"));
         assertThat(compilation).hadErrorContaining(
-            "@ProtoOneofCase without a scalar payload cannot declare adapter");
+            "@ProtoOneof.Case without a scalar payload cannot declare adapter");
     }
 
     @Test
@@ -969,25 +1210,28 @@ class ProtoviaProcessorTest {
                     "package demo;",
                     "import io.github.rawvoid.protovia.annotation.ProtoField;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
                     "@ProtoMessage",
-                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
-                    "public record Addr(@ProtoField(number = 1) String city) implements Target {}"),
+                    "public class Addr implements Target {",
+                    "  @ProtoField(number = 1) public String city;",
+                    "}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Label",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Label(String s) implements Target {}"),
+                    "public record Label(String s) implements Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Holder",
                     "package demo;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Holder {",
-                    "  @ProtoOneof public Target target;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Addr.class, adapter = LocalDateEpochDay.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Target target;",
                     "}"));
         assertThat(compilation).hadErrorContaining(
-            "@ProtoOneofCase without a scalar payload cannot declare adapter");
+            "@ProtoOneof.Case without a scalar payload cannot declare adapter");
     }
 
     @Test
@@ -1249,22 +1493,23 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Count",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.ProtoType;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(value = 10, type = ProtoType.SINT32)",
                     "public record Count(int n) implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Label",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                    "public record Label(String s) implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Holder",
                     "package demo;",
+                    "import io.github.rawvoid.protovia.ProtoType;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Holder {",
-                    "  @ProtoOneof public Event event;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Count.class, type = ProtoType.SINT32),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Event event;",
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -1400,22 +1645,23 @@ class ProtoviaProcessorTest {
                 JavaFileObjects.forSourceLines(
                     "demo.Born",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
                     "import java.time.LocalDate;",
-                    "@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)",
                     "public record Born(LocalDate d) implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Label",
                     "package demo;",
-                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                    "@ProtoOneofCase(11) public record Label(String s) implements Event {}"),
+                    "public record Label(String s) implements Event {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Holder",
                     "package demo;",
                     "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Holder {",
-                    "  @ProtoOneof public Event event;",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Born.class, adapter = LocalDateEpochDay.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Label.class)",
+                    "  })",
+                    "  public Event event;",
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
@@ -1902,8 +2148,7 @@ class ProtoviaProcessorTest {
             JavaFileObjects.forSourceLines(
                 "demo.Email",
                 "package demo;",
-                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+                "public record Email(String value) implements Target {}"),
             JavaFileObjects.forSourceLines(
                 "demo.Addr",
                 "package demo;",
@@ -1913,9 +2158,22 @@ class ProtoviaProcessorTest {
             JavaFileObjects.forSourceLines(
                 "demo.Home",
                 "package demo;",
-                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
-                "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+                "public record Home(Addr address) implements Target {}"),
             extra);
+    }
+
+    private static Compilation compileOneofOn(String fieldDecl) {
+        return javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Bad",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage public class Bad {",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) })",
+                "  public " + fieldDecl + ";",
+                "}"));
     }
 
     private static javax.tools.JavaFileObject localDateAdapter() {

@@ -17,11 +17,12 @@
 package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.annotation.ProtoField;
-import io.github.rawvoid.protovia.annotation.ProtoOneof;
 import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.Names;
 
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -79,8 +80,21 @@ final class MemberScanner {
             ExecutableElement accessor = component.getAccessor();
             boolean unknown = component.getAnnotation(ProtoUnknown.class) != null
                 || (accessor != null && accessor.getAnnotation(ProtoUnknown.class) != null);
-            boolean oneof = component.getAnnotation(ProtoOneof.class) != null
-                || (accessor != null && accessor.getAnnotation(ProtoOneof.class) != null);
+            AnnotationMirror oneofOnComponent = protoOneofMirror(component);
+            AnnotationMirror oneofOnAccessor = protoOneofMirror(accessor);
+            AnnotationMirror protoOneofAnn = null;
+            boolean oneof = false;
+            if (oneofOnComponent != null && oneofOnAccessor != null
+                && !oneofOnComponent.toString().equals(oneofOnAccessor.toString())) {
+                diag.error(component,
+                    "do not annotate both the record component and its accessor with @ProtoOneof");
+            } else if (oneofOnComponent != null) {
+                protoOneofAnn = oneofOnComponent;
+                oneof = true;
+            } else if (oneofOnAccessor != null) {
+                protoOneofAnn = oneofOnAccessor;
+                oneof = true;
+            }
             ProtoField fieldOnComponent = component.getAnnotation(ProtoField.class);
             ProtoField field = fieldOnComponent;
             if (field == null && accessor != null) {
@@ -97,7 +111,8 @@ final class MemberScanner {
                 unknown,
                 oneof,
                 fieldOnComponent != null,
-                field));
+                field,
+                protoOneofAnn));
         }
         return members;
     }
@@ -122,7 +137,8 @@ final class MemberScanner {
         List<Member> members = new ArrayList<>();
         for (VariableElement field : fields.values()) {
             boolean unknown = field.getAnnotation(ProtoUnknown.class) != null;
-            boolean oneof = field.getAnnotation(ProtoOneof.class) != null;
+            AnnotationMirror protoOneofAnn = protoOneofMirror(field);
+            boolean oneof = protoOneofAnn != null;
             ProtoField protoField = field.getAnnotation(ProtoField.class);
             if (!unknown && !oneof && protoField == null) {
                 continue;
@@ -131,16 +147,17 @@ final class MemberScanner {
             Access access = resolvePojoAccess(field, name, field.asType(), methods);
             members.add(new Member(
                 field, name, field.asType(), access, false,
-                unknown, oneof, protoField != null, protoField));
+                unknown, oneof, protoField != null, protoField, protoOneofAnn));
         }
         for (ExecutableElement method : methods.values()) {
             boolean unknown = method.getAnnotation(ProtoUnknown.class) != null;
-            boolean oneof = method.getAnnotation(ProtoOneof.class) != null;
+            AnnotationMirror protoOneofAnn = protoOneofMirror(method);
+            boolean oneof = protoOneofAnn != null;
             ProtoField protoField = method.getAnnotation(ProtoField.class);
             if (!unknown && !oneof && protoField == null) {
                 continue;
             }
-            Member member = pojoMethodMember(method, unknown, oneof, protoField);
+            Member member = pojoMethodMember(method, unknown, oneof, protoField, protoOneofAnn);
             if (member != null) {
                 members.add(member);
             }
@@ -156,11 +173,26 @@ final class MemberScanner {
         ExecutableElement method,
         boolean unknown,
         boolean oneof,
-        ProtoField protoField) {
+        ProtoField protoField,
+        AnnotationMirror protoOneofAnn) {
         String property = Names.propertyFromGetter(method.getSimpleName().toString());
         return new Member(
             method, property, method.getReturnType(), null, false,
-            unknown, oneof, protoField != null, protoField);
+            unknown, oneof, protoField != null, protoField, protoOneofAnn);
+    }
+
+    private static AnnotationMirror protoOneofMirror(Element element) {
+        if (element == null) {
+            return null;
+        }
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            Element annotation = mirror.getAnnotationType().asElement();
+            if (annotation instanceof TypeElement type
+                && type.getQualifiedName().contentEquals(AdapterResolver.PROTO_ONEOF_ANN)) {
+                return mirror;
+            }
+        }
+        return null;
     }
 
     Access getterSetter(ExecutableElement method, String property, Map<String, ExecutableElement> methods) {

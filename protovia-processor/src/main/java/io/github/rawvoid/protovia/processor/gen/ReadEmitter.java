@@ -230,7 +230,11 @@ final class ReadEmitter {
                 if (c.payload.adapterType != null) {
                     read = fromWire(c.payload, read);
                 }
-                store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
+                if (c.accessor == null) {
+                    store(b, field, record, read);
+                } else {
+                    store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
+                }
             }
             b.endControlFlow();
         }
@@ -241,7 +245,9 @@ final class ReadEmitter {
         EnumModel enums = c.payload.enumModel;
         b.addStatement("int _n = reader.readEnum()");
         b.addStatement("$T _e = $L(_n)", enumType(enums), enumFrom(enums));
-        CodeBlock constructed = CodeBlock.of("new $T(_e)", oneofCaseType(c));
+        CodeBlock constructed = c.accessor == null
+            ? CodeBlock.of("_e")
+            : CodeBlock.of("new $T(_e)", oneofCaseType(c));
         if (enums.unrecognized != null) {
             b.beginControlFlow("if (_e == $L)", enumConstant(enums, enums.unrecognized));
             mergeUnknownVarint(b, model, c.tagConstant);

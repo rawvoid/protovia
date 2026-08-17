@@ -34,6 +34,9 @@ public class Contact {
     @ProtoField(number = 1)
     public String name;
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = Email.class),
+        @ProtoOneof.Case(number = 11, of = Home.class)
+    })
     public Target target;
 }

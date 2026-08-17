@@ -18,6 +18,7 @@ package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.annotation.ProtoField;
 
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.TypeMirror;
@@ -28,6 +29,7 @@ import javax.lang.model.type.TypeMirror;
  * @param access           {@code null} when access could not be resolved (error already reported)
  * @param fieldOnSameElement {@code @ProtoField} on the same element as unknown/oneof (for combine checks)
  * @param protoField       effective {@code @ProtoField}, including a record accessor
+ * @param protoOneofAnn    effective {@code @ProtoOneof} mirror, or {@code null} when not bound
  */
 record Member(
     Element origin,
@@ -38,7 +40,8 @@ record Member(
     boolean protoUnknown,
     boolean protoOneof,
     boolean fieldOnSameElement,
-    ProtoField protoField) {
+    ProtoField protoField,
+    AnnotationMirror protoOneofAnn) {
 
     boolean fromField() {
         return origin.getKind() == ElementKind.FIELD;

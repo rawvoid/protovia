@@ -59,7 +59,10 @@ final class GenTypes {
         return ClassName.get(model.type);
     }
 
-    static ClassName oneofCaseType(OneofCaseModel c) {
+    static TypeName oneofCaseType(OneofCaseModel c) {
+        if (c.type == null) {
+            return TypeName.get(c.payload.javaType);
+        }
         return ClassName.get(c.type);
     }
 

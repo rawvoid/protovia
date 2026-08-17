@@ -19,7 +19,6 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
 
 @ProtoMessage
 public class Picker {
@@ -27,17 +26,18 @@ public class Picker {
     @ProtoField(number = 1)
     public String name;
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = StatusPick.class),
+        @ProtoOneof.Case(number = 11, of = NamePick.class)
+    })
     public Choice choice;
 
     public sealed interface Choice permits StatusPick, NamePick {
     }
 
-    @ProtoOneofCase(10)
     public record StatusPick(Status value) implements Choice {
     }
 
-    @ProtoOneofCase(11)
     public record NamePick(String value) implements Choice {
     }
 }
