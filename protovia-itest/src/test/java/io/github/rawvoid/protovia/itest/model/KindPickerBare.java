@@ -22,6 +22,9 @@ import io.github.rawvoid.protovia.annotation.ProtoOneof;
 @ProtoMessage
 public class KindPickerBare {
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = KindPicker.KindPick.class),
+        @ProtoOneof.Case(number = 11, of = KindPicker.KindLabel.class)
+    })
     public KindPicker.Choice choice;
 }

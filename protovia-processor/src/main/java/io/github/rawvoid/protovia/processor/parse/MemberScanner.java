@@ -20,6 +20,8 @@ import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.Names;
 
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -75,6 +77,7 @@ final class MemberScanner {
         for (RecordComponentElement component : type.getRecordComponents()) {
             ExecutableElement accessor = component.getAccessor();
             Roles roles = Roles.of(component).union(Roles.of(accessor));
+            AnnotationMirror protoOneofAnn = resolveRecordOneof(component, accessor);
             ProtoField field = component.getAnnotation(ProtoField.class);
             if (field == null && accessor != null) {
                 field = accessor.getAnnotation(ProtoField.class);
@@ -85,9 +88,23 @@ final class MemberScanner {
                 component.asType(),
                 true,
                 roles,
-                field));
+                field,
+                protoOneofAnn));
         }
         return members;
+    }
+
+    private AnnotationMirror resolveRecordOneof(
+        RecordComponentElement component, ExecutableElement accessor) {
+        AnnotationMirror onComponent = protoOneofMirror(component);
+        AnnotationMirror onAccessor = protoOneofMirror(accessor);
+        if (onComponent != null && onAccessor != null
+            && !onComponent.toString().equals(onAccessor.toString())) {
+            diag.error(component,
+                "do not annotate both the record component and its accessor with @ProtoOneof");
+            return null;
+        }
+        return onComponent != null ? onComponent : onAccessor;
     }
 
     private ScanResult scanPojo(TypeElement type) {
@@ -118,7 +135,8 @@ final class MemberScanner {
                 field.asType(),
                 false,
                 roles,
-                field.getAnnotation(ProtoField.class)));
+                field.getAnnotation(ProtoField.class),
+                protoOneofMirror(field)));
         }
         for (ExecutableElement method : methods.values()) {
             Roles roles = Roles.of(method);
@@ -132,9 +150,24 @@ final class MemberScanner {
                 method.getReturnType(),
                 false,
                 roles,
-                method.getAnnotation(ProtoField.class)));
+                method.getAnnotation(ProtoField.class),
+                protoOneofMirror(method)));
         }
         return new ScanResult(members, methods);
+    }
+
+    private static AnnotationMirror protoOneofMirror(Element element) {
+        if (element == null) {
+            return null;
+        }
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            Element annotation = mirror.getAnnotationType().asElement();
+            if (annotation instanceof TypeElement type
+                && type.getQualifiedName().contentEquals(AdapterResolver.PROTO_ONEOF_ANN)) {
+                return mirror;
+            }
+        }
+        return null;
     }
 
     private Access getterSetter(

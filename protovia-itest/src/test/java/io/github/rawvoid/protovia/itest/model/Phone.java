@@ -16,27 +16,6 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.annotation.ProtoField;
-import io.github.rawvoid.protovia.annotation.ProtoMessage;
-import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-@ProtoMessage
-public class Contact {
-
-    @ProtoField(number = 1)
-    public String name;
-
-    @ProtoOneof({
-        @ProtoOneof.Case(number = 10, of = Email.class),
-        @ProtoOneof.Case(number = 11, of = Home.class)
-    })
-    public Target target;
+/** Assignable to {@link Target} but not listed on any oneof Case. */
+public record Phone(String value) implements Target {
 }

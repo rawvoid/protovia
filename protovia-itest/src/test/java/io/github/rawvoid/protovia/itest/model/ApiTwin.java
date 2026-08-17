@@ -26,6 +26,9 @@ public class ApiTwin {
     @ProtoField(number = 1)
     public boolean success;
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = Email.class),
+        @ProtoOneof.Case(number = 11, of = Home.class)
+    })
     public Target data;
 }

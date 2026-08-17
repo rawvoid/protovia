@@ -18,6 +18,7 @@ package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.annotation.ProtoField;
 
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.type.TypeMirror;
@@ -25,9 +26,10 @@ import javax.lang.model.type.TypeMirror;
 /**
  * One record component, POJO field, or JavaBean getter that may carry proto annotations.
  *
- * @param name       property name; {@code null} when a method is not a JavaBean getter
- * @param roles      union of annotations on the origin and, for records, the accessor
- * @param protoField effective {@code @ProtoField} (component, then accessor)
+ * @param name           property name; {@code null} when a method is not a JavaBean getter
+ * @param roles          union of annotations on the origin and, for records, the accessor
+ * @param protoField     effective {@code @ProtoField} (component, then accessor)
+ * @param protoOneofAnn  effective {@code @ProtoOneof} mirror, or {@code null} when not bound
  */
 record Member(
     Element origin,
@@ -35,7 +37,8 @@ record Member(
     TypeMirror type,
     boolean recordComponent,
     Roles roles,
-    ProtoField protoField) {
+    ProtoField protoField,
+    AnnotationMirror protoOneofAnn) {
 
     boolean fromField() {
         return origin.getKind() == ElementKind.FIELD;

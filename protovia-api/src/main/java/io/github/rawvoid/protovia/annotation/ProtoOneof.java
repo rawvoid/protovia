@@ -16,20 +16,73 @@
 
 package io.github.rawvoid.protovia.annotation;
 
-import java.lang.annotation.*;
+import io.github.rawvoid.protovia.ProtoType;
+import io.github.rawvoid.protovia.codec.ProtoAdapter;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Marks a field, getter, or record component as a proto3 oneof.
- * The Java type must be a {@code sealed} interface (or class) whose permitted
- * subtypes each have {@link ProtoOneofCase}, or a type variable bounded by
- * such a sealed type. The member has no field number.
- * A message-case payload of {@code null} is omitted on the wire and cannot be
- * distinguished from an unset oneof.
+ * Marks a field, JavaBean getter, or record component as a proto3 oneof.
+ * The group itself has no field number; each {@link Case#number()} belongs
+ * to the parent message. {@code sealed} is optional and is not consulted.
  *
- * @author Rawvoid
+ * <pre>{@code
+ * @ProtoOneof({
+ *     @ProtoOneof.Case(number = 10, of = Email.class),
+ *     @ProtoOneof.Case(number = 11, of = Home.class)
+ * })
+ * private Target target;
+ * }</pre>
  */
 @Documented
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.RECORD_COMPONENT})
 @Retention(RetentionPolicy.CLASS)
 public @interface ProtoOneof {
+
+    /**
+     * Cases in declaration order. At least one is required
+     * (proto3 allows a single-field oneof). An empty array is rejected.
+     */
+    Case[] value();
+
+    /**
+     * One parent-message field that this oneof may hold.
+     * Only usable as an element of {@link ProtoOneof#value()}.
+     */
+    @Documented
+    @Retention(RetentionPolicy.CLASS)
+    @Target({})
+    @interface Case {
+
+        /**
+         * Parent-message field number, in {@code [1, 536870911]},
+         * not in {@code [19000, 19999]}. Must be unique in the message.
+         */
+        int number();
+
+        /**
+         * Runtime type stored in the oneof field: a 0- or 1-component record,
+         * a {@link ProtoMessage}, or a naked scalar / enum / {@code byte[]}
+         * (for example {@code String.class}). Duplicate or overlapping
+         * {@code of} types in one oneof are rejected.
+         */
+        Class<?> of();
+
+        /**
+         * Wire type of this case's scalar payload.
+         * {@link ProtoType#AUTO} infers from the Java type or the adapter.
+         */
+        ProtoType type() default ProtoType.AUTO;
+
+        /**
+         * Case-level adapter for a naked scalar or a 1-component scalar record.
+         * {@link ProtoAdapter.Unset} means resolve from
+         * {@link ProtoAdapters} / {@link ProtoAdapted}.
+         */
+        Class<? extends ProtoAdapter<?, ?>> adapter() default ProtoAdapter.Unset.class;
+    }
 }

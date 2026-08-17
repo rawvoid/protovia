@@ -53,7 +53,7 @@ final class AdapterResolver {
     static final String PROTO_ADAPTER = "io.github.rawvoid.protovia.codec.ProtoAdapter";
     static final String PROTO_ADAPTER_UNSET = "io.github.rawvoid.protovia.codec.ProtoAdapter.Unset";
     static final String PROTO_FIELD_ANN = "io.github.rawvoid.protovia.annotation.ProtoField";
-    static final String PROTO_ONEOF_CASE_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneofCase";
+    static final String PROTO_ONEOF_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneof";
     static final String PROTO_ADAPTERS_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapters";
     static final String PROTO_ADAPTED_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapted";
 
@@ -143,18 +143,15 @@ final class AdapterResolver {
             .build();
     }
 
-    void rejectOneofAdapter(Element origin, TypeElement fieldAdapter) {
-        if (fieldAdapter != null) {
-            diag.error(origin, "@ProtoOneofCase without a scalar payload cannot declare adapter");
-        }
+    TypeElement adapterFrom(Element origin, String annotationName) {
+        return adapterFrom(findAnnotation(origin, annotationName), origin);
     }
 
-    TypeElement adapterFrom(Element origin, String annotationName) {
-        AnnotationMirror mirror = findAnnotation(origin, annotationName);
-        if (mirror == null) {
+    TypeElement adapterFrom(AnnotationMirror caseMirror, Element origin) {
+        if (caseMirror == null) {
             return null;
         }
-        TypeElement adapter = typeElementFrom(annotationMember(mirror, "adapter"), origin, "adapter");
+        TypeElement adapter = typeElementFrom(annotationMember(caseMirror, "adapter"), origin, "adapter");
         if (adapter == null) {
             return null;
         }
@@ -334,7 +331,7 @@ final class AdapterResolver {
         return typeElementFrom(annotationMember(mirror, "value"), javaType, "adapter");
     }
 
-    private TypeElement typeElementFrom(AnnotationValue value, Element origin, String what) {
+    TypeElement typeElementFrom(AnnotationValue value, Element origin, String what) {
         if (value == null || !(value.getValue() instanceof TypeMirror type)) {
             return null;
         }
@@ -350,7 +347,7 @@ final class AdapterResolver {
         return element;
     }
 
-    private AnnotationValue annotationMember(AnnotationMirror mirror, String name) {
+    AnnotationValue annotationMember(AnnotationMirror mirror, String name) {
         for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
             : env.elements.getElementValuesWithDefaults(mirror).entrySet()) {
             if (entry.getKey().getSimpleName().contentEquals(name)) {

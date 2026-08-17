@@ -161,6 +161,7 @@ final class WriteEmitter {
     }
 
     private static void oneofCaseWrite(CodeBlock.Builder b, OneofCaseModel c) {
+        String value = c.accessor == null ? "_c" : "_c." + c.accessor;
         if (c.empty()) {
             writeTag(b, c.tagConstant);
             b.addStatement("writer.writeUInt32NoTag(0)");
@@ -168,25 +169,24 @@ final class WriteEmitter {
             writeTag(b, c.tagConstant);
             writeCachedMessage(b, c.payload, "_c", c.tagConstant + "_sz");
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$T _p = _c.$L", javaType(c.payload), c.accessor);
+            b.addStatement("$T _p = $L", javaType(c.payload), value);
             b.beginControlFlow("if (_p != null)");
             writeTag(b, c.tagConstant);
             writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
-            String payload = "_c." + c.accessor;
-            b.beginControlFlow("if ($L)", enumPresent(c.payload, payload));
+            b.beginControlFlow("if ($L)", enumPresent(c.payload, value));
             writeTag(b, c.tagConstant);
-            b.addStatement("writer.writeInt32NoTag($L($L))", enumNumberOf(c.payload.enumModel), payload);
+            b.addStatement("writer.writeInt32NoTag($L($L))", enumNumberOf(c.payload.enumModel), value);
             b.endControlFlow();
         } else if (c.payload.adapterType != null) {
             String w = oneofWireLocal(c);
-            assignToWire(b, c.payload, "_c." + c.accessor, w);
+            assignToWire(b, c.payload, value, w);
             writeTag(b, c.tagConstant);
             b.addStatement("$L", writeNoTag("writer", c.payload, w));
         } else {
             writeTag(b, c.tagConstant);
-            b.addStatement("$L", writeNoTag("writer", c.payload, "_c." + c.accessor));
+            b.addStatement("$L", writeNoTag("writer", c.payload, value));
         }
     }
 

@@ -19,13 +19,15 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.UnknownFields;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
 import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 
 @ProtoMessage
 public class KindPicker {
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = KindPick.class),
+        @ProtoOneof.Case(number = 11, of = KindLabel.class)
+    })
     public Choice choice;
 
     @ProtoUnknown
@@ -34,11 +36,9 @@ public class KindPicker {
     public sealed interface Choice permits KindPick, KindLabel {
     }
 
-    @ProtoOneofCase(10)
     public record KindPick(Kind value) implements Choice {
     }
 
-    @ProtoOneofCase(11)
     public record KindLabel(String value) implements Choice {
     }
 }

@@ -208,6 +208,28 @@ final class TypeEnv {
         return false;
     }
 
+    /**
+     * Whether a sibling top-level codec in {@code parentPkg} can mention {@code type}.
+     */
+    boolean isAccessibleFromCodec(TypeElement type, String parentPkg) {
+        Element current = type;
+        while (current instanceof TypeElement te) {
+            if (te.getModifiers().contains(Modifier.PRIVATE)) {
+                return false;
+            }
+            Element enclosing = te.getEnclosingElement();
+            if (enclosing instanceof TypeElement && !te.getModifiers().contains(Modifier.STATIC)) {
+                return false;
+            }
+            if (!te.getModifiers().contains(Modifier.PUBLIC)
+                && !Names.packageName(te).equals(parentPkg)) {
+                return false;
+            }
+            current = enclosing;
+        }
+        return true;
+    }
+
     boolean isResolvedType(TypeMirror type) {
         TypeKind kind = type.getKind();
         return kind != TypeKind.WILDCARD && kind != TypeKind.TYPEVAR && kind != TypeKind.ERROR;

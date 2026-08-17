@@ -16,7 +16,6 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
 import lombok.AllArgsConstructor;
@@ -29,14 +28,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @ProtoMessage
-public class Contact {
-
-    @ProtoField(number = 1)
-    public String name;
+public class Alias {
 
     @ProtoOneof({
-        @ProtoOneof.Case(number = 10, of = Email.class),
-        @ProtoOneof.Case(number = 11, of = Home.class)
+        @ProtoOneof.Case(number = 1, of = Email.class),
+        @ProtoOneof.Case(number = 2, of = Home.class)
     })
     public Target target;
 }

@@ -26,6 +26,9 @@ public class ApiRS<T extends Target> {
     @ProtoField(number = 1)
     public boolean success;
 
-    @ProtoOneof
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = Email.class),
+        @ProtoOneof.Case(number = 11, of = Home.class)
+    })
     public T data;
 }

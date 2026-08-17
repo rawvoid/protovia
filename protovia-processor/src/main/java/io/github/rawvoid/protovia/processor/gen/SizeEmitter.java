@@ -182,6 +182,7 @@ final class SizeEmitter {
     }
 
     private static void oneofCaseSize(CodeBlock.Builder b, OneofCaseModel c) {
+        String value = c.accessor == null ? "_c" : "_c." + c.accessor;
         if (c.empty()) {
             b.addStatement("size += $T.lengthDelimited($L, 0)", CODED_SIZE, c.number);
         } else if (c.selfMessage) {
@@ -190,7 +191,7 @@ final class SizeEmitter {
             b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
         } else if (c.payload.kind == FieldKind.MESSAGE) {
-            b.addStatement("$T _p = _c.$L", javaType(c.payload), c.accessor);
+            b.addStatement("$T _p = $L", javaType(c.payload), value);
             b.beginControlFlow("if (_p != null)");
             b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
             b.addStatement("int $L_sz = $L.computeSize(_p, cache)", c.tagConstant, codecInstance(c.payload));
@@ -198,17 +199,16 @@ final class SizeEmitter {
             b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
-            String payload = "_c." + c.accessor;
-            b.beginControlFlow("if ($L)", enumPresent(c.payload, payload));
+            b.beginControlFlow("if ($L)", enumPresent(c.payload, value));
             b.addStatement("size += $T.enumValue($L, $L($L))",
-                CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), payload);
+                CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), value);
             b.endControlFlow();
         } else if (c.payload.adapterType != null) {
             String w = oneofWireLocal(c);
-            assignToWire(b, c.payload, "_c." + c.accessor, w);
+            assignToWire(b, c.payload, value, w);
             b.addStatement("size += $L", sizeCall(c.payload, c.number, w));
         } else {
-            b.addStatement("size += $L", sizeCall(c.payload, c.number, "_c." + c.accessor));
+            b.addStatement("size += $L", sizeCall(c.payload, c.number, value));
         }
     }
 }

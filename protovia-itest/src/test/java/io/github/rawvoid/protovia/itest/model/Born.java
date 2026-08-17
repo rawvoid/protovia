@@ -16,11 +16,7 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.LocalDateEpochDay;
-import io.github.rawvoid.protovia.annotation.ProtoOneofCase;
-
 import java.time.LocalDate;
 
-@ProtoOneofCase(value = 10, adapter = LocalDateEpochDay.class)
 public record Born(LocalDate d) implements Life {
 }

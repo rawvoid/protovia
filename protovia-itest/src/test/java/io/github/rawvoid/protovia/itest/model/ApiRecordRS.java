@@ -23,5 +23,8 @@ import io.github.rawvoid.protovia.annotation.ProtoOneof;
 @ProtoMessage
 public record ApiRecordRS<T extends Target>(
     @ProtoField(number = 1) boolean success,
-    @ProtoOneof T data) {
+    @ProtoOneof({
+        @ProtoOneof.Case(number = 10, of = Email.class),
+        @ProtoOneof.Case(number = 11, of = Home.class)
+    }) T data) {
 }
