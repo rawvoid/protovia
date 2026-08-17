@@ -54,7 +54,6 @@ final class AdapterResolver {
     static final String PROTO_ADAPTER_UNSET = "io.github.rawvoid.protovia.codec.ProtoAdapter.Unset";
     static final String PROTO_FIELD_ANN = "io.github.rawvoid.protovia.annotation.ProtoField";
     static final String PROTO_ONEOF_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneof";
-    static final String PROTO_ONEOF_CASE_ANN = "io.github.rawvoid.protovia.annotation.ProtoOneof.Case";
     static final String PROTO_ADAPTERS_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapters";
     static final String PROTO_ADAPTED_ANN = "io.github.rawvoid.protovia.annotation.ProtoAdapted";
 
@@ -142,12 +141,6 @@ final class AdapterResolver {
             .adapterType(adapter.adapterType())
             .wireJavaType(adapter.w())
             .build();
-    }
-
-    void rejectOneofAdapter(Element origin, TypeElement fieldAdapter) {
-        if (fieldAdapter != null) {
-            diag.error(origin, "@ProtoOneof.Case without a scalar payload cannot declare adapter");
-        }
     }
 
     TypeElement adapterFrom(Element origin, String annotationName) {

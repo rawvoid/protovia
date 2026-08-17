@@ -681,6 +681,10 @@ class ProtoviaProcessorTest {
                     "  public Animal target;",
                     "}"));
         assertThat(compilation).hadErrorContaining("overlap");
+        org.junit.jupiter.api.Assertions.assertTrue(compilation.errors().stream().anyMatch(d ->
+            d.getMessage(null).contains("overlap")
+                && d.getSource() != null
+                && d.getSource().getName().contains("Holder")));
     }
 
     @Test
