@@ -16,6 +16,11 @@
 
 package io.github.rawvoid.protovia.processor.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Singular;
+
 import javax.lang.model.element.TypeElement;
 import java.util.List;
 
@@ -24,22 +29,19 @@ import java.util.List;
  *
  * @author Rawvoid
  */
+@Getter
+@Builder(builderClassName = "Builder", toBuilder = true)
+@AllArgsConstructor
 public final class EnumModel {
 
     public final TypeElement type;
     public final String typeName;
+    @Singular
     public final List<Constant> constants;
     /**
      * Java-only sentinel name, or {@code null}.
      */
     public final String unrecognized;
-
-    public EnumModel(TypeElement type, String typeName, List<Constant> constants, String unrecognized) {
-        this.type = type;
-        this.typeName = typeName;
-        this.constants = List.copyOf(constants);
-        this.unrecognized = unrecognized;
-    }
 
     public record Constant(String name, int number) {
     }

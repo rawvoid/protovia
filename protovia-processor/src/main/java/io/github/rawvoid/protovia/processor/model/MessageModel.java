@@ -16,6 +16,11 @@
 
 package io.github.rawvoid.protovia.processor.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Singular;
+
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
@@ -25,6 +30,9 @@ import java.util.List;
  *
  * @author Rawvoid
  */
+@Getter
+@Builder(builderClassName = "Builder", toBuilder = true)
+@AllArgsConstructor
 public final class MessageModel {
 
     public final TypeElement type;
@@ -34,32 +42,11 @@ public final class MessageModel {
     public final String typeName;
     public final String codecSimpleName;
     public final boolean record;
+    @Singular
     public final List<FieldModel> fields;
+    @Singular
     public final List<RecordComponentModel> recordComponents;
     public final UnknownField unknown;
-
-    public MessageModel(
-        TypeElement type,
-        String packageName,
-        String protoPackage,
-        String protoMessageName,
-        String typeName,
-        String codecSimpleName,
-        boolean record,
-        List<FieldModel> fields,
-        List<RecordComponentModel> recordComponents,
-        UnknownField unknown) {
-        this.type = type;
-        this.packageName = packageName;
-        this.protoPackage = protoPackage;
-        this.protoMessageName = protoMessageName;
-        this.typeName = typeName;
-        this.codecSimpleName = codecSimpleName;
-        this.record = record;
-        this.fields = List.copyOf(fields);
-        this.recordComponents = List.copyOf(recordComponents);
-        this.unknown = unknown;
-    }
 
     /**
      * @return {@code package.name} or just {@code name} when the proto package is empty

@@ -16,6 +16,10 @@
 
 package io.github.rawvoid.protovia.processor.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+
 import javax.lang.model.element.TypeElement;
 
 /**
@@ -23,6 +27,9 @@ import javax.lang.model.element.TypeElement;
  *
  * @author Rawvoid
  */
+@Getter
+@Builder(builderClassName = "Builder", toBuilder = true)
+@AllArgsConstructor
 public final class OneofCaseModel {
 
     public final int number;
@@ -38,23 +45,6 @@ public final class OneofCaseModel {
      */
     public final String accessor;
     public final boolean selfMessage;
-
-    public OneofCaseModel(
-        int number,
-        TypeElement type,
-        String typeName,
-        String tagConstant,
-        FieldModel payload,
-        String accessor,
-        boolean selfMessage) {
-        this.number = number;
-        this.type = type;
-        this.typeName = typeName;
-        this.tagConstant = tagConstant;
-        this.payload = payload;
-        this.accessor = accessor;
-        this.selfMessage = selfMessage;
-    }
 
     public boolean empty() {
         return !selfMessage && payload == null;

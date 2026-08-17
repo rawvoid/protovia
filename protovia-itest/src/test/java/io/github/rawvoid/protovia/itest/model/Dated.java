@@ -21,6 +21,10 @@ import io.github.rawvoid.protovia.adapter.UuidString;
 import io.github.rawvoid.protovia.annotation.ProtoAdapters;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,6 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @ProtoMessage
 @ProtoAdapters({LocalDateEpochDay.class, UuidString.class})
 public class Dated {
@@ -39,18 +47,22 @@ public class Dated {
     @ProtoField(number = 3)
     public LocalDate birthDate;
 
+    @Builder.Default
     @ProtoField(number = 4)
     public List<LocalDate> days = new ArrayList<>();
 
+    @Builder.Default
     @ProtoField(number = 5, packed = false)
     public List<LocalDate> unpacked = new ArrayList<>();
 
+    @Builder.Default
     @ProtoField(number = 6)
     public Map<String, LocalDate> dates = new LinkedHashMap<>();
 
     @ProtoField(number = 7)
     public UUID id;
 
+    @Builder.Default
     @ProtoField(number = 8)
     public Map<UUID, LocalDate> byId = new LinkedHashMap<>();
 }

@@ -19,6 +19,7 @@ package io.github.rawvoid.protovia.processor.model;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.*;
 import io.github.rawvoid.protovia.wire.WireType;
+import lombok.AllArgsConstructor;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
@@ -1715,16 +1716,11 @@ public final class SchemaParser {
         ONEOF
     }
 
+    @AllArgsConstructor
     private static final class Access {
         final AccessKind kind;
         final String readExpr;
         final String setter;
-
-        Access(AccessKind kind, String readExpr, String setter) {
-            this.kind = kind;
-            this.readExpr = readExpr;
-            this.setter = setter;
-        }
     }
 
     private static final class Resolved {
@@ -1737,17 +1733,11 @@ public final class SchemaParser {
         String codecName;
     }
 
+    @AllArgsConstructor
     private static final class ResolvedAdapter {
         final TypeElement adapterType;
         final TypeMirror j;
         final TypeMirror w;
         final ProtoType p;
-
-        ResolvedAdapter(TypeElement adapterType, TypeMirror j, TypeMirror w, ProtoType p) {
-            this.adapterType = adapterType;
-            this.j = j;
-            this.w = w;
-            this.p = p;
-        }
     }
 }

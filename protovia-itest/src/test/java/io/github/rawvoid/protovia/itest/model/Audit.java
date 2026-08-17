@@ -19,9 +19,17 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.adapter.InstantEpochMilli;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @ProtoMessage
 public class Audit {
 

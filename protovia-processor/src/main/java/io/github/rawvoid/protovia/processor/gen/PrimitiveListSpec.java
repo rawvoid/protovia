@@ -19,6 +19,9 @@ package io.github.rawvoid.protovia.processor.gen;
 import com.palantir.javapoet.ClassName;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.Accessors;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
 
@@ -27,6 +30,9 @@ import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
  *
  * @author Rawvoid
  */
+@Getter
+@Accessors(fluent = true)
+@RequiredArgsConstructor
 enum PrimitiveListSpec {
     INT("IntArrayList", "addInt", "ensureIntCapacity", "toIntArray", "getInt"),
     LONG("LongArrayList", "addLong", "ensureLongCapacity", "toLongArray", "getLong"),
@@ -39,14 +45,6 @@ enum PrimitiveListSpec {
     private final String ensure;
     private final String toArray;
     private final String get;
-
-    PrimitiveListSpec(String simpleName, String add, String ensure, String toArray, String get) {
-        this.simpleName = simpleName;
-        this.add = add;
-        this.ensure = ensure;
-        this.toArray = toArray;
-        this.get = get;
-    }
 
     static PrimitiveListSpec of(FieldModel field) {
         if (field.primitiveListType() == null) {
@@ -68,21 +66,5 @@ enum PrimitiveListSpec {
 
     ClassName listType() {
         return ClassName.get(PROTO_LISTS.packageName(), simpleName);
-    }
-
-    String add() {
-        return add;
-    }
-
-    String ensure() {
-        return ensure;
-    }
-
-    String toArray() {
-        return toArray;
-    }
-
-    String get() {
-        return get;
     }
 }

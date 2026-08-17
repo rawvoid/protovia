@@ -20,13 +20,22 @@ import io.github.rawvoid.protovia.UnknownFields;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoUnknown;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @ProtoMessage
 public class Flags {
 
+    @Builder.Default
     @ProtoField(number = 1)
     public List<Status> flags = new ArrayList<>();
 
