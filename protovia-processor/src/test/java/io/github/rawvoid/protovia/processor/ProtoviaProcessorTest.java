@@ -74,6 +74,43 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void fieldAndGetterBothAnnotatedFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Dup",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage",
+                "public class Dup {",
+                "  @ProtoField(number = 1) private int age;",
+                "  @ProtoField(number = 1) public int getAge() { return age; }",
+                "}"));
+        assertThat(compilation).hadErrorContaining("already annotated");
+        assertThat(compilation).hadErrorContaining("getter and setter");
+    }
+
+    @Test
+    void oneofOnFieldOccupiesNameEvenIfInvalid() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Bad",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage",
+                "public class Bad {",
+                "  @ProtoOneof public String data;",
+                "  @ProtoField(number = 1) public String getData() { return data; }",
+                "  public void setData(String data) { this.data = data; }",
+                "}"));
+        assertThat(compilation).hadErrorContaining("already annotated");
+    }
+
+    @Test
     void duplicateFieldNumberFails() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
@@ -371,6 +408,55 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void oneofAndUnknownOnSameFieldFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Bad",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                "@ProtoMessage",
+                "public class Bad {",
+                "  @ProtoOneof @ProtoUnknown public String data;",
+                "}"));
+        assertThat(compilation).hadErrorContaining("cannot combine @ProtoOneof with @ProtoUnknown");
+    }
+
+    @Test
+    void recordOneofOnComponentFieldOnAccessorFails() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Target",
+                    "package demo;",
+                    "public sealed interface Target permits Email, Phone {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Email",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(1) public record Email(String value) implements Target {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Phone",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                    "@ProtoOneofCase(2) public record Phone(String value) implements Target {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage",
+                    "public record Box(@ProtoOneof Target target) {",
+                    "  @ProtoField(number = 1) public Target target() { return target; }",
+                    "}"));
+        assertThat(compilation).hadErrorContaining("cannot combine @ProtoOneof with @ProtoField");
+    }
+
+    @Test
     void oneofRejectsNonSealed() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
@@ -590,6 +676,27 @@ class ProtoviaProcessorTest {
                 "  @ProtoUnknown public byte[] unknown;",
                 "}"));
         assertThat(compilation).hadErrorContaining("UnknownFields");
+    }
+
+    @Test
+    void unknownWrongTypeOnPrivateFieldReportsTypeNotAccess() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Env",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                "@ProtoMessage",
+                "public class Env {",
+                "  @ProtoField(number = 1) public String name;",
+                "  @ProtoUnknown private String extra;",
+                "}"));
+        assertThat(compilation).hadErrorContaining("UnknownFields");
+        org.junit.jupiter.api.Assertions.assertFalse(
+            compilation.errors().stream()
+                .anyMatch(d -> String.valueOf(d.getMessage(null)).contains("getter and setter")));
     }
 
     @Test

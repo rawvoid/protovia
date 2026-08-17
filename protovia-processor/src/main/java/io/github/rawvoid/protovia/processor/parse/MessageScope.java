@@ -70,6 +70,15 @@ final class MessageScope {
         return true;
     }
 
+    boolean checkUnknownType(Element origin, TypeMirror type, TypeEnv env, Diagnostics diag) {
+        TypeElement expected = env.elements.getTypeElement("io.github.rawvoid.protovia.UnknownFields");
+        if (expected == null || !env.types.isSameType(env.types.erasure(type), expected.asType())) {
+            diag.error(origin, "@ProtoUnknown must be of type UnknownFields");
+            return false;
+        }
+        return true;
+    }
+
     boolean bindUnknown(
         Element origin,
         TypeMirror type,
@@ -77,9 +86,7 @@ final class MessageScope {
         String name,
         TypeEnv env,
         Diagnostics diag) {
-        TypeElement expected = env.elements.getTypeElement("io.github.rawvoid.protovia.UnknownFields");
-        if (expected == null || !env.types.isSameType(env.types.erasure(type), expected.asType())) {
-            diag.error(origin, "@ProtoUnknown must be of type UnknownFields");
+        if (!checkUnknownType(origin, type, env, diag)) {
             return false;
         }
         if (unknown != null) {

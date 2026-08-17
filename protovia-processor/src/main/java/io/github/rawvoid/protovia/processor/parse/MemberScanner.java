@@ -17,8 +17,6 @@
 package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.annotation.ProtoField;
-import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.Names;
 
@@ -37,9 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Walks a {@code @ProtoMessage} type and yields a unified {@link Member} list.
- * Record components, POJO fields, then POJO getters — same order as the old
- * {@code parseRecord} / {@code parsePojo} loops.
+ * Walks a {@code @ProtoMessage} and collects members. Does not resolve access
+ * or report bind errors — that happens in {@link SchemaParser} after role checks.
  */
 final class MemberScanner {
 
@@ -49,60 +46,51 @@ final class MemberScanner {
         this.diag = diag;
     }
 
-    private Map<String, ExecutableElement> lastMethods = Map.of();
-
-    List<Member> scan(TypeElement type) {
-        lastMethods = Map.of();
+    ScanResult scan(TypeElement type) {
         if (type.getKind() == ElementKind.RECORD) {
-            return scanRecord(type);
+            return new ScanResult(scanRecord(type), Map.of());
         }
         return scanPojo(type);
     }
 
-    /**
-     * Resolves getter+setter for a method-annotated member after
-     * duplicate-annotation checks have run.
-     */
-    Access completeAccess(Member member) {
-        if (member.access() != null) {
-            return member.access();
+    Access resolveAccess(Member member, Map<String, ExecutableElement> methods) {
+        if (member.recordComponent()) {
+            return new Access(AccessKind.RECORD, "value." + member.name() + "()", null);
         }
-        if (!member.fromMethod()) {
-            return null;
+        if (member.fromField()) {
+            return resolvePojoAccess(
+                (VariableElement) member.origin(), member.name(), member.type(), methods);
         }
-        return getterSetter((ExecutableElement) member.origin(), member.name(), lastMethods);
+        if (member.fromMethod()) {
+            if (member.name() == null) {
+                return null;
+            }
+            return getterSetter((ExecutableElement) member.origin(), member.name(), methods);
+        }
+        return null;
     }
 
     private List<Member> scanRecord(TypeElement type) {
         List<Member> members = new ArrayList<>();
         for (RecordComponentElement component : type.getRecordComponents()) {
             ExecutableElement accessor = component.getAccessor();
-            boolean unknown = component.getAnnotation(ProtoUnknown.class) != null
-                || (accessor != null && accessor.getAnnotation(ProtoUnknown.class) != null);
-            boolean oneof = component.getAnnotation(ProtoOneof.class) != null
-                || (accessor != null && accessor.getAnnotation(ProtoOneof.class) != null);
-            ProtoField fieldOnComponent = component.getAnnotation(ProtoField.class);
-            ProtoField field = fieldOnComponent;
+            Roles roles = Roles.of(component).union(Roles.of(accessor));
+            ProtoField field = component.getAnnotation(ProtoField.class);
             if (field == null && accessor != null) {
                 field = accessor.getAnnotation(ProtoField.class);
             }
-            String name = component.getSimpleName().toString();
-            Access access = new Access(AccessKind.RECORD, "value." + name + "()", null);
             members.add(new Member(
                 component,
-                name,
+                component.getSimpleName().toString(),
                 component.asType(),
-                access,
                 true,
-                unknown,
-                oneof,
-                fieldOnComponent != null,
+                roles,
                 field));
         }
         return members;
     }
 
-    private List<Member> scanPojo(TypeElement type) {
+    private ScanResult scanPojo(TypeElement type) {
         Map<String, VariableElement> fields = new HashMap<>();
         Map<String, ExecutableElement> methods = new HashMap<>();
         for (VariableElement field : ElementFilter.fieldsIn(type.getEnclosedElements())) {
@@ -117,53 +105,42 @@ final class MemberScanner {
             }
             methods.put(method.getSimpleName().toString(), method);
         }
-        lastMethods = methods;
 
         List<Member> members = new ArrayList<>();
         for (VariableElement field : fields.values()) {
-            boolean unknown = field.getAnnotation(ProtoUnknown.class) != null;
-            boolean oneof = field.getAnnotation(ProtoOneof.class) != null;
-            ProtoField protoField = field.getAnnotation(ProtoField.class);
-            if (!unknown && !oneof && protoField == null) {
+            Roles roles = Roles.of(field);
+            if (!roles.any()) {
                 continue;
             }
-            String name = field.getSimpleName().toString();
-            Access access = resolvePojoAccess(field, name, field.asType(), methods);
             members.add(new Member(
-                field, name, field.asType(), access, false,
-                unknown, oneof, protoField != null, protoField));
+                field,
+                field.getSimpleName().toString(),
+                field.asType(),
+                false,
+                roles,
+                field.getAnnotation(ProtoField.class)));
         }
         for (ExecutableElement method : methods.values()) {
-            boolean unknown = method.getAnnotation(ProtoUnknown.class) != null;
-            boolean oneof = method.getAnnotation(ProtoOneof.class) != null;
-            ProtoField protoField = method.getAnnotation(ProtoField.class);
-            if (!unknown && !oneof && protoField == null) {
+            Roles roles = Roles.of(method);
+            if (!roles.any()) {
                 continue;
             }
-            Member member = pojoMethodMember(method, unknown, oneof, protoField);
-            if (member != null) {
-                members.add(member);
-            }
+            String property = Names.propertyFromGetter(method.getSimpleName().toString());
+            members.add(new Member(
+                method,
+                property,
+                method.getReturnType(),
+                false,
+                roles,
+                method.getAnnotation(ProtoField.class)));
         }
-        return members;
+        return new ScanResult(members, methods);
     }
 
-    /**
-     * Shape checks (getter / setter / already-annotated) run in
-     * {@link SchemaParser} so error order matches the old method loop.
-     */
-    private static Member pojoMethodMember(
+    private Access getterSetter(
         ExecutableElement method,
-        boolean unknown,
-        boolean oneof,
-        ProtoField protoField) {
-        String property = Names.propertyFromGetter(method.getSimpleName().toString());
-        return new Member(
-            method, property, method.getReturnType(), null, false,
-            unknown, oneof, protoField != null, protoField);
-    }
-
-    Access getterSetter(ExecutableElement method, String property, Map<String, ExecutableElement> methods) {
+        String property,
+        Map<String, ExecutableElement> methods) {
         String setter = Names.setterName(property);
         ExecutableElement set = methods.get(setter);
         if (set == null || set.getParameters().size() != 1) {

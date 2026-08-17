@@ -247,9 +247,7 @@ final class AdapterResolver {
         if (adaptedType == null) {
             return null;
         }
-        ResolvedAdapter adapter = javaType.equals(req.origin)
-            ? validateAdapter(adaptedType, req.origin)
-            : validateAdapter(adaptedType, javaType, req.origin);
+        ResolvedAdapter adapter = validateAdapter(adaptedType, javaType, req.origin);
         if (adapter == null) {
             return null;
         }

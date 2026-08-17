@@ -66,8 +66,13 @@ final class Diagnostics {
     }
 
     void error(String message, Element... origins) {
+        current = true;
+        if (origins.length == 0) {
+            messager.printMessage(Diagnostic.Kind.ERROR, message);
+            return;
+        }
         for (Element origin : origins) {
-            error(origin, message);
+            messager.printMessage(Diagnostic.Kind.ERROR, message, origin);
         }
     }
 }

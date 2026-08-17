@@ -25,19 +25,16 @@ import javax.lang.model.type.TypeMirror;
 /**
  * One record component, POJO field, or JavaBean getter that may carry proto annotations.
  *
- * @param access           {@code null} when access could not be resolved (error already reported)
- * @param fieldOnSameElement {@code @ProtoField} on the same element as unknown/oneof (for combine checks)
- * @param protoField       effective {@code @ProtoField}, including a record accessor
+ * @param name       property name; {@code null} when a method is not a JavaBean getter
+ * @param roles      union of annotations on the origin and, for records, the accessor
+ * @param protoField effective {@code @ProtoField} (component, then accessor)
  */
 record Member(
     Element origin,
     String name,
     TypeMirror type,
-    Access access,
     boolean recordComponent,
-    boolean protoUnknown,
-    boolean protoOneof,
-    boolean fieldOnSameElement,
+    Roles roles,
     ProtoField protoField) {
 
     boolean fromField() {

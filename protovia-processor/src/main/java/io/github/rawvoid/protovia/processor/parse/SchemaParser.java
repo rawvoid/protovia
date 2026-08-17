@@ -36,6 +36,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.Map;
 
 /**
  * Validates {@code @ProtoMessage} / {@code @ProtoEnum} types and builds the models
@@ -85,9 +86,11 @@ public final class SchemaParser {
      */
     public MessageModel parseMessage(TypeElement type) {
         diag.push();
-        MessageModel model = doParseMessage(type);
-        diag.popAndMerge();
-        return model;
+        try {
+            return doParseMessage(type);
+        } finally {
+            diag.popAndMerge();
+        }
     }
 
     private MessageModel doParseMessage(TypeElement type) {
@@ -121,8 +124,9 @@ public final class SchemaParser {
         MessageScope scope = new MessageScope(type, pkg);
         adapters.enter(type);
         try {
-            for (Member member : scanner.scan(type)) {
-                dispatch(member, scope);
+            ScanResult scanned = scanner.scan(type);
+            for (Member member : scanned.members()) {
+                dispatch(member, scope, scanned.methods());
             }
             if (scope.byNumber.isEmpty() && scope.oneofs.isEmpty()) {
                 diag.error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField or @ProtoOneof members");
@@ -142,37 +146,75 @@ public final class SchemaParser {
     }
 
     /**
-     * Single annotation dispatch for record components, POJO fields, and getters.
-     * Error order matches the previous three copies of this logic.
+     * Role check, then bind. A field-origin role occupies the property name
+     * whether or not bind succeeds, so a getter cannot also claim it.
      */
-    private void dispatch(Member member, MessageScope scope) {
-        if (member.protoUnknown()) {
-            bindUnknown(member, scope);
+    private void dispatch(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+        if (member.recordComponent() && !member.roles().any()) {
+            scope.addComponent(member.name(), member.type(), null);
             return;
         }
-        if (member.protoOneof()) {
-            bindOneof(member, scope);
+        if (rejectCombinedRoles(member)) {
+            return;
+        }
+        if (member.fromField() && member.roles().any()) {
+            scope.annotatedViaField.add(member.name());
+        }
+        if (member.roles().unknown()) {
+            bindUnknown(member, scope, methods);
+            return;
+        }
+        if (member.roles().oneof()) {
+            bindOneof(member, scope, methods);
             return;
         }
         if (member.protoField() != null) {
-            bindField(member, scope);
-            return;
-        }
-        if (member.recordComponent()) {
-            scope.addComponent(member.name(), member.type(), null);
+            bindField(member, scope, methods);
         }
     }
 
-    private void bindUnknown(Member member, MessageScope scope) {
-        if (member.fieldOnSameElement()) {
-            diag.error(member.origin(), "cannot combine @ProtoUnknown with @ProtoField");
-            return;
+    /**
+     * @return {@code true} if this site mixed proto roles and should not bind
+     */
+    private boolean rejectCombinedRoles(Member member) {
+        Roles roles = member.roles();
+        if (roles.count() <= 1) {
+            return false;
         }
+        if (roles.unknown() && roles.oneof()) {
+            diag.error(member.origin(), "cannot combine @ProtoOneof with @ProtoUnknown");
+        }
+        if (roles.unknown() && roles.field()) {
+            diag.error(member.origin(), "cannot combine @ProtoUnknown with @ProtoField");
+        }
+        if (roles.oneof() && roles.field()) {
+            diag.error(member.origin(), "cannot combine @ProtoOneof with @ProtoField");
+        }
+        return true;
+    }
+
+    private boolean alreadyAnnotatedOnGetter(Member member, MessageScope scope) {
+        if (!member.fromMethod() || member.name() == null
+            || !scope.annotatedViaField.contains(member.name())) {
+            return false;
+        }
+        diag.error(member.origin(), "field '" + member.name()
+            + "' is already annotated; do not also annotate the getter");
+        return true;
+    }
+
+    private void bindUnknown(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
         if (member.fromMethod() && member.name() == null) {
             diag.error(member.origin(), "@ProtoUnknown on a method must be a JavaBean getter");
             return;
         }
-        Access access = scanner.completeAccess(member);
+        if (alreadyAnnotatedOnGetter(member, scope)) {
+            return;
+        }
+        if (!scope.checkUnknownType(member.origin(), member.type(), env, diag)) {
+            return;
+        }
+        Access access = scanner.resolveAccess(member, methods);
         if (access == null) {
             return;
         }
@@ -182,20 +224,14 @@ public final class SchemaParser {
         }
     }
 
-    private void bindOneof(Member member, MessageScope scope) {
-        if (member.fieldOnSameElement()) {
-            diag.error(member.origin(), "cannot combine @ProtoOneof with @ProtoField");
-            return;
-        }
+    private void bindOneof(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
         if (member.fromMethod() && badMethodGetter(member, "@ProtoOneof")) {
             return;
         }
-        if (member.fromMethod() && scope.annotatedViaField.contains(member.name())) {
-            diag.error(member.origin(), "field '" + member.name()
-                + "' is already annotated; do not also annotate the getter");
+        if (alreadyAnnotatedOnGetter(member, scope)) {
             return;
         }
-        Access access = scanner.completeAccess(member);
+        Access access = scanner.resolveAccess(member, methods);
         if (access == null) {
             return;
         }
@@ -210,9 +246,6 @@ public final class SchemaParser {
             scope.pkg,
             scope.taken);
         if (oneof != null && scope.claimed.add(member.name())) {
-            if (member.fromField()) {
-                scope.annotatedViaField.add(member.name());
-            }
             scope.oneofs.add(oneof);
             if (member.recordComponent()) {
                 scope.addComponent(member.name(), oneof.javaType, oneof);
@@ -220,21 +253,14 @@ public final class SchemaParser {
         }
     }
 
-    private void bindField(Member member, MessageScope scope) {
-        if (member.fromField()) {
-            scope.annotatedViaField.add(member.name());
+    private void bindField(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+        if (member.fromMethod() && badMethodGetter(member, "@ProtoField")) {
+            return;
         }
-        if (member.fromMethod()) {
-            if (badMethodGetter(member, "@ProtoField")) {
-                return;
-            }
-            if (scope.annotatedViaField.contains(member.name())) {
-                diag.error(member.origin(), "field '" + member.name()
-                    + "' is already annotated; do not also annotate the getter");
-                return;
-            }
+        if (alreadyAnnotatedOnGetter(member, scope)) {
+            return;
         }
-        Access access = scanner.completeAccess(member);
+        Access access = scanner.resolveAccess(member, methods);
         if (access == null) {
             return;
         }

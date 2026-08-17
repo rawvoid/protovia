@@ -46,9 +46,11 @@ final class EnumParser {
      */
     EnumModel parse(TypeElement type) {
         diag.push();
-        EnumModel model = doParse(type);
-        diag.popAndMerge();
-        return model;
+        try {
+            return doParse(type);
+        } finally {
+            diag.popAndMerge();
+        }
     }
 
     private EnumModel doParse(TypeElement type) {
