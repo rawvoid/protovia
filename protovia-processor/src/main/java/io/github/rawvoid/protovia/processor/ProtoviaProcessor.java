@@ -21,7 +21,7 @@ import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.processor.gen.CodecGenerator;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.SchemaParser;
+import io.github.rawvoid.protovia.processor.parse.SchemaParser;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
