@@ -220,6 +220,14 @@ class ProtoviaProcessorTest {
             .generatedSourceFile("demo.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("else if (target instanceof Home");
+        assertThat(compilation)
+            .generatedSourceFile("demo.ContactProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoException");
+        assertThat(compilation)
+            .generatedSourceFile("demo.ContactProtoCodec")
+            .contentsAsUtf8String()
+            .contains("unexpected type");
     }
 
     @Test

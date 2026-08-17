@@ -145,6 +145,11 @@ final class WireCodegen {
             caseBody.accept(b, c);
         }
         if (!first) {
+            b.nextControlFlow("else");
+            b.addStatement("throw new $T($S + $L.getClass().getName())",
+                PROTO_EXCEPTION,
+                "oneof '" + field.name + "' value has unexpected type ",
+                field.localName);
             b.endControlFlow();
         }
         b.endControlFlow();
