@@ -211,6 +211,61 @@ class RoundTripTest {
     }
 
     @Test
+    void genericOneofClassRoundTrip() {
+        ApiRS<Target> email = new ApiRS<>();
+        email.success = true;
+        email.data = new Email("ada@example.com");
+        ApiRS<Target> emailBack = ProtoVia.fromBytes(ApiRS.class, ProtoVia.toBytes(email));
+        assertTrue(emailBack.success);
+        assertEquals(new Email("ada@example.com"), emailBack.data);
+
+        ApiRS<Target> home = new ApiRS<>();
+        home.success = true;
+        home.data = new Home(new Address("Paris", "Rue"));
+        ApiRS<Target> homeBack = ProtoVia.fromBytes(ApiRS.class, ProtoVia.toBytes(home));
+        assertTrue(homeBack.success);
+        assertEquals(new Home(new Address("Paris", "Rue")), homeBack.data);
+    }
+
+    @Test
+    void genericOneofRecordRoundTrip() {
+        ApiRecordRS<Target> email = new ApiRecordRS<>(true, new Email("ada@example.com"));
+        assertEquals(email, ProtoVia.fromBytes(ApiRecordRS.class, ProtoVia.toBytes(email)));
+
+        ApiRecordRS<Target> home = new ApiRecordRS<>(true, new Home(new Address("Paris", "Rue")));
+        assertEquals(home, ProtoVia.fromBytes(ApiRecordRS.class, ProtoVia.toBytes(home)));
+    }
+
+    @Test
+    void genericOneofMatchesConcreteTwinBytes() {
+        ApiRS<Target> generic = new ApiRS<>();
+        generic.success = true;
+        generic.data = new Email("ada@example.com");
+        ApiTwin twin = new ApiTwin();
+        twin.success = true;
+        twin.data = new Email("ada@example.com");
+        assertArrayEquals(ProtoVia.toBytes(twin), ProtoVia.toBytes(generic));
+
+        ApiTwin decoded = ProtoVia.fromBytes(ApiTwin.class, ProtoVia.toBytes(generic));
+        assertTrue(decoded.success);
+        assertEquals(new Email("ada@example.com"), decoded.data);
+    }
+
+    @Test
+    void genericOneofOmitsDefaultsAndWritesEmptyScalar() {
+        ApiRS<Target> empty = new ApiRS<>();
+        assertEquals(0, ProtoVia.toBytes(empty).length);
+
+        ApiRS<Target> blank = new ApiRS<>();
+        blank.data = new Email("");
+        byte[] bytes = ProtoVia.toBytes(blank);
+        assertTrue(bytes.length > 0);
+        ApiRS<Target> back = ProtoVia.fromBytes(ApiRS.class, bytes);
+        assertFalse(back.success);
+        assertEquals(new Email(""), back.data);
+    }
+
+    @Test
     void oneofEmailRoundTrip() {
         Contact c = new Contact();
         c.name = "Ada";

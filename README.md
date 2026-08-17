@@ -107,7 +107,7 @@ Generated codecs:
 | `byte[]`, `ByteBuffer`                    | bytes | |
 | `@ProtoEnum` enum                         | enum | |
 | `@ProtoMessage` type                      | message | |
-| `@ProtoOneof` sealed interface            | oneof (cases flatten onto the parent) | |
+| `@ProtoOneof` sealed interface (or `T extends` that type) | oneof (cases flatten onto the parent) | |
 | `java.time.Instant`                       | `google.protobuf.Timestamp` | |
 | `java.time.Duration`                      | `google.protobuf.Duration` | |
 | `ProtoAny`                                | `google.protobuf.Any` | |
@@ -181,7 +181,7 @@ LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 
 **oneof**
 
-- Mark the field `@ProtoOneof` (no field number). The type must be `sealed`.
+- Mark the field `@ProtoOneof` (no field number). The type must be `sealed`, or a type variable bounded by a `sealed` type.
 - Each permitted type is `@ProtoOneofCase(n)` — that number is the parent field.
 - A one-component scalar record encodes as that scalar, not a nested message.
 

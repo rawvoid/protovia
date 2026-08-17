@@ -384,6 +384,174 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void oneofAcceptsTypeVariableBoundedBySealed() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Box<T extends Target> {",
+                    "  @ProtoField(number = 1) public boolean success;",
+                    "  @ProtoOneof public T data;",
+                    "}")));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .contains("else if (data instanceof Home");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain(" T ");
+    }
+
+    @Test
+    void oneofAcceptsTypeVariableOnGenericRecord() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.BoxRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public record BoxRecord<T extends Target>(",
+                    "  @ProtoField(number = 1) boolean success,",
+                    "  @ProtoOneof T data) {}")));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("Target data = existing != null ? existing.data() : null");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("return new BoxRecord(");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain(" T ");
+    }
+
+    @Test
+    void oneofAcceptsTypeVariableOnGetter() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Box<T extends Target> {",
+                    "  private T data;",
+                    "  @ProtoOneof public T getData() { return data; }",
+                    "  public void setData(T data) { this.data = data; }",
+                    "}")));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.getData()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof Email");
+    }
+
+    @Test
+    void oneofAcceptsIntersectionBoundWithOneSealed() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(withOneofTarget(
+                JavaFileObjects.forSourceLines(
+                    "demo.Box",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "import java.io.Serializable;",
+                    "@ProtoMessage public class Box<T extends Target & Serializable> {",
+                    "  @ProtoOneof public T data;",
+                    "}")));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BoxProtoCodec")
+            .contentsAsUtf8String()
+            .contains("instanceof Email");
+    }
+
+    @Test
+    void oneofRejectsUnboundedTypeVariable() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Bad",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage public class Bad<T> { @ProtoOneof public T data; }"));
+        assertThat(compilation).hadErrorContaining(
+            "type variable must be bounded by a sealed interface or class");
+    }
+
+    @Test
+    void oneofRejectsNonSealedTypeVariableBound() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Bad",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage public class Bad<T extends CharSequence> { @ProtoOneof public T data; }"));
+        assertThat(compilation).hadErrorContaining(
+            "type variable must be bounded by a sealed interface or class");
+    }
+
+    @Test
+    void oneofRejectsTypeVariableWithTwoSealedBounds() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Left",
+                    "package demo;",
+                    "public sealed interface Left permits LeftA, LeftB {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.LeftA",
+                    "package demo;",
+                    "public record LeftA() implements Left {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.LeftB",
+                    "package demo;",
+                    "public record LeftB() implements Left {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Right",
+                    "package demo;",
+                    "public sealed interface Right permits RightA, RightB {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.RightA",
+                    "package demo;",
+                    "public record RightA() implements Right {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.RightB",
+                    "package demo;",
+                    "public record RightB() implements Right {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Bad",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Bad<T extends Left & Right> { @ProtoOneof public T data; }"));
+        assertThat(compilation).hadErrorContaining("more than one sealed bound");
+    }
+
+    @Test
     void unknownFieldsSlotGeneratesMerge() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
@@ -1714,6 +1882,32 @@ class ProtoviaProcessorTest {
                     "  public Map<String, Integer> scores;",
                     "}"));
         assertThat(compilation).hadErrorContaining("handles UUID, not Map");
+    }
+
+    private static java.util.List<javax.tools.JavaFileObject> withOneofTarget(
+        javax.tools.JavaFileObject extra) {
+        return java.util.List.of(
+            JavaFileObjects.forSourceLines(
+                "demo.Target",
+                "package demo;",
+                "public sealed interface Target permits Email, Home {}"),
+            JavaFileObjects.forSourceLines(
+                "demo.Email",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                "@ProtoOneofCase(10) public record Email(String value) implements Target {}"),
+            JavaFileObjects.forSourceLines(
+                "demo.Addr",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+            JavaFileObjects.forSourceLines(
+                "demo.Home",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneofCase;",
+                "@ProtoOneofCase(11) public record Home(Addr address) implements Target {}"),
+            extra);
     }
 
     private static javax.tools.JavaFileObject localDateAdapter() {

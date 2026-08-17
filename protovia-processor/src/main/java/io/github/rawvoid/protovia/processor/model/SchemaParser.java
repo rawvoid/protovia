@@ -25,8 +25,10 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.IntersectionType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -292,7 +294,7 @@ public final class SchemaParser {
                 if (oneof != null && claimed.add(name)) {
                     oneofs.add(oneof);
                     recordComponents.add(new MessageModel.RecordComponentModel(
-                        name, component.asType(), oneof));
+                        name, oneof.javaType, oneof));
                 }
                 continue;
             }
@@ -580,8 +582,12 @@ public final class SchemaParser {
         String fieldName,
         String pkg,
         Set<Integer> taken) {
-        TypeElement sealed = asTypeElement(type);
-        if (sealed == null || !sealed.getModifiers().contains(Modifier.SEALED)) {
+        TypeMirror oneofType = resolveOneofSealedType(origin, name, type);
+        if (oneofType == null) {
+            return null;
+        }
+        TypeElement sealed = asTypeElement(oneofType);
+        if (sealed == null) {
             error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
             return null;
         }
@@ -628,11 +634,60 @@ public final class SchemaParser {
             .readExpr(readExpr)
             .setterName(setter)
             .fieldName(fieldName)
-            .javaTypeName(renderType(type, pkg))
-            .javaType(type)
+            .javaTypeName(renderType(oneofType, pkg))
+            .javaType(oneofType)
             .oneofCases(cases)
             .origin(origin)
             .build();
+    }
+
+    /**
+     * Resolves a {@code @ProtoOneof} Java type to its sealed bound.
+     * A type variable is treated as that bound so generic wrappers can reuse
+     * the permitted {@code @ProtoOneofCase} types.
+     */
+    private TypeMirror resolveOneofSealedType(Element origin, String name, TypeMirror type) {
+        List<TypeMirror> sealed = new ArrayList<>();
+        collectSealedBounds(type, sealed, new HashSet<>());
+        if (sealed.size() > 1) {
+            error(origin, "@ProtoOneof field '" + name + "' type variable has more than one sealed bound");
+            return null;
+        }
+        if (sealed.isEmpty()) {
+            if (type.getKind() == TypeKind.TYPEVAR) {
+                error(origin, "@ProtoOneof field '" + name
+                    + "' type variable must be bounded by a sealed interface or class");
+            } else {
+                error(origin, "@ProtoOneof field '" + name + "' must be a sealed interface or class");
+            }
+            return null;
+        }
+        return sealed.get(0);
+    }
+
+    private void collectSealedBounds(TypeMirror type, List<TypeMirror> sealed, Set<Element> seen) {
+        if (type == null) {
+            return;
+        }
+        TypeKind kind = type.getKind();
+        if (kind == TypeKind.TYPEVAR) {
+            Element element = types.asElement(type);
+            if (element != null && !seen.add(element)) {
+                return;
+            }
+            collectSealedBounds(((TypeVariable) type).getUpperBound(), sealed, seen);
+            return;
+        }
+        if (kind == TypeKind.INTERSECTION) {
+            for (TypeMirror bound : ((IntersectionType) type).getBounds()) {
+                collectSealedBounds(bound, sealed, seen);
+            }
+            return;
+        }
+        TypeElement declared = asTypeElement(type);
+        if (declared != null && declared.getModifiers().contains(Modifier.SEALED)) {
+            sealed.add(type);
+        }
     }
 
     private OneofCaseModel parseOneofCase(TypeElement caseType, int number, String oneofName, String pkg) {

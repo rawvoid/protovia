@@ -176,6 +176,54 @@ class OfficialInteropTest {
     }
 
     @Test
+    void genericOneofInteropsWithDynamicMessage() throws Exception {
+        DescriptorProtos.DescriptorProto address = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("Address")
+            .addField(field("city", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+            .addField(field("street", 2, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+            .build();
+        DescriptorProtos.DescriptorProto api = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("ApiRS")
+            .addField(field("success", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_BOOL))
+            .addOneofDecl(DescriptorProtos.OneofDescriptorProto.newBuilder().setName("data"))
+            .addField(field("email", 10, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING)
+                .setOneofIndex(0))
+            .addField(field("address", 11, DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
+                .setTypeName(".Address")
+                .setOneofIndex(0))
+            .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+            DescriptorProtos.FileDescriptorProto.newBuilder()
+                .setName("api.proto")
+                .setSyntax("proto3")
+                .addMessageType(address)
+                .addMessageType(api)
+                .build(),
+            new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("ApiRS");
+        Descriptors.Descriptor addrDesc = fd.findMessageTypeByName("Address");
+
+        ApiRS<Target> sent = new ApiRS<>();
+        sent.success = true;
+        sent.data = new Email("ada@example.com");
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(sent));
+        assertEquals(true, parsed.getField(desc.findFieldByName("success")));
+        assertEquals("ada@example.com", parsed.getField(desc.findFieldByName("email")));
+
+        DynamicMessage official = DynamicMessage.newBuilder(desc)
+            .setField(desc.findFieldByName("success"), true)
+            .setField(desc.findFieldByName("address"),
+                DynamicMessage.newBuilder(addrDesc)
+                    .setField(addrDesc.findFieldByName("city"), "Paris")
+                    .setField(addrDesc.findFieldByName("street"), "Rue")
+                    .build())
+            .build();
+        ApiRS<Target> back = ProtoVia.fromBytes(ApiRS.class, official.toByteArray());
+        assertTrue(back.success);
+        assertEquals(new Home(new Address("Paris", "Rue")), back.data);
+    }
+
+    @Test
     void oneofUnknownEnumInteropsWithDynamicMessage() throws Exception {
         DescriptorProtos.EnumDescriptorProto kind = DescriptorProtos.EnumDescriptorProto.newBuilder()
             .setName("Kind")
