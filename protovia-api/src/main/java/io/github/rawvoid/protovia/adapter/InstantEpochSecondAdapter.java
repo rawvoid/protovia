@@ -16,39 +16,35 @@
 
 package io.github.rawvoid.protovia.adapter;
 
-import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.DateTimeException;
-import java.time.ZoneOffset;
+import java.time.Instant;
 
 /**
- * Opt-in {@link ZoneOffset} as proto3 {@code int32} total seconds offset from UTC (e.g. +28800 for +08:00).
- * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link Instant} as proto3 {@code int64} epoch second. Unused unless named
+ * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ *
+ * @implNote Lossy conversion: drops sub-second (millisecond and nanosecond) precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT32)
-public final class ZoneOffsetSeconds implements ProtoAdapter<ZoneOffset, Integer> {
+@ProtoScalar(ProtoType.INT64)
+public final class InstantEpochSecondAdapter implements ProtoAdapter<Instant, Long> {
 
-    public static final ZoneOffsetSeconds INSTANCE = new ZoneOffsetSeconds();
+    public static final InstantEpochSecondAdapter INSTANCE = new InstantEpochSecondAdapter();
 
-    private ZoneOffsetSeconds() {
+    private InstantEpochSecondAdapter() {
     }
 
     @Override
-    public Integer toWire(ZoneOffset value) {
-        return value.getTotalSeconds();
+    public Long toWire(Instant value) {
+        return value.getEpochSecond();
     }
 
     @Override
-    public ZoneOffset fromWire(Integer wire) {
-        try {
-            return ZoneOffset.ofTotalSeconds(wire);
-        } catch (DateTimeException e) {
-            throw new ProtoException("invalid ZoneOffset seconds: " + wire, e);
-        }
+    public Instant fromWire(Long wire) {
+        return Instant.ofEpochSecond(wire);
     }
 }

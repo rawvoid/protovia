@@ -21,34 +21,34 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.LocalTime;
+import java.math.BigDecimal;
 
 /**
- * Opt-in {@link LocalTime} as proto3 {@code int32} second of day (0 to 86,399).
+ * Opt-in {@link BigDecimal} as proto3 {@code string} using {@link BigDecimal#toPlainString()}
+ * to prevent scientific notation. Provides cross-language lossless decimal encoding.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote Lossy conversion: drops sub-second precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT32)
-public final class LocalTimeSecondOfDay implements ProtoAdapter<LocalTime, Integer> {
+@ProtoScalar(ProtoType.STRING)
+public final class BigDecimalStringAdapter implements ProtoAdapter<BigDecimal, String> {
 
-    public static final LocalTimeSecondOfDay INSTANCE = new LocalTimeSecondOfDay();
+    public static final BigDecimalStringAdapter INSTANCE = new BigDecimalStringAdapter();
 
-    private LocalTimeSecondOfDay() {
+    private BigDecimalStringAdapter() {
     }
 
     @Override
-    public Integer toWire(LocalTime value) {
-        return value.toSecondOfDay();
+    public String toWire(BigDecimal value) {
+        return value.toPlainString();
     }
 
     @Override
-    public LocalTime fromWire(Integer wire) {
-        if (wire < 0 || wire > 86399) {
-            throw new ProtoException("LocalTime second-of-day out of range [0, 86399]: " + wire);
+    public BigDecimal fromWire(String wire) {
+        try {
+            return new BigDecimal(wire);
+        } catch (NumberFormatException e) {
+            throw new ProtoException("invalid BigDecimal string: " + wire, e);
         }
-        return LocalTime.ofSecondOfDay(wire);
     }
 }

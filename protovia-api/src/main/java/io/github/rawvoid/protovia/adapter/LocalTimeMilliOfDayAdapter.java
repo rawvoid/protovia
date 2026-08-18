@@ -21,34 +21,37 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.time.temporal.ChronoField;
 
 /**
- * Opt-in {@link BigDecimal} as proto3 {@code string} using {@link BigDecimal#toPlainString()}
- * to prevent scientific notation. Provides cross-language lossless decimal encoding.
+ * Opt-in {@link LocalTime} as proto3 {@code int32} millisecond of day (0 to 86,399,999).
+ * Fits comfortably within standard signed 32-bit integer range.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ *
+ * @implNote Lossy conversion: drops sub-millisecond (nanosecond) precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.STRING)
-public final class BigDecimalString implements ProtoAdapter<BigDecimal, String> {
+@ProtoScalar(ProtoType.INT32)
+public final class LocalTimeMilliOfDayAdapter implements ProtoAdapter<LocalTime, Integer> {
 
-    public static final BigDecimalString INSTANCE = new BigDecimalString();
+    public static final LocalTimeMilliOfDayAdapter INSTANCE = new LocalTimeMilliOfDayAdapter();
+    private static final int MAX_MILLI_OF_DAY = 86_399_999;
 
-    private BigDecimalString() {
+    private LocalTimeMilliOfDayAdapter() {
     }
 
     @Override
-    public String toWire(BigDecimal value) {
-        return value.toPlainString();
+    public Integer toWire(LocalTime value) {
+        return value.get(ChronoField.MILLI_OF_DAY);
     }
 
     @Override
-    public BigDecimal fromWire(String wire) {
-        try {
-            return new BigDecimal(wire);
-        } catch (NumberFormatException e) {
-            throw new ProtoException("invalid BigDecimal string: " + wire, e);
+    public LocalTime fromWire(Integer wire) {
+        if (wire < 0 || wire > MAX_MILLI_OF_DAY) {
+            throw new ProtoException("LocalTime milli-of-day out of range [0, 86399999]: " + wire);
         }
+        return LocalTime.ofNanoOfDay((long) wire * 1_000_000L);
     }
 }

@@ -21,29 +21,34 @@ import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 
 /**
- * Opt-in {@link Instant} as proto3 {@code int64} epoch milli. Unused unless named
- * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. The default mapping
- * remains {@code google.protobuf.Timestamp}.
+ * Opt-in {@link ZonedDateTime} as proto3 {@code int64} epoch millisecond.
+ * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ *
+ * @implNote Lossy conversion: the original {@link java.time.ZoneId} is not preserved on the wire.
+ * {@link #fromWire(Long)} restores the timestamp in {@link ZoneOffset#UTC}. Drops sub-millisecond precision.
+ * For lossless representation, use {@link ZonedDateTimeIsoStringAdapter}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT64)
-public final class InstantEpochMilli implements ProtoAdapter<Instant, Long> {
+public final class ZonedDateTimeEpochMilliAdapter implements ProtoAdapter<ZonedDateTime, Long> {
 
-    public static final InstantEpochMilli INSTANCE = new InstantEpochMilli();
+    public static final ZonedDateTimeEpochMilliAdapter INSTANCE = new ZonedDateTimeEpochMilliAdapter();
 
-    private InstantEpochMilli() {
+    private ZonedDateTimeEpochMilliAdapter() {
     }
 
     @Override
-    public Long toWire(Instant value) {
-        return value.toEpochMilli();
+    public Long toWire(ZonedDateTime value) {
+        return value.toInstant().toEpochMilli();
     }
 
     @Override
-    public Instant fromWire(Long wire) {
-        return Instant.ofEpochMilli(wire);
+    public ZonedDateTime fromWire(Long wire) {
+        return Instant.ofEpochMilli(wire).atZone(ZoneOffset.UTC);
     }
 }

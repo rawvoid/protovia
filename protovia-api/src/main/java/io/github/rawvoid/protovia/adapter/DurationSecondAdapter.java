@@ -16,38 +16,35 @@
 
 package io.github.rawvoid.protovia.adapter;
 
-import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.LocalDate;
+import java.time.Duration;
 
 /**
- * Opt-in {@link LocalDate} as proto3 {@code int32} epoch day. Unused unless named
- * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. Not a well-known type.
+ * Opt-in {@link Duration} as proto3 {@code int64} seconds. Unused unless named
+ * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ *
+ * @implNote Lossy conversion: drops sub-second (millisecond and nanosecond) precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT32)
-public final class LocalDateEpochDay implements ProtoAdapter<LocalDate, Integer> {
+@ProtoScalar(ProtoType.INT64)
+public final class DurationSecondAdapter implements ProtoAdapter<Duration, Long> {
 
-    public static final LocalDateEpochDay INSTANCE = new LocalDateEpochDay();
+    public static final DurationSecondAdapter INSTANCE = new DurationSecondAdapter();
 
-    private LocalDateEpochDay() {
+    private DurationSecondAdapter() {
     }
 
     @Override
-    public Integer toWire(LocalDate value) {
-        long day = value.toEpochDay();
-        if (day < Integer.MIN_VALUE || day > Integer.MAX_VALUE) {
-            throw new ProtoException("LocalDate out of int32 epoch-day range: " + value);
-        }
-        return (int) day;
+    public Long toWire(Duration value) {
+        return value.toSeconds();
     }
 
     @Override
-    public LocalDate fromWire(Integer wire) {
-        return LocalDate.ofEpochDay(wire);
+    public Duration fromWire(Long wire) {
+        return Duration.ofSeconds(wire);
     }
 }

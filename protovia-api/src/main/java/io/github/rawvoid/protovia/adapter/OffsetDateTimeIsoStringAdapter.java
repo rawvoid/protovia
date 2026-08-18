@@ -21,33 +21,35 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.net.URI;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 
 /**
- * Opt-in {@link URI} as proto3 {@code string} formatted according to RFC 3986.
+ * Opt-in {@link OffsetDateTime} as proto3 {@code string} formatted in standard ISO-8601 / RFC 3339
+ * (e.g. {@code "2026-08-18T15:47:05.123+08:00"}).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.STRING)
-public final class UriString implements ProtoAdapter<URI, String> {
+public final class OffsetDateTimeIsoStringAdapter implements ProtoAdapter<OffsetDateTime, String> {
 
-    public static final UriString INSTANCE = new UriString();
+    public static final OffsetDateTimeIsoStringAdapter INSTANCE = new OffsetDateTimeIsoStringAdapter();
 
-    private UriString() {
+    private OffsetDateTimeIsoStringAdapter() {
     }
 
     @Override
-    public String toWire(URI value) {
+    public String toWire(OffsetDateTime value) {
         return value.toString();
     }
 
     @Override
-    public URI fromWire(String wire) {
+    public OffsetDateTime fromWire(String wire) {
         try {
-            return URI.create(wire);
-        } catch (IllegalArgumentException e) {
-            throw new ProtoException("invalid URI string: " + wire, e);
+            return OffsetDateTime.parse(wire);
+        } catch (DateTimeParseException e) {
+            throw new ProtoException("invalid OffsetDateTime string: " + wire, e);
         }
     }
 }

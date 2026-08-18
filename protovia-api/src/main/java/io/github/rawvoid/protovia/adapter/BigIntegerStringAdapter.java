@@ -21,37 +21,33 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.LocalTime;
-import java.time.temporal.ChronoField;
+import java.math.BigInteger;
 
 /**
- * Opt-in {@link LocalTime} as proto3 {@code int32} millisecond of day (0 to 86,399,999).
- * Fits comfortably within standard signed 32-bit integer range.
+ * Opt-in {@link BigInteger} as proto3 {@code string} formatted in base 10.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote Lossy conversion: drops sub-millisecond (nanosecond) precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT32)
-public final class LocalTimeMilliOfDay implements ProtoAdapter<LocalTime, Integer> {
+@ProtoScalar(ProtoType.STRING)
+public final class BigIntegerStringAdapter implements ProtoAdapter<BigInteger, String> {
 
-    public static final LocalTimeMilliOfDay INSTANCE = new LocalTimeMilliOfDay();
-    private static final int MAX_MILLI_OF_DAY = 86_399_999;
+    public static final BigIntegerStringAdapter INSTANCE = new BigIntegerStringAdapter();
 
-    private LocalTimeMilliOfDay() {
+    private BigIntegerStringAdapter() {
     }
 
     @Override
-    public Integer toWire(LocalTime value) {
-        return value.get(ChronoField.MILLI_OF_DAY);
+    public String toWire(BigInteger value) {
+        return value.toString();
     }
 
     @Override
-    public LocalTime fromWire(Integer wire) {
-        if (wire < 0 || wire > MAX_MILLI_OF_DAY) {
-            throw new ProtoException("LocalTime milli-of-day out of range [0, 86399999]: " + wire);
+    public BigInteger fromWire(String wire) {
+        try {
+            return new BigInteger(wire);
+        } catch (NumberFormatException e) {
+            throw new ProtoException("invalid BigInteger string: " + wire, e);
         }
-        return LocalTime.ofNanoOfDay((long) wire * 1_000_000L);
     }
 }

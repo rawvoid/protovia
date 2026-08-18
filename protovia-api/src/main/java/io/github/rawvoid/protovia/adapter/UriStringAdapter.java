@@ -21,33 +21,33 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.LocalTime;
+import java.net.URI;
 
 /**
- * Opt-in {@link LocalTime} as proto3 {@code int64} nanosecond of day (0 to 86,399,999,999,999).
+ * Opt-in {@link URI} as proto3 {@code string} formatted according to RFC 3986.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class LocalTimeNanoOfDay implements ProtoAdapter<LocalTime, Long> {
+@ProtoScalar(ProtoType.STRING)
+public final class UriStringAdapter implements ProtoAdapter<URI, String> {
 
-    public static final LocalTimeNanoOfDay INSTANCE = new LocalTimeNanoOfDay();
-    private static final long MAX_NANO_OF_DAY = 86_399_999_999_999L;
+    public static final UriStringAdapter INSTANCE = new UriStringAdapter();
 
-    private LocalTimeNanoOfDay() {
+    private UriStringAdapter() {
     }
 
     @Override
-    public Long toWire(LocalTime value) {
-        return value.toNanoOfDay();
+    public String toWire(URI value) {
+        return value.toString();
     }
 
     @Override
-    public LocalTime fromWire(Long wire) {
-        if (wire < 0 || wire > MAX_NANO_OF_DAY) {
-            throw new ProtoException("LocalTime nano-of-day out of range [0, 86399999999999]: " + wire);
+    public URI fromWire(String wire) {
+        try {
+            return URI.create(wire);
+        } catch (IllegalArgumentException e) {
+            throw new ProtoException("invalid URI string: " + wire, e);
         }
-        return LocalTime.ofNanoOfDay(wire);
     }
 }

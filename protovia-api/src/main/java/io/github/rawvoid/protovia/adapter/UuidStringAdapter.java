@@ -21,33 +21,33 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.math.BigInteger;
+import java.util.UUID;
 
 /**
- * Opt-in {@link BigInteger} as proto3 {@code string} formatted in base 10.
- * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link UUID} as proto3 {@code string} (canonical 36-char form). Unused
+ * unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.STRING)
-public final class BigIntegerString implements ProtoAdapter<BigInteger, String> {
+public final class UuidStringAdapter implements ProtoAdapter<UUID, String> {
 
-    public static final BigIntegerString INSTANCE = new BigIntegerString();
+    public static final UuidStringAdapter INSTANCE = new UuidStringAdapter();
 
-    private BigIntegerString() {
+    private UuidStringAdapter() {
     }
 
     @Override
-    public String toWire(BigInteger value) {
+    public String toWire(UUID value) {
         return value.toString();
     }
 
     @Override
-    public BigInteger fromWire(String wire) {
+    public UUID fromWire(String wire) {
         try {
-            return new BigInteger(wire);
-        } catch (NumberFormatException e) {
-            throw new ProtoException("invalid BigInteger string: " + wire, e);
+            return UUID.fromString(wire);
+        } catch (IllegalArgumentException e) {
+            throw new ProtoException("invalid UUID: " + wire, e);
         }
     }
 }

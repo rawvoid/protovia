@@ -42,21 +42,21 @@ import java.util.UUID;
 @AllArgsConstructor
 @ProtoMessage
 @ProtoAdapters({
-    UuidBytes.class,
-    BigDecimalString.class,
-    BigIntegerString.class,
-    InetAddressBytes.class,
-    UriString.class,
-    InstantEpochNano.class,
-    LocalTimeMilliOfDay.class,
-    YearMonthEpochMonth.class,
-    YearValue.class,
-    PeriodString.class,
-    ZoneIdString.class,
-    ZoneOffsetSeconds.class,
-    DateEpochMilli.class,
-    ZonedDateTimeString.class,
-    OffsetDateTimeString.class
+    UuidBytesAdapter.class,
+    BigDecimalStringAdapter.class,
+    BigIntegerStringAdapter.class,
+    InetAddressBytesAdapter.class,
+    UriStringAdapter.class,
+    InstantEpochNanoAdapter.class,
+    LocalTimeMilliOfDayAdapter.class,
+    YearMonthEpochMonthAdapter.class,
+    YearInt32Adapter.class,
+    PeriodIsoStringAdapter.class,
+    ZoneIdStringAdapter.class,
+    ZoneOffsetSecondsAdapter.class,
+    DateEpochMilliAdapter.class,
+    ZonedDateTimeIsoStringAdapter.class,
+    OffsetDateTimeIsoStringAdapter.class
 })
 public class RichAdaptersModel {
 

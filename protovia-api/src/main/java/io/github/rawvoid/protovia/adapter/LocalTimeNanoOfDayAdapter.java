@@ -21,36 +21,33 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Duration;
+import java.time.LocalTime;
 
 /**
- * Opt-in {@link Duration} as proto3 {@code int64} nanoseconds. Unused unless named
- * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote Supports durations up to ±292 years. Throws {@link ProtoException}
- * if the duration exceeds the 64-bit nanosecond range.
+ * Opt-in {@link LocalTime} as proto3 {@code int64} nanosecond of day (0 to 86,399,999,999,999).
+ * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT64)
-public final class DurationNano implements ProtoAdapter<Duration, Long> {
+public final class LocalTimeNanoOfDayAdapter implements ProtoAdapter<LocalTime, Long> {
 
-    public static final DurationNano INSTANCE = new DurationNano();
+    public static final LocalTimeNanoOfDayAdapter INSTANCE = new LocalTimeNanoOfDayAdapter();
+    private static final long MAX_NANO_OF_DAY = 86_399_999_999_999L;
 
-    private DurationNano() {
+    private LocalTimeNanoOfDayAdapter() {
     }
 
     @Override
-    public Long toWire(Duration value) {
-        try {
-            return value.toNanos();
-        } catch (ArithmeticException e) {
-            throw new ProtoException("Duration out of int64 nanoseconds range: " + value, e);
+    public Long toWire(LocalTime value) {
+        return value.toNanoOfDay();
+    }
+
+    @Override
+    public LocalTime fromWire(Long wire) {
+        if (wire < 0 || wire > MAX_NANO_OF_DAY) {
+            throw new ProtoException("LocalTime nano-of-day out of range [0, 86399999999999]: " + wire);
         }
-    }
-
-    @Override
-    public Duration fromWire(Long wire) {
-        return Duration.ofNanos(wire);
+        return LocalTime.ofNanoOfDay(wire);
     }
 }

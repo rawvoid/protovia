@@ -16,7 +16,7 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.InstantEpochMilli;
+import io.github.rawvoid.protovia.adapter.InstantEpochMilliAdapter;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import lombok.AllArgsConstructor;
@@ -39,7 +39,7 @@ public class Audit {
     @ProtoField(number = 1)
     public String id;
 
-    @ProtoField(number = 2, adapter = InstantEpochMilli.class)
+    @ProtoField(number = 2, adapter = InstantEpochMilliAdapter.class)
     public Instant created;
 
     @ProtoField(number = 3)

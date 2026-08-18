@@ -37,46 +37,46 @@ class SampleAdapterTest {
     @Test
     void localDateEpochDayRoundTrip() {
         LocalDate epoch = LocalDate.of(1970, 1, 1);
-        assertEquals(0, LocalDateEpochDay.INSTANCE.toWire(epoch));
-        assertEquals(epoch, LocalDateEpochDay.INSTANCE.fromWire(0));
+        assertEquals(0, LocalDateEpochDayAdapter.INSTANCE.toWire(epoch));
+        assertEquals(epoch, LocalDateEpochDayAdapter.INSTANCE.fromWire(0));
 
         LocalDate day = LocalDate.of(2026, 8, 13);
-        assertEquals(20678, LocalDateEpochDay.INSTANCE.toWire(day));
-        assertEquals(day, LocalDateEpochDay.INSTANCE.fromWire(20678));
+        assertEquals(20678, LocalDateEpochDayAdapter.INSTANCE.toWire(day));
+        assertEquals(day, LocalDateEpochDayAdapter.INSTANCE.fromWire(20678));
     }
 
     @Test
     void localDateEpochDayRejectsOutOfInt32Range() {
         LocalDate tooBig = LocalDate.ofEpochDay((long) Integer.MAX_VALUE + 1);
         ProtoException high = assertThrows(ProtoException.class,
-            () -> LocalDateEpochDay.INSTANCE.toWire(tooBig));
+            () -> LocalDateEpochDayAdapter.INSTANCE.toWire(tooBig));
         assertTrue(high.getMessage().contains("int32 epoch-day range"));
 
         LocalDate tooSmall = LocalDate.ofEpochDay((long) Integer.MIN_VALUE - 1);
         ProtoException low = assertThrows(ProtoException.class,
-            () -> LocalDateEpochDay.INSTANCE.toWire(tooSmall));
+            () -> LocalDateEpochDayAdapter.INSTANCE.toWire(tooSmall));
         assertTrue(low.getMessage().contains("int32 epoch-day range"));
 
-        assertThrows(ProtoException.class, () -> LocalDateEpochDay.INSTANCE.toWire(LocalDate.MAX));
-        assertThrows(ProtoException.class, () -> LocalDateEpochDay.INSTANCE.toWire(LocalDate.MIN));
+        assertThrows(ProtoException.class, () -> LocalDateEpochDayAdapter.INSTANCE.toWire(LocalDate.MAX));
+        assertThrows(ProtoException.class, () -> LocalDateEpochDayAdapter.INSTANCE.toWire(LocalDate.MIN));
 
         assertEquals(Integer.MAX_VALUE,
-            LocalDateEpochDay.INSTANCE.toWire(LocalDate.ofEpochDay(Integer.MAX_VALUE)));
+            LocalDateEpochDayAdapter.INSTANCE.toWire(LocalDate.ofEpochDay(Integer.MAX_VALUE)));
         assertEquals(Integer.MIN_VALUE,
-            LocalDateEpochDay.INSTANCE.toWire(LocalDate.ofEpochDay(Integer.MIN_VALUE)));
+            LocalDateEpochDayAdapter.INSTANCE.toWire(LocalDate.ofEpochDay(Integer.MIN_VALUE)));
     }
 
     @Test
     void uuidStringRoundTrip() {
         UUID id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-        assertEquals(id.toString(), UuidString.INSTANCE.toWire(id));
-        assertEquals(id, UuidString.INSTANCE.fromWire(id.toString()));
+        assertEquals(id.toString(), UuidStringAdapter.INSTANCE.toWire(id));
+        assertEquals(id, UuidStringAdapter.INSTANCE.fromWire(id.toString()));
     }
 
     @Test
     void uuidStringWrapsParseFailure() {
         ProtoException ex = assertThrows(ProtoException.class,
-            () -> UuidString.INSTANCE.fromWire("not-a-uuid"));
+            () -> UuidStringAdapter.INSTANCE.fromWire("not-a-uuid"));
         assertTrue(ex.getMessage().contains("not-a-uuid"));
         assertInstanceOf(IllegalArgumentException.class, ex.getCause());
     }
@@ -84,114 +84,114 @@ class SampleAdapterTest {
     @Test
     void uuidBytesRoundTrip() {
         UUID id = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
-        byte[] wire = UuidBytes.INSTANCE.toWire(id);
+        byte[] wire = UuidBytesAdapter.INSTANCE.toWire(id);
         assertEquals(16, wire.length);
-        assertEquals(id, UuidBytes.INSTANCE.fromWire(wire));
+        assertEquals(id, UuidBytesAdapter.INSTANCE.fromWire(wire));
 
         UUID random = UUID.randomUUID();
-        assertEquals(random, UuidBytes.INSTANCE.fromWire(UuidBytes.INSTANCE.toWire(random)));
+        assertEquals(random, UuidBytesAdapter.INSTANCE.fromWire(UuidBytesAdapter.INSTANCE.toWire(random)));
     }
 
     @Test
     void uuidBytesRejectsInvalidLength() {
-        assertThrows(ProtoException.class, () -> UuidBytes.INSTANCE.fromWire(null));
-        assertThrows(ProtoException.class, () -> UuidBytes.INSTANCE.fromWire(new byte[15]));
-        assertThrows(ProtoException.class, () -> UuidBytes.INSTANCE.fromWire(new byte[17]));
+        assertThrows(ProtoException.class, () -> UuidBytesAdapter.INSTANCE.fromWire(null));
+        assertThrows(ProtoException.class, () -> UuidBytesAdapter.INSTANCE.fromWire(new byte[15]));
+        assertThrows(ProtoException.class, () -> UuidBytesAdapter.INSTANCE.fromWire(new byte[17]));
     }
 
     @Test
     void instantEpochMilliRoundTrip() {
         Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
-        assertEquals(at.toEpochMilli(), InstantEpochMilli.INSTANCE.toWire(at));
-        assertEquals(at, InstantEpochMilli.INSTANCE.fromWire(at.toEpochMilli()));
+        assertEquals(at.toEpochMilli(), InstantEpochMilliAdapter.INSTANCE.toWire(at));
+        assertEquals(at, InstantEpochMilliAdapter.INSTANCE.fromWire(at.toEpochMilli()));
     }
 
     @Test
     void instantEpochSecondRoundTrip() {
         Instant at = Instant.ofEpochSecond(1700000000L);
-        assertEquals(1700000000L, InstantEpochSecond.INSTANCE.toWire(at));
-        assertEquals(at, InstantEpochSecond.INSTANCE.fromWire(1700000000L));
+        assertEquals(1700000000L, InstantEpochSecondAdapter.INSTANCE.toWire(at));
+        assertEquals(at, InstantEpochSecondAdapter.INSTANCE.fromWire(1700000000L));
     }
 
     @Test
     void instantEpochNanoRoundTrip() {
         Instant at = Instant.parse("2026-08-18T15:47:05.123456789Z");
-        long wire = InstantEpochNano.INSTANCE.toWire(at);
-        assertEquals(at, InstantEpochNano.INSTANCE.fromWire(wire));
+        long wire = InstantEpochNanoAdapter.INSTANCE.toWire(at);
+        assertEquals(at, InstantEpochNanoAdapter.INSTANCE.fromWire(wire));
 
         Instant negative = Instant.ofEpochSecond(-10, 500_000_000);
-        long negWire = InstantEpochNano.INSTANCE.toWire(negative);
-        assertEquals(negative, InstantEpochNano.INSTANCE.fromWire(negWire));
+        long negWire = InstantEpochNanoAdapter.INSTANCE.toWire(negative);
+        assertEquals(negative, InstantEpochNanoAdapter.INSTANCE.fromWire(negWire));
     }
 
     @Test
     void durationMilliRoundTrip() {
         Duration wait = Duration.ofMillis(-1500);
-        assertEquals(-1500L, DurationMilli.INSTANCE.toWire(wait));
-        assertEquals(wait, DurationMilli.INSTANCE.fromWire(-1500L));
+        assertEquals(-1500L, DurationMilliAdapter.INSTANCE.toWire(wait));
+        assertEquals(wait, DurationMilliAdapter.INSTANCE.fromWire(-1500L));
     }
 
     @Test
     void durationSecondRoundTrip() {
         Duration d = Duration.ofSeconds(120);
-        assertEquals(120L, DurationSecond.INSTANCE.toWire(d));
-        assertEquals(d, DurationSecond.INSTANCE.fromWire(120L));
+        assertEquals(120L, DurationSecondAdapter.INSTANCE.toWire(d));
+        assertEquals(d, DurationSecondAdapter.INSTANCE.fromWire(120L));
     }
 
     @Test
     void durationNanoRoundTrip() {
         Duration d = Duration.ofNanos(9876543210L);
-        assertEquals(9876543210L, DurationNano.INSTANCE.toWire(d));
-        assertEquals(d, DurationNano.INSTANCE.fromWire(9876543210L));
+        assertEquals(9876543210L, DurationNanoAdapter.INSTANCE.toWire(d));
+        assertEquals(d, DurationNanoAdapter.INSTANCE.fromWire(9876543210L));
     }
 
     @Test
     void localTimeSecondOfDayRoundTrip() {
         LocalTime time = LocalTime.of(14, 30, 45);
-        int wire = LocalTimeSecondOfDay.INSTANCE.toWire(time);
+        int wire = LocalTimeSecondOfDayAdapter.INSTANCE.toWire(time);
         assertEquals(time.toSecondOfDay(), wire);
-        assertEquals(time, LocalTimeSecondOfDay.INSTANCE.fromWire(wire));
+        assertEquals(time, LocalTimeSecondOfDayAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> LocalTimeSecondOfDay.INSTANCE.fromWire(-1));
-        assertThrows(ProtoException.class, () -> LocalTimeSecondOfDay.INSTANCE.fromWire(86400));
+        assertThrows(ProtoException.class, () -> LocalTimeSecondOfDayAdapter.INSTANCE.fromWire(-1));
+        assertThrows(ProtoException.class, () -> LocalTimeSecondOfDayAdapter.INSTANCE.fromWire(86400));
     }
 
     @Test
     void localTimeMilliOfDayRoundTrip() {
         LocalTime time = LocalTime.of(14, 30, 45, 123_000_000);
-        int wire = LocalTimeMilliOfDay.INSTANCE.toWire(time);
-        assertEquals(time, LocalTimeMilliOfDay.INSTANCE.fromWire(wire));
+        int wire = LocalTimeMilliOfDayAdapter.INSTANCE.toWire(time);
+        assertEquals(time, LocalTimeMilliOfDayAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> LocalTimeMilliOfDay.INSTANCE.fromWire(-1));
-        assertThrows(ProtoException.class, () -> LocalTimeMilliOfDay.INSTANCE.fromWire(86_400_000));
+        assertThrows(ProtoException.class, () -> LocalTimeMilliOfDayAdapter.INSTANCE.fromWire(-1));
+        assertThrows(ProtoException.class, () -> LocalTimeMilliOfDayAdapter.INSTANCE.fromWire(86_400_000));
     }
 
     @Test
     void localTimeNanoOfDayRoundTrip() {
         LocalTime time = LocalTime.of(23, 59, 59, 999_999_999);
-        long wire = LocalTimeNanoOfDay.INSTANCE.toWire(time);
-        assertEquals(time, LocalTimeNanoOfDay.INSTANCE.fromWire(wire));
+        long wire = LocalTimeNanoOfDayAdapter.INSTANCE.toWire(time);
+        assertEquals(time, LocalTimeNanoOfDayAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> LocalTimeNanoOfDay.INSTANCE.fromWire(-1L));
-        assertThrows(ProtoException.class, () -> LocalTimeNanoOfDay.INSTANCE.fromWire(86_400_000_000_000L));
+        assertThrows(ProtoException.class, () -> LocalTimeNanoOfDayAdapter.INSTANCE.fromWire(-1L));
+        assertThrows(ProtoException.class, () -> LocalTimeNanoOfDayAdapter.INSTANCE.fromWire(86_400_000_000_000L));
     }
 
     @Test
     void localDateTimeEpochMilliRoundTrip() {
         LocalDateTime ldt = LocalDateTime.of(2026, 8, 18, 15, 30, 0, 123_000_000);
-        long wire = LocalDateTimeEpochMilli.INSTANCE.toWire(ldt);
-        assertEquals(ldt, LocalDateTimeEpochMilli.INSTANCE.fromWire(wire));
+        long wire = LocalDateTimeEpochMilliAdapter.INSTANCE.toWire(ldt);
+        assertEquals(ldt, LocalDateTimeEpochMilliAdapter.INSTANCE.fromWire(wire));
     }
 
     @Test
     void zonedDateTimeEpochMilliRoundTrip() {
         ZonedDateTime zdt = ZonedDateTime.of(2026, 8, 18, 15, 30, 0, 0, ZoneOffset.UTC);
-        long wire = ZonedDateTimeEpochMilli.INSTANCE.toWire(zdt);
-        assertEquals(zdt, ZonedDateTimeEpochMilli.INSTANCE.fromWire(wire));
+        long wire = ZonedDateTimeEpochMilliAdapter.INSTANCE.toWire(zdt);
+        assertEquals(zdt, ZonedDateTimeEpochMilliAdapter.INSTANCE.fromWire(wire));
 
         ZonedDateTime shanghai = ZonedDateTime.of(2026, 8, 18, 15, 30, 0, 0, ZoneId.of("Asia/Shanghai"));
-        long wireSh = ZonedDateTimeEpochMilli.INSTANCE.toWire(shanghai);
-        ZonedDateTime restoredUtc = ZonedDateTimeEpochMilli.INSTANCE.fromWire(wireSh);
+        long wireSh = ZonedDateTimeEpochMilliAdapter.INSTANCE.toWire(shanghai);
+        ZonedDateTime restoredUtc = ZonedDateTimeEpochMilliAdapter.INSTANCE.fromWire(wireSh);
         assertEquals(shanghai.toInstant(), restoredUtc.toInstant());
         assertEquals(ZoneOffset.UTC, restoredUtc.getZone());
     }
@@ -199,142 +199,142 @@ class SampleAdapterTest {
     @Test
     void offsetDateTimeEpochMilliRoundTrip() {
         OffsetDateTime odt = OffsetDateTime.of(2026, 8, 18, 15, 30, 0, 0, ZoneOffset.UTC);
-        long wire = OffsetDateTimeEpochMilli.INSTANCE.toWire(odt);
-        assertEquals(odt, OffsetDateTimeEpochMilli.INSTANCE.fromWire(wire));
+        long wire = OffsetDateTimeEpochMilliAdapter.INSTANCE.toWire(odt);
+        assertEquals(odt, OffsetDateTimeEpochMilliAdapter.INSTANCE.fromWire(wire));
     }
 
     @Test
-    void zonedDateTimeStringRoundTrip() {
+    void zonedDateTimeIsoStringRoundTrip() {
         ZonedDateTime zdt = ZonedDateTime.of(2026, 8, 18, 15, 30, 0, 123_000_000, ZoneId.of("Asia/Shanghai"));
-        String wire = ZonedDateTimeString.INSTANCE.toWire(zdt);
-        assertEquals(zdt, ZonedDateTimeString.INSTANCE.fromWire(wire));
+        String wire = ZonedDateTimeIsoStringAdapter.INSTANCE.toWire(zdt);
+        assertEquals(zdt, ZonedDateTimeIsoStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> ZonedDateTimeString.INSTANCE.fromWire("invalid-zdt"));
+        assertThrows(ProtoException.class, () -> ZonedDateTimeIsoStringAdapter.INSTANCE.fromWire("invalid-zdt"));
     }
 
     @Test
-    void offsetDateTimeStringRoundTrip() {
+    void offsetDateTimeIsoStringRoundTrip() {
         OffsetDateTime odt = OffsetDateTime.of(2026, 8, 18, 15, 30, 0, 123_000_000, ZoneOffset.ofHours(8));
-        String wire = OffsetDateTimeString.INSTANCE.toWire(odt);
-        assertEquals(odt, OffsetDateTimeString.INSTANCE.fromWire(wire));
+        String wire = OffsetDateTimeIsoStringAdapter.INSTANCE.toWire(odt);
+        assertEquals(odt, OffsetDateTimeIsoStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> OffsetDateTimeString.INSTANCE.fromWire("invalid-odt"));
+        assertThrows(ProtoException.class, () -> OffsetDateTimeIsoStringAdapter.INSTANCE.fromWire("invalid-odt"));
     }
 
     @Test
     void yearMonthEpochMonthRoundTrip() {
         YearMonth ym = YearMonth.of(2026, 8);
-        int wire = YearMonthEpochMonth.INSTANCE.toWire(ym);
-        assertEquals(ym, YearMonthEpochMonth.INSTANCE.fromWire(wire));
+        int wire = YearMonthEpochMonthAdapter.INSTANCE.toWire(ym);
+        assertEquals(ym, YearMonthEpochMonthAdapter.INSTANCE.fromWire(wire));
 
         YearMonth epoch = YearMonth.of(1970, 1);
-        assertEquals(23640, YearMonthEpochMonth.INSTANCE.toWire(epoch));
-        assertEquals(epoch, YearMonthEpochMonth.INSTANCE.fromWire(23640));
+        assertEquals(23640, YearMonthEpochMonthAdapter.INSTANCE.toWire(epoch));
+        assertEquals(epoch, YearMonthEpochMonthAdapter.INSTANCE.fromWire(23640));
 
         YearMonth bc = YearMonth.of(-1, 12);
-        int bcWire = YearMonthEpochMonth.INSTANCE.toWire(bc);
-        assertEquals(bc, YearMonthEpochMonth.INSTANCE.fromWire(bcWire));
+        int bcWire = YearMonthEpochMonthAdapter.INSTANCE.toWire(bc);
+        assertEquals(bc, YearMonthEpochMonthAdapter.INSTANCE.fromWire(bcWire));
     }
 
     @Test
-    void yearValueRoundTrip() {
+    void yearInt32RoundTrip() {
         Year y = Year.of(2026);
-        assertEquals(2026, YearValue.INSTANCE.toWire(y));
-        assertEquals(y, YearValue.INSTANCE.fromWire(2026));
+        assertEquals(2026, YearInt32Adapter.INSTANCE.toWire(y));
+        assertEquals(y, YearInt32Adapter.INSTANCE.fromWire(2026));
 
-        assertThrows(ProtoException.class, () -> YearValue.INSTANCE.fromWire((int) 1e10));
+        assertThrows(ProtoException.class, () -> YearInt32Adapter.INSTANCE.fromWire((int) 1e10));
     }
 
     @Test
-    void periodStringRoundTrip() {
+    void periodIsoStringRoundTrip() {
         Period period = Period.of(1, 2, 3);
-        String wire = PeriodString.INSTANCE.toWire(period);
+        String wire = PeriodIsoStringAdapter.INSTANCE.toWire(period);
         assertEquals("P1Y2M3D", wire);
-        assertEquals(period, PeriodString.INSTANCE.fromWire(wire));
+        assertEquals(period, PeriodIsoStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> PeriodString.INSTANCE.fromWire("invalid-period"));
+        assertThrows(ProtoException.class, () -> PeriodIsoStringAdapter.INSTANCE.fromWire("invalid-period"));
     }
 
     @Test
     void zoneIdStringRoundTrip() {
         ZoneId zone = ZoneId.of("Asia/Shanghai");
-        String wire = ZoneIdString.INSTANCE.toWire(zone);
+        String wire = ZoneIdStringAdapter.INSTANCE.toWire(zone);
         assertEquals("Asia/Shanghai", wire);
-        assertEquals(zone, ZoneIdString.INSTANCE.fromWire(wire));
+        assertEquals(zone, ZoneIdStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> ZoneIdString.INSTANCE.fromWire("Invalid/Zone_ID"));
+        assertThrows(ProtoException.class, () -> ZoneIdStringAdapter.INSTANCE.fromWire("Invalid/Zone_ID"));
     }
 
     @Test
     void zoneOffsetSecondsRoundTrip() {
         ZoneOffset offset = ZoneOffset.ofHours(8);
-        int wire = ZoneOffsetSeconds.INSTANCE.toWire(offset);
+        int wire = ZoneOffsetSecondsAdapter.INSTANCE.toWire(offset);
         assertEquals(28800, wire);
-        assertEquals(offset, ZoneOffsetSeconds.INSTANCE.fromWire(wire));
+        assertEquals(offset, ZoneOffsetSecondsAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> ZoneOffsetSeconds.INSTANCE.fromWire(1000000));
+        assertThrows(ProtoException.class, () -> ZoneOffsetSecondsAdapter.INSTANCE.fromWire(1000000));
     }
 
     @Test
     void dateEpochMilliRoundTrip() {
         Date date = new Date(1700000000000L);
-        long wire = DateEpochMilli.INSTANCE.toWire(date);
+        long wire = DateEpochMilliAdapter.INSTANCE.toWire(date);
         assertEquals(1700000000000L, wire);
-        assertEquals(date, DateEpochMilli.INSTANCE.fromWire(wire));
+        assertEquals(date, DateEpochMilliAdapter.INSTANCE.fromWire(wire));
     }
 
     @Test
     void bigDecimalStringRoundTrip() {
         BigDecimal dec = new BigDecimal("12345678901234567890.123456789");
-        String wire = BigDecimalString.INSTANCE.toWire(dec);
+        String wire = BigDecimalStringAdapter.INSTANCE.toWire(dec);
         assertEquals("12345678901234567890.123456789", wire);
-        assertEquals(dec, BigDecimalString.INSTANCE.fromWire(wire));
+        assertEquals(dec, BigDecimalStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> BigDecimalString.INSTANCE.fromWire("abc"));
+        assertThrows(ProtoException.class, () -> BigDecimalStringAdapter.INSTANCE.fromWire("abc"));
     }
 
     @Test
     void bigIntegerStringRoundTrip() {
         BigInteger bi = new BigInteger("987654321098765432109876543210");
-        String wire = BigIntegerString.INSTANCE.toWire(bi);
+        String wire = BigIntegerStringAdapter.INSTANCE.toWire(bi);
         assertEquals("987654321098765432109876543210", wire);
-        assertEquals(bi, BigIntegerString.INSTANCE.fromWire(wire));
+        assertEquals(bi, BigIntegerStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> BigIntegerString.INSTANCE.fromWire("xyz"));
+        assertThrows(ProtoException.class, () -> BigIntegerStringAdapter.INSTANCE.fromWire("xyz"));
     }
 
     @Test
     void inetAddressBytesRoundTrip() throws Exception {
         InetAddress v4 = InetAddress.getByName("192.168.1.1");
-        byte[] wireV4 = InetAddressBytes.INSTANCE.toWire(v4);
+        byte[] wireV4 = InetAddressBytesAdapter.INSTANCE.toWire(v4);
         assertEquals(4, wireV4.length);
-        assertEquals(v4, InetAddressBytes.INSTANCE.fromWire(wireV4));
+        assertEquals(v4, InetAddressBytesAdapter.INSTANCE.fromWire(wireV4));
 
         InetAddress v6 = InetAddress.getByName("2001:db8::1");
-        byte[] wireV6 = InetAddressBytes.INSTANCE.toWire(v6);
+        byte[] wireV6 = InetAddressBytesAdapter.INSTANCE.toWire(v6);
         assertEquals(16, wireV6.length);
-        assertEquals(v6, InetAddressBytes.INSTANCE.fromWire(wireV6));
+        assertEquals(v6, InetAddressBytesAdapter.INSTANCE.fromWire(wireV6));
 
-        assertThrows(ProtoException.class, () -> InetAddressBytes.INSTANCE.fromWire(new byte[5]));
+        assertThrows(ProtoException.class, () -> InetAddressBytesAdapter.INSTANCE.fromWire(new byte[5]));
     }
 
     @Test
     void inetAddressStringRoundTrip() throws Exception {
         InetAddress v4 = InetAddress.getByName("192.168.1.1");
-        String wireV4 = InetAddressString.INSTANCE.toWire(v4);
+        String wireV4 = InetAddressStringAdapter.INSTANCE.toWire(v4);
         assertEquals("192.168.1.1", wireV4);
-        assertEquals(v4, InetAddressString.INSTANCE.fromWire(wireV4));
+        assertEquals(v4, InetAddressStringAdapter.INSTANCE.fromWire(wireV4));
 
-        assertThrows(ProtoException.class, () -> InetAddressString.INSTANCE.fromWire("999.999.999.999"));
+        assertThrows(ProtoException.class, () -> InetAddressStringAdapter.INSTANCE.fromWire("999.999.999.999"));
     }
 
     @Test
     void uriStringRoundTrip() {
         URI uri = URI.create("https://example.com/api/v1?query=protovia#top");
-        String wire = UriString.INSTANCE.toWire(uri);
+        String wire = UriStringAdapter.INSTANCE.toWire(uri);
         assertEquals(uri.toString(), wire);
-        assertEquals(uri, UriString.INSTANCE.fromWire(wire));
+        assertEquals(uri, UriStringAdapter.INSTANCE.fromWire(wire));
 
-        assertThrows(ProtoException.class, () -> UriString.INSTANCE.fromWire("http:// invalid url with spaces"));
+        assertThrows(ProtoException.class, () -> UriStringAdapter.INSTANCE.fromWire("http:// invalid url with spaces"));
     }
 }

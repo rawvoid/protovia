@@ -16,7 +16,7 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.LocalDateEpochDay;
+import io.github.rawvoid.protovia.adapter.LocalDateEpochDayAdapter;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
@@ -28,6 +28,6 @@ import java.time.LocalDate;
 @ProtoMessage
 public record DatedRecord(
     @ProtoField(number = 1) String id,
-    @ProtoField(number = 2, adapter = LocalDateEpochDay.class) LocalDate on
+    @ProtoField(number = 2, adapter = LocalDateEpochDayAdapter.class) LocalDate on
 ) {
 }

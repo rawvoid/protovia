@@ -16,39 +16,39 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Instant;
+import java.time.DateTimeException;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 
 /**
- * Opt-in {@link ZonedDateTime} as proto3 {@code int64} epoch millisecond.
+ * Opt-in {@link ZoneOffset} as proto3 {@code int32} total seconds offset from UTC (e.g. +28800 for +08:00).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote Lossy conversion: the original {@link java.time.ZoneId} is not preserved on the wire.
- * {@link #fromWire(Long)} restores the timestamp in {@link ZoneOffset#UTC}. Drops sub-millisecond precision.
- * For lossless representation, use {@link ZonedDateTimeString}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class ZonedDateTimeEpochMilli implements ProtoAdapter<ZonedDateTime, Long> {
+@ProtoScalar(ProtoType.INT32)
+public final class ZoneOffsetSecondsAdapter implements ProtoAdapter<ZoneOffset, Integer> {
 
-    public static final ZonedDateTimeEpochMilli INSTANCE = new ZonedDateTimeEpochMilli();
+    public static final ZoneOffsetSecondsAdapter INSTANCE = new ZoneOffsetSecondsAdapter();
 
-    private ZonedDateTimeEpochMilli() {
+    private ZoneOffsetSecondsAdapter() {
     }
 
     @Override
-    public Long toWire(ZonedDateTime value) {
-        return value.toInstant().toEpochMilli();
+    public Integer toWire(ZoneOffset value) {
+        return value.getTotalSeconds();
     }
 
     @Override
-    public ZonedDateTime fromWire(Long wire) {
-        return Instant.ofEpochMilli(wire).atZone(ZoneOffset.UTC);
+    public ZoneOffset fromWire(Integer wire) {
+        try {
+            return ZoneOffset.ofTotalSeconds(wire);
+        } catch (DateTimeException e) {
+            throw new ProtoException("invalid ZoneOffset seconds: " + wire, e);
+        }
     }
 }

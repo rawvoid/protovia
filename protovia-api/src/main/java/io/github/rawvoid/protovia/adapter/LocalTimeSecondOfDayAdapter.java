@@ -16,35 +16,39 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Instant;
+import java.time.LocalTime;
 
 /**
- * Opt-in {@link Instant} as proto3 {@code int64} epoch second. Unused unless named
- * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link LocalTime} as proto3 {@code int32} second of day (0 to 86,399).
+ * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
- * @implNote Lossy conversion: drops sub-second (millisecond and nanosecond) precision.
+ * @implNote Lossy conversion: drops sub-second precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class InstantEpochSecond implements ProtoAdapter<Instant, Long> {
+@ProtoScalar(ProtoType.INT32)
+public final class LocalTimeSecondOfDayAdapter implements ProtoAdapter<LocalTime, Integer> {
 
-    public static final InstantEpochSecond INSTANCE = new InstantEpochSecond();
+    public static final LocalTimeSecondOfDayAdapter INSTANCE = new LocalTimeSecondOfDayAdapter();
 
-    private InstantEpochSecond() {
+    private LocalTimeSecondOfDayAdapter() {
     }
 
     @Override
-    public Long toWire(Instant value) {
-        return value.getEpochSecond();
+    public Integer toWire(LocalTime value) {
+        return value.toSecondOfDay();
     }
 
     @Override
-    public Instant fromWire(Long wire) {
-        return Instant.ofEpochSecond(wire);
+    public LocalTime fromWire(Integer wire) {
+        if (wire < 0 || wire > 86399) {
+            throw new ProtoException("LocalTime second-of-day out of range [0, 86399]: " + wire);
+        }
+        return LocalTime.ofSecondOfDay(wire);
     }
 }

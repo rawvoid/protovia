@@ -16,8 +16,8 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.DurationMilli;
-import io.github.rawvoid.protovia.adapter.InstantEpochMilli;
+import io.github.rawvoid.protovia.adapter.DurationMilliAdapter;
+import io.github.rawvoid.protovia.adapter.InstantEpochMilliAdapter;
 import io.github.rawvoid.protovia.annotation.ProtoAdapters;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
@@ -37,7 +37,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @ProtoMessage
-@ProtoAdapters({InstantEpochMilli.class, DurationMilli.class})
+@ProtoAdapters({InstantEpochMilliAdapter.class, DurationMilliAdapter.class})
 public class Event {
 
     @ProtoField(number = 1)

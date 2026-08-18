@@ -16,34 +16,39 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.util.Date;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /**
- * Opt-in {@link Date} as proto3 {@code int64} epoch millisecond.
- * Useful for interoperability with legacy Java codebases.
+ * Opt-in {@link InetAddress} as proto3 {@code bytes} (4 bytes for IPv4, 16 bytes for IPv6 in network byte order).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class DateEpochMilli implements ProtoAdapter<Date, Long> {
+@ProtoScalar(ProtoType.BYTES)
+public final class InetAddressBytesAdapter implements ProtoAdapter<InetAddress, byte[]> {
 
-    public static final DateEpochMilli INSTANCE = new DateEpochMilli();
+    public static final InetAddressBytesAdapter INSTANCE = new InetAddressBytesAdapter();
 
-    private DateEpochMilli() {
+    private InetAddressBytesAdapter() {
     }
 
     @Override
-    public Long toWire(Date value) {
-        return value.getTime();
+    public byte[] toWire(InetAddress value) {
+        return value.getAddress();
     }
 
     @Override
-    public Date fromWire(Long wire) {
-        return new Date(wire);
+    public InetAddress fromWire(byte[] wire) {
+        try {
+            return InetAddress.getByAddress(wire);
+        } catch (UnknownHostException e) {
+            throw new ProtoException("invalid IP address bytes: " + (wire == null ? 0 : wire.length) + " bytes", e);
+        }
     }
 }

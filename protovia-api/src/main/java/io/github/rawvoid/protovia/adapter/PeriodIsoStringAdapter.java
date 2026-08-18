@@ -21,35 +21,34 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.OffsetDateTime;
+import java.time.Period;
 import java.time.format.DateTimeParseException;
 
 /**
- * Opt-in {@link OffsetDateTime} as proto3 {@code string} formatted in standard ISO-8601 / RFC 3339
- * (e.g. {@code "2026-08-18T15:47:05.123+08:00"}).
+ * Opt-in {@link Period} as proto3 {@code string} in ISO-8601 period format (e.g. {@code "P1Y2M3D"}).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.STRING)
-public final class OffsetDateTimeString implements ProtoAdapter<OffsetDateTime, String> {
+public final class PeriodIsoStringAdapter implements ProtoAdapter<Period, String> {
 
-    public static final OffsetDateTimeString INSTANCE = new OffsetDateTimeString();
+    public static final PeriodIsoStringAdapter INSTANCE = new PeriodIsoStringAdapter();
 
-    private OffsetDateTimeString() {
+    private PeriodIsoStringAdapter() {
     }
 
     @Override
-    public String toWire(OffsetDateTime value) {
+    public String toWire(Period value) {
         return value.toString();
     }
 
     @Override
-    public OffsetDateTime fromWire(String wire) {
+    public Period fromWire(String wire) {
         try {
-            return OffsetDateTime.parse(wire);
+            return Period.parse(wire);
         } catch (DateTimeParseException e) {
-            throw new ProtoException("invalid OffsetDateTime string: " + wire, e);
+            throw new ProtoException("invalid Period string: " + wire, e);
         }
     }
 }

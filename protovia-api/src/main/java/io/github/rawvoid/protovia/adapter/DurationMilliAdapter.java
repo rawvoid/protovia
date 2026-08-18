@@ -16,39 +16,34 @@
 
 package io.github.rawvoid.protovia.adapter;
 
-import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Period;
-import java.time.format.DateTimeParseException;
+import java.time.Duration;
 
 /**
- * Opt-in {@link Period} as proto3 {@code string} in ISO-8601 period format (e.g. {@code "P1Y2M3D"}).
- * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link Duration} as proto3 {@code int64} millis. Unused unless named
+ * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. The default mapping
+ * remains {@code google.protobuf.Duration}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.STRING)
-public final class PeriodString implements ProtoAdapter<Period, String> {
+@ProtoScalar(ProtoType.INT64)
+public final class DurationMilliAdapter implements ProtoAdapter<Duration, Long> {
 
-    public static final PeriodString INSTANCE = new PeriodString();
+    public static final DurationMilliAdapter INSTANCE = new DurationMilliAdapter();
 
-    private PeriodString() {
+    private DurationMilliAdapter() {
     }
 
     @Override
-    public String toWire(Period value) {
-        return value.toString();
+    public Long toWire(Duration value) {
+        return value.toMillis();
     }
 
     @Override
-    public Period fromWire(String wire) {
-        try {
-            return Period.parse(wire);
-        } catch (DateTimeParseException e) {
-            throw new ProtoException("invalid Period string: " + wire, e);
-        }
+    public Duration fromWire(Long wire) {
+        return Duration.ofMillis(wire);
     }
 }

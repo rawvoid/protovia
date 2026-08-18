@@ -16,39 +16,40 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 
 /**
- * Opt-in {@link LocalDateTime} as proto3 {@code int64} epoch millisecond.
+ * Opt-in {@link ZonedDateTime} as proto3 {@code string} formatted in standard ISO-8601
+ * (e.g. {@code "2026-08-18T15:47:05.123+08:00[Asia/Shanghai]"}).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote {@link LocalDateTime} has no timezone component. This adapter implicitly assumes
- * and binds to {@link ZoneOffset#UTC} during serialization and deserialization.
- * Drops sub-millisecond precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class LocalDateTimeEpochMilli implements ProtoAdapter<LocalDateTime, Long> {
+@ProtoScalar(ProtoType.STRING)
+public final class ZonedDateTimeIsoStringAdapter implements ProtoAdapter<ZonedDateTime, String> {
 
-    public static final LocalDateTimeEpochMilli INSTANCE = new LocalDateTimeEpochMilli();
+    public static final ZonedDateTimeIsoStringAdapter INSTANCE = new ZonedDateTimeIsoStringAdapter();
 
-    private LocalDateTimeEpochMilli() {
+    private ZonedDateTimeIsoStringAdapter() {
     }
 
     @Override
-    public Long toWire(LocalDateTime value) {
-        return value.toInstant(ZoneOffset.UTC).toEpochMilli();
+    public String toWire(ZonedDateTime value) {
+        return value.toString();
     }
 
     @Override
-    public LocalDateTime fromWire(Long wire) {
-        return LocalDateTime.ofInstant(Instant.ofEpochMilli(wire), ZoneOffset.UTC);
+    public ZonedDateTime fromWire(String wire) {
+        try {
+            return ZonedDateTime.parse(wire);
+        } catch (DateTimeParseException e) {
+            throw new ProtoException("invalid ZonedDateTime string: " + wire, e);
+        }
     }
 }

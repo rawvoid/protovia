@@ -21,35 +21,36 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
+import java.time.YearMonth;
 
 /**
- * Opt-in {@link ZonedDateTime} as proto3 {@code string} formatted in standard ISO-8601
- * (e.g. {@code "2026-08-18T15:47:05.123+08:00[Asia/Shanghai]"}).
+ * Opt-in {@link YearMonth} as proto3 {@code int32} 0-based epoch month (1970-01 is 23640).
+ * Calculates month count from year 0: {@code year * 12 + (month - 1)}.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.STRING)
-public final class ZonedDateTimeString implements ProtoAdapter<ZonedDateTime, String> {
+@ProtoScalar(ProtoType.INT32)
+public final class YearMonthEpochMonthAdapter implements ProtoAdapter<YearMonth, Integer> {
 
-    public static final ZonedDateTimeString INSTANCE = new ZonedDateTimeString();
+    public static final YearMonthEpochMonthAdapter INSTANCE = new YearMonthEpochMonthAdapter();
 
-    private ZonedDateTimeString() {
+    private YearMonthEpochMonthAdapter() {
     }
 
     @Override
-    public String toWire(ZonedDateTime value) {
-        return value.toString();
-    }
-
-    @Override
-    public ZonedDateTime fromWire(String wire) {
-        try {
-            return ZonedDateTime.parse(wire);
-        } catch (DateTimeParseException e) {
-            throw new ProtoException("invalid ZonedDateTime string: " + wire, e);
+    public Integer toWire(YearMonth value) {
+        long epochMonth = value.getYear() * 12L + (value.getMonthValue() - 1);
+        if (epochMonth < Integer.MIN_VALUE || epochMonth > Integer.MAX_VALUE) {
+            throw new ProtoException("YearMonth out of int32 epoch-month range: " + value);
         }
+        return (int) epochMonth;
+    }
+
+    @Override
+    public YearMonth fromWire(Integer wire) {
+        int year = Math.floorDiv(wire, 12);
+        int month = Math.floorMod(wire, 12) + 1;
+        return YearMonth.of(year, month);
     }
 }

@@ -16,8 +16,8 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.LocalDateEpochDay;
-import io.github.rawvoid.protovia.adapter.UuidString;
+import io.github.rawvoid.protovia.adapter.LocalDateEpochDayAdapter;
+import io.github.rawvoid.protovia.adapter.UuidStringAdapter;
 import io.github.rawvoid.protovia.annotation.ProtoAdapters;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
@@ -37,7 +37,7 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @ProtoMessage
-@ProtoAdapters({LocalDateEpochDay.class, UuidString.class})
+@ProtoAdapters({LocalDateEpochDayAdapter.class, UuidStringAdapter.class})
 public class Dated {
 
     @ProtoField(number = 1)

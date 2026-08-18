@@ -33,12 +33,12 @@ import java.time.Instant;
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT64)
-public final class InstantEpochNano implements ProtoAdapter<Instant, Long> {
+public final class InstantEpochNanoAdapter implements ProtoAdapter<Instant, Long> {
 
-    public static final InstantEpochNano INSTANCE = new InstantEpochNano();
+    public static final InstantEpochNanoAdapter INSTANCE = new InstantEpochNanoAdapter();
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
 
-    private InstantEpochNano() {
+    private InstantEpochNanoAdapter() {
     }
 
     @Override

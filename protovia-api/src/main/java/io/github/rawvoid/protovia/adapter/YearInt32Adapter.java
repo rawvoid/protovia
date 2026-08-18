@@ -31,11 +31,11 @@ import java.time.Year;
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT32)
-public final class YearValue implements ProtoAdapter<Year, Integer> {
+public final class YearInt32Adapter implements ProtoAdapter<Year, Integer> {
 
-    public static final YearValue INSTANCE = new YearValue();
+    public static final YearInt32Adapter INSTANCE = new YearInt32Adapter();
 
-    private YearValue() {
+    private YearInt32Adapter() {
     }
 
     @Override

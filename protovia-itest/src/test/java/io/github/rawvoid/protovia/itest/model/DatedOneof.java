@@ -16,7 +16,7 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.adapter.LocalDateEpochDay;
+import io.github.rawvoid.protovia.adapter.LocalDateEpochDayAdapter;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
 
@@ -27,7 +27,7 @@ import io.github.rawvoid.protovia.annotation.ProtoOneof;
 public class DatedOneof {
 
     @ProtoOneof({
-        @ProtoOneof.Case(number = 10, of = Born.class, adapter = LocalDateEpochDay.class),
+        @ProtoOneof.Case(number = 10, of = Born.class, adapter = LocalDateEpochDayAdapter.class),
         @ProtoOneof.Case(number = 11, of = Named.class)
     })
     public Life event;

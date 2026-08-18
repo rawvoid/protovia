@@ -127,34 +127,34 @@ Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. 
 
 | Category | Java Type | Adapter Class | Proto Wire Type | Description |
 |---|---|---|---|---|
-| **Time** | `Instant` | `InstantEpochMilli` | `int64` | Epoch milliseconds |
-| | `Instant` | `InstantEpochSecond` | `int64` | Epoch seconds (drops sub-second) |
-| | `Instant` | `InstantEpochNano` | `int64` | Epoch nanoseconds (~1678 to ~2262) |
-| | `Duration` | `DurationMilli` | `int64` | Milliseconds duration |
-| | `Duration` | `DurationSecond` | `int64` | Seconds duration |
-| | `Duration` | `DurationNano` | `int64` | Nanoseconds duration |
-| | `LocalDate` | `LocalDateEpochDay` | `int32` | Epoch day count (days since 1970-01-01) |
-| | `LocalTime` | `LocalTimeMilliOfDay` | `int32` | Millisecond of day (0..86,399,999) |
-| | `LocalTime` | `LocalTimeSecondOfDay` | `int32` | Second of day (0..86,399) |
-| | `LocalTime` | `LocalTimeNanoOfDay` | `int64` | Nanosecond of day (0..86,399,999,999,999) |
-| | `LocalDateTime` | `LocalDateTimeEpochMilli` | `int64` | Epoch milli assuming UTC |
-| | `ZonedDateTime` | `ZonedDateTimeEpochMilli` | `int64` | Epoch milli (restores as UTC) |
-| | `ZonedDateTime` | `ZonedDateTimeString` | `string` | Lossless ISO-8601 with timezone ID |
-| | `OffsetDateTime` | `OffsetDateTimeEpochMilli` | `int64` | Epoch milli (restores as UTC) |
-| | `OffsetDateTime` | `OffsetDateTimeString` | `string` | Lossless ISO-8601 / RFC 3339 |
-| | `YearMonth` | `YearMonthEpochMonth` | `int32` | 0-based epoch month (`year * 12 + month - 1`) |
-| | `Year` | `YearValue` | `int32` | Integer year (e.g. 2026) |
-| | `Period` | `PeriodString` | `string` | ISO-8601 period format (`"P1Y2M3D"`) |
-| | `ZoneId` | `ZoneIdString` | `string` | IANA zone ID (`"Asia/Shanghai"`) |
-| | `ZoneOffset` | `ZoneOffsetSeconds` | `int32` | Total seconds offset from UTC |
-| | `Date` | `DateEpochMilli` | `int64` | Epoch milliseconds |
-| **Math** | `BigDecimal` | `BigDecimalString` | `string` | Lossless canonical plain string (`toPlainString()`) |
-| | `BigInteger` | `BigIntegerString` | `string` | Base-10 string |
-| **Network & ID** | `UUID` | `UuidString` | `string` | 36-char canonical RFC 4122 string |
-| | `UUID` | `UuidBytes` | `bytes` | 16 bytes in big-endian network byte order |
-| | `InetAddress` | `InetAddressBytes` | `bytes` | 4 bytes (IPv4) / 16 bytes (IPv6) |
-| | `InetAddress` | `InetAddressString` | `string` | Host IP string (`"192.168.1.1"` / `"::1"`) |
-| | `URI` | `UriString` | `string` | RFC 3986 URI string |
+| **Time** | `Instant` | `InstantEpochMilliAdapter` | `int64` | Epoch milliseconds |
+| | `Instant` | `InstantEpochSecondAdapter` | `int64` | Epoch seconds (drops sub-second) |
+| | `Instant` | `InstantEpochNanoAdapter` | `int64` | Epoch nanoseconds (~1678 to ~2262) |
+| | `Duration` | `DurationMilliAdapter` | `int64` | Milliseconds duration |
+| | `Duration` | `DurationSecondAdapter` | `int64` | Seconds duration |
+| | `Duration` | `DurationNanoAdapter` | `int64` | Nanoseconds duration |
+| | `LocalDate` | `LocalDateEpochDayAdapter` | `int32` | Epoch day count (days since 1970-01-01) |
+| | `LocalTime` | `LocalTimeMilliOfDayAdapter` | `int32` | Millisecond of day (0..86,399,999) |
+| | `LocalTime` | `LocalTimeSecondOfDayAdapter` | `int32` | Second of day (0..86,399) |
+| | `LocalTime` | `LocalTimeNanoOfDayAdapter` | `int64` | Nanosecond of day (0..86,399,999,999,999) |
+| | `LocalDateTime` | `LocalDateTimeEpochMilliAdapter` | `int64` | Epoch milli assuming UTC |
+| | `ZonedDateTime` | `ZonedDateTimeEpochMilliAdapter` | `int64` | Epoch milli (restores as UTC) |
+| | `ZonedDateTime` | `ZonedDateTimeIsoStringAdapter` | `string` | Lossless ISO-8601 with timezone ID |
+| | `OffsetDateTime` | `OffsetDateTimeEpochMilliAdapter` | `int64` | Epoch milli (restores as UTC) |
+| | `OffsetDateTime` | `OffsetDateTimeIsoStringAdapter` | `string` | Lossless ISO-8601 / RFC 3339 |
+| | `YearMonth` | `YearMonthEpochMonthAdapter` | `int32` | 0-based epoch month (`year * 12 + month - 1`) |
+| | `Year` | `YearInt32Adapter` | `int32` | Integer year (e.g. 2026) |
+| | `Period` | `PeriodIsoStringAdapter` | `string` | ISO-8601 period format (`"P1Y2M3D"`) |
+| | `ZoneId` | `ZoneIdStringAdapter` | `string` | IANA zone ID (`"Asia/Shanghai"`) |
+| | `ZoneOffset` | `ZoneOffsetSecondsAdapter` | `int32` | Total seconds offset from UTC |
+| | `Date` | `DateEpochMilliAdapter` | `int64` | Epoch milliseconds |
+| **Math** | `BigDecimal` | `BigDecimalStringAdapter` | `string` | Lossless canonical plain string (`toPlainString()`) |
+| | `BigInteger` | `BigIntegerStringAdapter` | `string` | Base-10 string |
+| **Network & ID** | `UUID` | `UuidStringAdapter` | `string` | 36-char canonical RFC 4122 string |
+| | `UUID` | `UuidBytesAdapter` | `bytes` | 16 bytes in big-endian network byte order |
+| | `InetAddress` | `InetAddressBytesAdapter` | `bytes` | 4 bytes (IPv4) / 16 bytes (IPv6) |
+| | `InetAddress` | `InetAddressStringAdapter` | `string` | Host IP string (`"192.168.1.1"` / `"::1"`) |
+| | `URI` | `UriStringAdapter` | `string` | RFC 3986 URI string |
 
 `Instant` and `Duration` still default to `google.protobuf.Timestamp` / `Duration`. An adapter only changes fields that mention it.
 
@@ -166,7 +166,7 @@ Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. 
 public class Audit {
   @ProtoField(number = 1)
   String id;
-  @ProtoField(number = 2, adapter = InstantEpochMilli.class)
+  @ProtoField(number = 2, adapter = InstantEpochMilliAdapter.class)
   Instant created;                         // int64 created = 2
   @ProtoField(number = 3)
   Instant published;                       // still Timestamp
@@ -178,7 +178,7 @@ public class Audit {
 ```java
 
 @ProtoMessage
-@ProtoAdapters({InstantEpochMilli.class, DurationMilli.class})
+@ProtoAdapters({InstantEpochMilliAdapter.class, DurationMilliAdapter.class})
 public class Event {
   @ProtoField(number = 1)
   Instant created;     // int64
@@ -195,7 +195,7 @@ A sibling message with no `@ProtoAdapters` still encodes `Instant` as Timestamp.
 
 ```java
 
-@ProtoField(number = 3, adapter = LocalDateEpochDay.class)
+@ProtoField(number = 3, adapter = LocalDateEpochDayAdapter.class)
 LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 ```
 
@@ -231,8 +231,8 @@ Wire equivalent:
 message Contact {
   string name = 1;
   oneof target {
-    string email = 10;
-    Address home = 11;
+    Email email = 10;
+    Home home = 11;
   }
 }
 ```
@@ -262,7 +262,7 @@ Individual oneof cases can customize their scalar wire type or adapter:
 ```java
 @ProtoOneof({
   @ProtoOneof.Case(number = 10, of = Count.class, type = ProtoType.SINT32),
-  @ProtoOneof.Case(number = 11, of = Born.class, adapter = LocalDateEpochDay.class)
+  @ProtoOneof.Case(number = 11, of = Born.class, adapter = LocalDateEpochDayAdapter.class)
 })
 private Event event;
 ```

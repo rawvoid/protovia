@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
@@ -23,28 +24,33 @@ import io.github.rawvoid.protovia.codec.ProtoAdapter;
 import java.time.Duration;
 
 /**
- * Opt-in {@link Duration} as proto3 {@code int64} seconds. Unused unless named
+ * Opt-in {@link Duration} as proto3 {@code int64} nanoseconds. Unused unless named
  * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
- * @implNote Lossy conversion: drops sub-second (millisecond and nanosecond) precision.
+ * @implNote Supports durations up to ±292 years. Throws {@link ProtoException}
+ * if the duration exceeds the 64-bit nanosecond range.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT64)
-public final class DurationSecond implements ProtoAdapter<Duration, Long> {
+public final class DurationNanoAdapter implements ProtoAdapter<Duration, Long> {
 
-    public static final DurationSecond INSTANCE = new DurationSecond();
+    public static final DurationNanoAdapter INSTANCE = new DurationNanoAdapter();
 
-    private DurationSecond() {
+    private DurationNanoAdapter() {
     }
 
     @Override
     public Long toWire(Duration value) {
-        return value.toSeconds();
+        try {
+            return value.toNanos();
+        } catch (ArithmeticException e) {
+            throw new ProtoException("Duration out of int64 nanoseconds range: " + value, e);
+        }
     }
 
     @Override
     public Duration fromWire(Long wire) {
-        return Duration.ofSeconds(wire);
+        return Duration.ofNanos(wire);
     }
 }

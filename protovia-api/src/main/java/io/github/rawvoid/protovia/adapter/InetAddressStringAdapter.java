@@ -21,33 +21,34 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.util.UUID;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /**
- * Opt-in {@link UUID} as proto3 {@code string} (canonical 36-char form). Unused
- * unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link InetAddress} as proto3 {@code string} (e.g. {@code "192.168.1.1"} or {@code "2001:db8::1"}).
+ * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.STRING)
-public final class UuidString implements ProtoAdapter<UUID, String> {
+public final class InetAddressStringAdapter implements ProtoAdapter<InetAddress, String> {
 
-    public static final UuidString INSTANCE = new UuidString();
+    public static final InetAddressStringAdapter INSTANCE = new InetAddressStringAdapter();
 
-    private UuidString() {
+    private InetAddressStringAdapter() {
     }
 
     @Override
-    public String toWire(UUID value) {
-        return value.toString();
+    public String toWire(InetAddress value) {
+        return value.getHostAddress();
     }
 
     @Override
-    public UUID fromWire(String wire) {
+    public InetAddress fromWire(String wire) {
         try {
-            return UUID.fromString(wire);
-        } catch (IllegalArgumentException e) {
-            throw new ProtoException("invalid UUID: " + wire, e);
+            return InetAddress.getByName(wire);
+        } catch (UnknownHostException e) {
+            throw new ProtoException("invalid IP address string: " + wire, e);
         }
     }
 }

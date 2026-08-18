@@ -16,39 +16,39 @@
 
 package io.github.rawvoid.protovia.adapter;
 
-import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 /**
- * Opt-in {@link InetAddress} as proto3 {@code string} (e.g. {@code "192.168.1.1"} or {@code "2001:db8::1"}).
+ * Opt-in {@link LocalDateTime} as proto3 {@code int64} epoch millisecond.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ *
+ * @implNote {@link LocalDateTime} has no timezone component. This adapter implicitly assumes
+ * and binds to {@link ZoneOffset#UTC} during serialization and deserialization.
+ * Drops sub-millisecond precision.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.STRING)
-public final class InetAddressString implements ProtoAdapter<InetAddress, String> {
+@ProtoScalar(ProtoType.INT64)
+public final class LocalDateTimeEpochMilliAdapter implements ProtoAdapter<LocalDateTime, Long> {
 
-    public static final InetAddressString INSTANCE = new InetAddressString();
+    public static final LocalDateTimeEpochMilliAdapter INSTANCE = new LocalDateTimeEpochMilliAdapter();
 
-    private InetAddressString() {
+    private LocalDateTimeEpochMilliAdapter() {
     }
 
     @Override
-    public String toWire(InetAddress value) {
-        return value.getHostAddress();
+    public Long toWire(LocalDateTime value) {
+        return value.toInstant(ZoneOffset.UTC).toEpochMilli();
     }
 
     @Override
-    public InetAddress fromWire(String wire) {
-        try {
-            return InetAddress.getByName(wire);
-        } catch (UnknownHostException e) {
-            throw new ProtoException("invalid IP address string: " + wire, e);
-        }
+    public LocalDateTime fromWire(Long wire) {
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(wire), ZoneOffset.UTC);
     }
 }

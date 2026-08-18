@@ -25,17 +25,17 @@ import java.util.UUID;
 
 /**
  * Opt-in {@link UUID} as proto3 {@code bytes} (16 bytes in big-endian network byte order).
- * Pairs with {@link UuidString} when compact binary representation is preferred.
+ * Pairs with {@link UuidStringAdapter} when compact binary representation is preferred.
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.BYTES)
-public final class UuidBytes implements ProtoAdapter<UUID, byte[]> {
+public final class UuidBytesAdapter implements ProtoAdapter<UUID, byte[]> {
 
-    public static final UuidBytes INSTANCE = new UuidBytes();
+    public static final UuidBytesAdapter INSTANCE = new UuidBytesAdapter();
 
-    private UuidBytes() {
+    private UuidBytesAdapter() {
     }
 
     @Override

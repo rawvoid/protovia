@@ -16,39 +16,34 @@
 
 package io.github.rawvoid.protovia.adapter;
 
-import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.time.Instant;
 
 /**
- * Opt-in {@link InetAddress} as proto3 {@code bytes} (4 bytes for IPv4, 16 bytes for IPv6 in network byte order).
- * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link Instant} as proto3 {@code int64} epoch milli. Unused unless named
+ * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. The default mapping
+ * remains {@code google.protobuf.Timestamp}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.BYTES)
-public final class InetAddressBytes implements ProtoAdapter<InetAddress, byte[]> {
+@ProtoScalar(ProtoType.INT64)
+public final class InstantEpochMilliAdapter implements ProtoAdapter<Instant, Long> {
 
-    public static final InetAddressBytes INSTANCE = new InetAddressBytes();
+    public static final InstantEpochMilliAdapter INSTANCE = new InstantEpochMilliAdapter();
 
-    private InetAddressBytes() {
+    private InstantEpochMilliAdapter() {
     }
 
     @Override
-    public byte[] toWire(InetAddress value) {
-        return value.getAddress();
+    public Long toWire(Instant value) {
+        return value.toEpochMilli();
     }
 
     @Override
-    public InetAddress fromWire(byte[] wire) {
-        try {
-            return InetAddress.getByAddress(wire);
-        } catch (UnknownHostException e) {
-            throw new ProtoException("invalid IP address bytes: " + (wire == null ? 0 : wire.length) + " bytes", e);
-        }
+    public Instant fromWire(Long wire) {
+        return Instant.ofEpochMilli(wire);
     }
 }

@@ -20,30 +20,30 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Duration;
+import java.util.Date;
 
 /**
- * Opt-in {@link Duration} as proto3 {@code int64} millis. Unused unless named
- * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. The default mapping
- * remains {@code google.protobuf.Duration}.
+ * Opt-in {@link Date} as proto3 {@code int64} epoch millisecond.
+ * Useful for interoperability with legacy Java codebases.
+ * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT64)
-public final class DurationMilli implements ProtoAdapter<Duration, Long> {
+public final class DateEpochMilliAdapter implements ProtoAdapter<Date, Long> {
 
-    public static final DurationMilli INSTANCE = new DurationMilli();
+    public static final DateEpochMilliAdapter INSTANCE = new DateEpochMilliAdapter();
 
-    private DurationMilli() {
+    private DateEpochMilliAdapter() {
     }
 
     @Override
-    public Long toWire(Duration value) {
-        return value.toMillis();
+    public Long toWire(Date value) {
+        return value.getTime();
     }
 
     @Override
-    public Duration fromWire(Long wire) {
-        return Duration.ofMillis(wire);
+    public Date fromWire(Long wire) {
+        return new Date(wire);
     }
 }

@@ -21,36 +21,33 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 
 /**
- * Opt-in {@link YearMonth} as proto3 {@code int32} 0-based epoch month (1970-01 is 23640).
- * Calculates month count from year 0: {@code year * 12 + (month - 1)}.
- * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
+ * Opt-in {@link LocalDate} as proto3 {@code int32} epoch day. Unused unless named
+ * in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}. Not a well-known type.
  *
  * @author Rawvoid
  */
 @ProtoScalar(ProtoType.INT32)
-public final class YearMonthEpochMonth implements ProtoAdapter<YearMonth, Integer> {
+public final class LocalDateEpochDayAdapter implements ProtoAdapter<LocalDate, Integer> {
 
-    public static final YearMonthEpochMonth INSTANCE = new YearMonthEpochMonth();
+    public static final LocalDateEpochDayAdapter INSTANCE = new LocalDateEpochDayAdapter();
 
-    private YearMonthEpochMonth() {
+    private LocalDateEpochDayAdapter() {
     }
 
     @Override
-    public Integer toWire(YearMonth value) {
-        long epochMonth = value.getYear() * 12L + (value.getMonthValue() - 1);
-        if (epochMonth < Integer.MIN_VALUE || epochMonth > Integer.MAX_VALUE) {
-            throw new ProtoException("YearMonth out of int32 epoch-month range: " + value);
+    public Integer toWire(LocalDate value) {
+        long day = value.toEpochDay();
+        if (day < Integer.MIN_VALUE || day > Integer.MAX_VALUE) {
+            throw new ProtoException("LocalDate out of int32 epoch-day range: " + value);
         }
-        return (int) epochMonth;
+        return (int) day;
     }
 
     @Override
-    public YearMonth fromWire(Integer wire) {
-        int year = Math.floorDiv(wire, 12);
-        int month = Math.floorMod(wire, 12) + 1;
-        return YearMonth.of(year, month);
+    public LocalDate fromWire(Integer wire) {
+        return LocalDate.ofEpochDay(wire);
     }
 }

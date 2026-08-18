@@ -16,39 +16,39 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.DateTimeException;
+import java.time.ZoneId;
 
 /**
- * Opt-in {@link OffsetDateTime} as proto3 {@code int64} epoch millisecond.
+ * Opt-in {@link ZoneId} as proto3 {@code string} (e.g. {@code "Asia/Shanghai"}, {@code "UTC"}).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
- *
- * @implNote Lossy conversion: the original {@link ZoneOffset} is not preserved on the wire.
- * {@link #fromWire(Long)} restores the timestamp in {@link ZoneOffset#UTC}. Drops sub-millisecond precision.
- * For lossless representation, use {@link OffsetDateTimeString}.
  *
  * @author Rawvoid
  */
-@ProtoScalar(ProtoType.INT64)
-public final class OffsetDateTimeEpochMilli implements ProtoAdapter<OffsetDateTime, Long> {
+@ProtoScalar(ProtoType.STRING)
+public final class ZoneIdStringAdapter implements ProtoAdapter<ZoneId, String> {
 
-    public static final OffsetDateTimeEpochMilli INSTANCE = new OffsetDateTimeEpochMilli();
+    public static final ZoneIdStringAdapter INSTANCE = new ZoneIdStringAdapter();
 
-    private OffsetDateTimeEpochMilli() {
+    private ZoneIdStringAdapter() {
     }
 
     @Override
-    public Long toWire(OffsetDateTime value) {
-        return value.toInstant().toEpochMilli();
+    public String toWire(ZoneId value) {
+        return value.getId();
     }
 
     @Override
-    public OffsetDateTime fromWire(Long wire) {
-        return Instant.ofEpochMilli(wire).atOffset(ZoneOffset.UTC);
+    public ZoneId fromWire(String wire) {
+        try {
+            return ZoneId.of(wire);
+        } catch (DateTimeException e) {
+            throw new ProtoException("invalid ZoneId: " + wire, e);
+        }
     }
 }
