@@ -121,7 +121,40 @@ Map keys must be integral, `bool`, or `string`. Field numbers are **required** a
 
 ## Custom adapters
 
-Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. Sample adapters live in `io.github.rawvoid.protovia.adapter` (`LocalDateEpochDay`, `UuidString`, `InstantEpochMilli`, `DurationMilli`). They are unused unless named in `@ProtoField(adapter)` / `@ProtoAdapters` — **not** well-known types, and they are not registered in `CodecLookup`.
+Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. Built-in opt-in adapters live in `io.github.rawvoid.protovia.adapter`. They are unused unless named in `@ProtoField(adapter)` / `@ProtoAdapters` — **not** well-known types, and they are not registered in `CodecLookup`.
+
+### Built-in Adapters
+
+| Category | Java Type | Adapter Class | Proto Wire Type | Description |
+|---|---|---|---|---|
+| **Time** | `Instant` | `InstantEpochMilli` | `int64` | Epoch milliseconds |
+| | `Instant` | `InstantEpochSecond` | `int64` | Epoch seconds (drops sub-second) |
+| | `Instant` | `InstantEpochNano` | `int64` | Epoch nanoseconds (~1678 to ~2262) |
+| | `Duration` | `DurationMilli` | `int64` | Milliseconds duration |
+| | `Duration` | `DurationSecond` | `int64` | Seconds duration |
+| | `Duration` | `DurationNano` | `int64` | Nanoseconds duration |
+| | `LocalDate` | `LocalDateEpochDay` | `int32` | Epoch day count (days since 1970-01-01) |
+| | `LocalTime` | `LocalTimeMilliOfDay` | `int32` | Millisecond of day (0..86,399,999) |
+| | `LocalTime` | `LocalTimeSecondOfDay` | `int32` | Second of day (0..86,399) |
+| | `LocalTime` | `LocalTimeNanoOfDay` | `int64` | Nanosecond of day (0..86,399,999,999,999) |
+| | `LocalDateTime` | `LocalDateTimeEpochMilli` | `int64` | Epoch milli assuming UTC |
+| | `ZonedDateTime` | `ZonedDateTimeEpochMilli` | `int64` | Epoch milli (restores as UTC) |
+| | `ZonedDateTime` | `ZonedDateTimeString` | `string` | Lossless ISO-8601 with timezone ID |
+| | `OffsetDateTime` | `OffsetDateTimeEpochMilli` | `int64` | Epoch milli (restores as UTC) |
+| | `OffsetDateTime` | `OffsetDateTimeString` | `string` | Lossless ISO-8601 / RFC 3339 |
+| | `YearMonth` | `YearMonthEpochMonth` | `int32` | 0-based epoch month (`year * 12 + month - 1`) |
+| | `Year` | `YearValue` | `int32` | Integer year (e.g. 2026) |
+| | `Period` | `PeriodString` | `string` | ISO-8601 period format (`"P1Y2M3D"`) |
+| | `ZoneId` | `ZoneIdString` | `string` | IANA zone ID (`"Asia/Shanghai"`) |
+| | `ZoneOffset` | `ZoneOffsetSeconds` | `int32` | Total seconds offset from UTC |
+| | `Date` | `DateEpochMilli` | `int64` | Epoch milliseconds |
+| **Math** | `BigDecimal` | `BigDecimalString` | `string` | Lossless canonical plain string (`toPlainString()`) |
+| | `BigInteger` | `BigIntegerString` | `string` | Base-10 string |
+| **Network & ID** | `UUID` | `UuidString` | `string` | 36-char canonical RFC 4122 string |
+| | `UUID` | `UuidBytes` | `bytes` | 16 bytes in big-endian network byte order |
+| | `InetAddress` | `InetAddressBytes` | `bytes` | 4 bytes (IPv4) / 16 bytes (IPv6) |
+| | `InetAddress` | `InetAddressString` | `string` | Host IP string (`"192.168.1.1"` / `"::1"`) |
+| | `URI` | `UriString` | `string` | RFC 3986 URI string |
 
 `Instant` and `Duration` still default to `google.protobuf.Timestamp` / `Duration`. An adapter only changes fields that mention it.
 
