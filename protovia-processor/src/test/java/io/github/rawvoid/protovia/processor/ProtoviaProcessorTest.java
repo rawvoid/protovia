@@ -458,6 +458,29 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void recordConflictingOneofAnnotationsDoNotBind() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Box",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                "@ProtoMessage",
+                "public record Box(",
+                "  @ProtoField(number = 10) String name,",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) }) Object data) {",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 11, of = Integer.class) })",
+                "  public Object data() { return data; }",
+                "}"));
+        assertThat(compilation).hadErrorContaining(
+            "do not annotate both the record component and its accessor with @ProtoOneof");
+        org.junit.jupiter.api.Assertions.assertTrue(compilation.errors().stream().noneMatch(d ->
+            d.getMessage(null) != null && d.getMessage(null).contains("duplicate field number")));
+    }
+
+    @Test
     void oneofRejectsUnassignableCases() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())

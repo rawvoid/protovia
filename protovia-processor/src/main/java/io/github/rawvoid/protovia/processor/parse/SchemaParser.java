@@ -165,6 +165,10 @@ public final class SchemaParser {
             return;
         }
         if (member.roles().oneof()) {
+            // Record component vs accessor conflict already diagnosed; do not parse the leftover site.
+            if (member.protoOneofAnn() == null) {
+                return;
+            }
             bindOneof(member, scope, methods);
             return;
         }
