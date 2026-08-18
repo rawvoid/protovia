@@ -32,6 +32,8 @@ import java.util.Set;
 
 /**
  * Validates {@code @ProtoEnum} types.
+ *
+ * @author Rawvoid
  */
 final class EnumParser {
 

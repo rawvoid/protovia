@@ -22,6 +22,9 @@ import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
 import java.time.LocalDate;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public record DatedRecord(
     @ProtoField(number = 1) String id,

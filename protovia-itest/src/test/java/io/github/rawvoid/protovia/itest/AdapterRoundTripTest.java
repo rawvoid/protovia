@@ -18,14 +18,7 @@ package io.github.rawvoid.protovia.itest;
 
 import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoVia;
-import io.github.rawvoid.protovia.itest.model.Audit;
-import io.github.rawvoid.protovia.itest.model.Born;
-import io.github.rawvoid.protovia.itest.model.Dated;
-import io.github.rawvoid.protovia.itest.model.DatedOneof;
-import io.github.rawvoid.protovia.itest.model.DatedRecord;
-import io.github.rawvoid.protovia.itest.model.Event;
-import io.github.rawvoid.protovia.itest.model.Timed;
-import io.github.rawvoid.protovia.itest.model.User;
+import io.github.rawvoid.protovia.itest.model.*;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wkt.DurationCodec;
 import io.github.rawvoid.protovia.wkt.TimestampCodec;
@@ -39,6 +32,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Rawvoid
+ */
 class AdapterRoundTripTest {
 
     private static final LocalDate EPOCH = LocalDate.of(1970, 1, 1);

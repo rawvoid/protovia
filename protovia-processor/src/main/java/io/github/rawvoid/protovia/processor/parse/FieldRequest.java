@@ -27,6 +27,8 @@ import javax.lang.model.type.TypeMirror;
 
 /**
  * Inputs shared by singular / repeated / map / adapter field resolution.
+ *
+ * @author Rawvoid
  */
 final class FieldRequest {
 

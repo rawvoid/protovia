@@ -36,6 +36,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Rawvoid
+ */
 class OfficialInteropTest {
 
     private static Descriptors.Descriptor userDescriptor;

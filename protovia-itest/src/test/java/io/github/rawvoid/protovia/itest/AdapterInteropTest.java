@@ -32,6 +32,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Rawvoid
+ */
 class AdapterInteropTest {
 
     private static final LocalDate EPOCH = LocalDate.of(1970, 1, 1);

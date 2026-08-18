@@ -16,5 +16,8 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
+/**
+ * @author Rawvoid
+ */
 public sealed interface Life permits Born, Named {
 }

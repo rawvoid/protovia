@@ -46,6 +46,10 @@ enum PrimitiveListSpec {
     private final String toArray;
     private final String get;
 
+    ClassName listType() {
+        return ClassName.get(PROTO_LISTS.packageName(), simpleName);
+    }
+
     static PrimitiveListSpec of(FieldModel field) {
         if (field.primitiveListType() == null) {
             return null;
@@ -62,9 +66,5 @@ enum PrimitiveListSpec {
             case BOOL -> BOOLEAN;
             default -> null;
         };
-    }
-
-    ClassName listType() {
-        return ClassName.get(PROTO_LISTS.packageName(), simpleName);
     }
 }

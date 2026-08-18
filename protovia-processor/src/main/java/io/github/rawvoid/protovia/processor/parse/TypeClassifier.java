@@ -34,6 +34,8 @@ import java.util.Set;
 
 /**
  * Maps a Java type to a proto scalar, enum, or message. Does not apply adapters.
+ *
+ * @author Rawvoid
  */
 final class TypeClassifier {
 
@@ -184,30 +186,6 @@ final class TypeClassifier {
         };
     }
 
-    static Set<ProtoType> intFamily() {
-        return Set.of(
-            ProtoType.AUTO, ProtoType.INT32, ProtoType.UINT32, ProtoType.SINT32,
-            ProtoType.FIXED32, ProtoType.SFIXED32);
-    }
-
-    static Set<ProtoType> longFamily() {
-        return Set.of(
-            ProtoType.AUTO, ProtoType.INT64, ProtoType.UINT64, ProtoType.SINT64,
-            ProtoType.FIXED64, ProtoType.SFIXED64);
-    }
-
-    static boolean isValidMapKey(ProtoType type) {
-        return switch (type) {
-            case INT32, INT64, UINT32, UINT64, SINT32, SINT64,
-                 FIXED32, FIXED64, SFIXED32, SFIXED64, BOOL, STRING -> true;
-            default -> false;
-        };
-    }
-
-    static ProtoType protoOrAuto(ProtoType type, ProtoType fallback) {
-        return type == ProtoType.AUTO ? fallback : type;
-    }
-
     private Resolved wellKnown(Element origin, String name, ProtoType declared, String codec) {
         if (declared != ProtoType.AUTO && declared != ProtoType.MESSAGE) {
             diag.error(origin, "field '" + name + "' Java type cannot use ProtoType." + declared);
@@ -230,5 +208,29 @@ final class TypeClassifier {
         r.kind = FieldKind.SCALAR;
         r.protoType = actual;
         return r;
+    }
+
+    static Set<ProtoType> intFamily() {
+        return Set.of(
+            ProtoType.AUTO, ProtoType.INT32, ProtoType.UINT32, ProtoType.SINT32,
+            ProtoType.FIXED32, ProtoType.SFIXED32);
+    }
+
+    static Set<ProtoType> longFamily() {
+        return Set.of(
+            ProtoType.AUTO, ProtoType.INT64, ProtoType.UINT64, ProtoType.SINT64,
+            ProtoType.FIXED64, ProtoType.SFIXED64);
+    }
+
+    static boolean isValidMapKey(ProtoType type) {
+        return switch (type) {
+            case INT32, INT64, UINT32, UINT64, SINT32, SINT64,
+                 FIXED32, FIXED64, SFIXED32, SFIXED64, BOOL, STRING -> true;
+            default -> false;
+        };
+    }
+
+    static ProtoType protoOrAuto(ProtoType type, ProtoType fallback) {
+        return type == ProtoType.AUTO ? fallback : type;
     }
 }

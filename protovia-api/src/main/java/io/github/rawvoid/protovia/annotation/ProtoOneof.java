@@ -19,11 +19,7 @@ package io.github.rawvoid.protovia.annotation;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 /**
  * Marks a field, JavaBean getter, or record component as a proto3 oneof.
@@ -37,6 +33,8 @@ import java.lang.annotation.Target;
  * })
  * private Target target;
  * }</pre>
+ *
+ * @author Rawvoid
  */
 @Documented
 @Target({ElementType.FIELD, ElementType.METHOD, ElementType.RECORD_COMPONENT})

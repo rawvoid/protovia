@@ -25,20 +25,12 @@ import javax.lang.model.element.Element;
 /**
  * Proto role annotations on one element, or the union across a record
  * component and its accessor (they are one site).
+ *
+ * @author Rawvoid
  */
 record Roles(boolean unknown, boolean oneof, boolean field) {
 
     static final Roles NONE = new Roles(false, false, false);
-
-    static Roles of(Element element) {
-        if (element == null) {
-            return NONE;
-        }
-        return new Roles(
-            element.getAnnotation(ProtoUnknown.class) != null,
-            element.getAnnotation(ProtoOneof.class) != null,
-            element.getAnnotation(ProtoField.class) != null);
-    }
 
     Roles union(Roles other) {
         return new Roles(
@@ -53,5 +45,15 @@ record Roles(boolean unknown, boolean oneof, boolean field) {
 
     boolean any() {
         return unknown || oneof || field;
+    }
+
+    static Roles of(Element element) {
+        if (element == null) {
+            return NONE;
+        }
+        return new Roles(
+            element.getAnnotation(ProtoUnknown.class) != null,
+            element.getAnnotation(ProtoOneof.class) != null,
+            element.getAnnotation(ProtoField.class) != null);
     }
 }

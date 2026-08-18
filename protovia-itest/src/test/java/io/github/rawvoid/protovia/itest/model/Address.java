@@ -19,6 +19,9 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public record Address(
     @ProtoField(number = 1) String city,

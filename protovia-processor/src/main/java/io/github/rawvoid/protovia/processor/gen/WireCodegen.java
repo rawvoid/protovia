@@ -16,11 +16,7 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
-import com.palantir.javapoet.ArrayTypeName;
-import com.palantir.javapoet.ClassName;
-import com.palantir.javapoet.CodeBlock;
-import com.palantir.javapoet.ParameterizedTypeName;
-import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.*;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
@@ -28,26 +24,10 @@ import io.github.rawvoid.protovia.wire.WireType;
 
 import java.util.function.BiConsumer;
 
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.*;
 import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
 import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.ARRAY_LIST;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.adapterInstance;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.OPTIONAL;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.implConstructorRef;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.mapDefaultSkip;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.wireDefaultPresent;
 
 /**
  * Shared {@link CodeBlock} fragments and statement patterns for size / write / read.

@@ -33,6 +33,8 @@ import java.util.List;
 
 /**
  * Cached {@link TypeMirror}s and type-query helpers shared by the parse pipeline.
+ *
+ * @author Rawvoid
  */
 final class TypeEnv {
 

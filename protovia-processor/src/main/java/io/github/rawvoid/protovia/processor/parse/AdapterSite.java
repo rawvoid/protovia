@@ -19,6 +19,8 @@ package io.github.rawvoid.protovia.processor.parse;
 /**
  * Where an adapter is being applied. Map key/value mismatch falls through to
  * classify; other sites reject a Java-type mismatch immediately.
+ *
+ * @author Rawvoid
  */
 enum AdapterSite {
     SINGULAR,

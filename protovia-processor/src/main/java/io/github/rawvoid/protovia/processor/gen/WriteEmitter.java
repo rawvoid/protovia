@@ -19,35 +19,14 @@ package io.github.rawvoid.protovia.processor.gen;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.TypeName;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.MessageModel;
-import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 
 import javax.lang.model.element.Modifier;
 
-import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.model.Names.mapEntryWrite;
-import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofWireLocal;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeCachedMessage;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeNoTag;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.writeTag;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.*;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.*;
+import static io.github.rawvoid.protovia.processor.model.Names.*;
 
 /**
  * Emits {@code writeTo} and related field-write logic.

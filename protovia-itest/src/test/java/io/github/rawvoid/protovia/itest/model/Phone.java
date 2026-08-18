@@ -16,6 +16,10 @@
 
 package io.github.rawvoid.protovia.itest.model;
 
-/** Assignable to {@link Target} but not listed on any oneof Case. */
+/**
+ * Assignable to {@link Target} but not listed on any oneof Case.
+ *
+ * @author Rawvoid
+ */
 public record Phone(String value) implements Target {
 }

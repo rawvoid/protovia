@@ -20,14 +20,7 @@ import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.Names;
 
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.RecordComponentElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
@@ -39,6 +32,8 @@ import java.util.Map;
 /**
  * Walks a {@code @ProtoMessage} and collects members. Does not resolve access
  * or report bind errors — that happens in {@link SchemaParser} after role checks.
+ *
+ * @author Rawvoid
  */
 final class MemberScanner {
 
@@ -156,20 +151,6 @@ final class MemberScanner {
         return new ScanResult(members, methods);
     }
 
-    private static AnnotationMirror protoOneofMirror(Element element) {
-        if (element == null) {
-            return null;
-        }
-        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
-            Element annotation = mirror.getAnnotationType().asElement();
-            if (annotation instanceof TypeElement type
-                && type.getQualifiedName().contentEquals(AdapterResolver.PROTO_ONEOF_ANN)) {
-                return mirror;
-            }
-        }
-        return null;
-    }
-
     private Access getterSetter(
         ExecutableElement method,
         String property,
@@ -211,6 +192,20 @@ final class MemberScanner {
             return new Access(AccessKind.FIELD, "value." + name, null);
         }
         diag.error(field, "private field '" + name + "' needs a JavaBean getter and setter, or must not be private");
+        return null;
+    }
+
+    private static AnnotationMirror protoOneofMirror(Element element) {
+        if (element == null) {
+            return null;
+        }
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            Element annotation = mirror.getAnnotationType().asElement();
+            if (annotation instanceof TypeElement type
+                && type.getQualifiedName().contentEquals(AdapterResolver.PROTO_ONEOF_ANN)) {
+                return mirror;
+            }
+        }
         return null;
     }
 }

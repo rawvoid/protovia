@@ -23,6 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public record UserRecord(
     @ProtoField(number = 1) String name,

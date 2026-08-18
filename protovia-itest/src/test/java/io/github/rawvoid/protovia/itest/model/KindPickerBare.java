@@ -19,6 +19,9 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public class KindPickerBare {
 

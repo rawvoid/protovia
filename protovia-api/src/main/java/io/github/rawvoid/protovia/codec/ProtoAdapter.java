@@ -46,5 +46,6 @@ public interface ProtoAdapter<J, W> {
      * Annotation default for {@code @ProtoField.adapter} / {@code @ProtoOneof.Case.adapter}.
      * Not a real adapter.
      */
-    interface Unset extends ProtoAdapter<Void, Void> {}
+    interface Unset extends ProtoAdapter<Void, Void> {
+    }
 }

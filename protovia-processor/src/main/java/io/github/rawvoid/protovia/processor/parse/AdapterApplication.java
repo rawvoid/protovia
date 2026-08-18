@@ -23,6 +23,7 @@ import io.github.rawvoid.protovia.processor.model.FieldModel;
  *
  * @param field adapted model when applied
  * @param done  {@code true} if classify must not run (applied or rejected)
+ * @author Rawvoid
  */
 record AdapterApplication(FieldModel field, boolean done) {
 

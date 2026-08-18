@@ -45,12 +45,12 @@ The bytes are readable by official Protocol Buffers implementations (Go, Python,
 
 ## Modules
 
-| Artifact | Role |
-|----------|------|
-| `protovia-api` | Annotations, `ProtoType`, `ProtoCodec`, wire types |
-| `protovia-runtime` | `ProtoVia` facade and codec lookup |
+| Artifact             | Role                                                |
+|----------------------|-----------------------------------------------------|
+| `protovia-api`       | Annotations, `ProtoType`, `ProtoCodec`, wire types  |
+| `protovia-runtime`   | `ProtoVia` facade and codec lookup                  |
 | `protovia-processor` | Annotation processor that generates `XxxProtoCodec` |
-| `protovia-itest` | End-to-end + official protobuf interop tests |
+| `protovia-itest`     | End-to-end + official protobuf interop tests        |
 
 Runtime has **no third-party dependencies**.
 
@@ -96,26 +96,26 @@ Generated codecs:
 
 ## Type mapping
 
-| Java                                      | Default proto | Override with `ProtoType` |
-|-------------------------------------------|---------------|---------------------------|
-| `int` / `Integer`                         | int32 | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
-| `long` / `Long`                           | int64 | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
-| `float` / `Float`                         | float | |
-| `double` / `Double`                       | double | |
-| `boolean` / `Boolean`                     | bool | |
-| `String`                                  | string | `BYTES` |
-| `byte[]`, `ByteBuffer`                    | bytes | |
-| `@ProtoEnum` enum                         | enum | |
-| `@ProtoMessage` type                      | message | |
-| `@ProtoOneof` field (cases listed on the field) | oneof (cases flatten onto the parent) | |
-| `java.time.Instant`                       | `google.protobuf.Timestamp` | |
-| `java.time.Duration`                      | `google.protobuf.Duration` | |
-| `ProtoAny`                                | `google.protobuf.Any` | |
-| `wkt.Int32Value` and the other 8 wrappers | wrapper messages | |
-| adapted `J` via `@ProtoField(adapter)` / `@ProtoAdapters` | proto scalar of the adapter | |
-| `List` / `Set` / array (not `byte[]`)     | repeated | `packed` (default `true` for scalars) |
-| `Map<K,V>`                                | map | `keyType` / `valueType` |
-| `Optional<T>`                             | proto3 optional T | |
+| Java                                                      | Default proto                         | Override with `ProtoType`                 |
+|-----------------------------------------------------------|---------------------------------------|-------------------------------------------|
+| `int` / `Integer`                                         | int32                                 | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
+| `long` / `Long`                                           | int64                                 | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
+| `float` / `Float`                                         | float                                 |                                           |
+| `double` / `Double`                                       | double                                |                                           |
+| `boolean` / `Boolean`                                     | bool                                  |                                           |
+| `String`                                                  | string                                | `BYTES`                                   |
+| `byte[]`, `ByteBuffer`                                    | bytes                                 |                                           |
+| `@ProtoEnum` enum                                         | enum                                  |                                           |
+| `@ProtoMessage` type                                      | message                               |                                           |
+| `@ProtoOneof` field (cases listed on the field)           | oneof (cases flatten onto the parent) |                                           |
+| `java.time.Instant`                                       | `google.protobuf.Timestamp`           |                                           |
+| `java.time.Duration`                                      | `google.protobuf.Duration`            |                                           |
+| `ProtoAny`                                                | `google.protobuf.Any`                 |                                           |
+| `wkt.Int32Value` and the other 8 wrappers                 | wrapper messages                      |                                           |
+| adapted `J` via `@ProtoField(adapter)` / `@ProtoAdapters` | proto scalar of the adapter           |                                           |
+| `List` / `Set` / array (not `byte[]`)                     | repeated                              | `packed` (default `true` for scalars)     |
+| `Map<K,V>`                                                | map                                   | `keyType` / `valueType`                   |
+| `Optional<T>`                                             | proto3 optional T                     |                                           |
 
 Map keys must be integral, `bool`, or `string`. Field numbers are **required** and must stay stable.
 
@@ -128,9 +128,11 @@ Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. 
 **Field-level override** — only this member becomes `int64`:
 
 ```java
+
 @ProtoMessage
 public class Audit {
-  @ProtoField(number = 1) String id;
+  @ProtoField(number = 1)
+  String id;
   @ProtoField(number = 2, adapter = InstantEpochMilli.class)
   Instant created;                         // int64 created = 2
   @ProtoField(number = 3)
@@ -141,12 +143,16 @@ public class Audit {
 **Class-level override** — every matching field on that message:
 
 ```java
+
 @ProtoMessage
 @ProtoAdapters({InstantEpochMilli.class, DurationMilli.class})
 public class Event {
-  @ProtoField(number = 1) Instant created;     // int64
-  @ProtoField(number = 2) Instant updated;     // int64
-  @ProtoField(number = 3) Duration ttl;        // int64 millis
+  @ProtoField(number = 1)
+  Instant created;     // int64
+  @ProtoField(number = 2)
+  Instant updated;     // int64
+  @ProtoField(number = 3)
+  Duration ttl;        // int64 millis
 }
 ```
 
@@ -155,6 +161,7 @@ A sibling message with no `@ProtoAdapters` still encodes `Instant` as Timestamp.
 **Presence.** Adapted singular fields use Java reference presence: `null` is omitted; a non-null value is **always written**, including proto3 defaults such as epoch day `0` (`1970-01-01`). Missing on the wire decodes as `null` — do not call `fromWire(0)`. A Go / proto3-Java client using implicit-presence `int32` will omit `0`; Protovia then reads `null`. Use `optional = true` on both sides if unset vs epoch must survive the wire.
 
 ```java
+
 @ProtoField(number = 3, adapter = LocalDateEpochDay.class)
 LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 ```

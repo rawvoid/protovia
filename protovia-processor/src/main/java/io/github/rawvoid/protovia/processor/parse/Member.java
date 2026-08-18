@@ -26,10 +26,11 @@ import javax.lang.model.type.TypeMirror;
 /**
  * One record component, POJO field, or JavaBean getter that may carry proto annotations.
  *
- * @param name           property name; {@code null} when a method is not a JavaBean getter
- * @param roles          union of annotations on the origin and, for records, the accessor
- * @param protoField     effective {@code @ProtoField} (component, then accessor)
- * @param protoOneofAnn  effective {@code @ProtoOneof} mirror, or {@code null} when not bound
+ * @param name          property name; {@code null} when a method is not a JavaBean getter
+ * @param roles         union of annotations on the origin and, for records, the accessor
+ * @param protoField    effective {@code @ProtoField} (component, then accessor)
+ * @param protoOneofAnn effective {@code @ProtoOneof} mirror, or {@code null} when not bound
+ * @author Rawvoid
  */
 record Member(
     Element origin,

@@ -24,6 +24,8 @@ import javax.lang.model.element.TypeElement;
 
 /**
  * Result of classifying a Java type as a proto scalar, enum, or message.
+ *
+ * @author Rawvoid
  */
 final class Resolved {
 

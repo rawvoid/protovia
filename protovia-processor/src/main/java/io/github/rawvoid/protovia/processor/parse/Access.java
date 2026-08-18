@@ -22,6 +22,7 @@ import io.github.rawvoid.protovia.processor.model.AccessKind;
  * How generated code reads and writes one member.
  *
  * @param setter {@code null} when the member is a field or record component
+ * @author Rawvoid
  */
 record Access(AccessKind kind, String readExpr, String setter) {
 }

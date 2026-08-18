@@ -26,6 +26,9 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * @author Rawvoid
+ */
 class WellKnownCodecTest {
 
     @Test

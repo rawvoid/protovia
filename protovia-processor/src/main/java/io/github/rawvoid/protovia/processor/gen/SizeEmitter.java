@@ -27,26 +27,10 @@ import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import javax.lang.model.element.Modifier;
 import java.util.List;
 
-import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.model.Names.mapEntrySizeOf;
-import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.CODED_SIZE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.MAP;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.assignToWire;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.loadField;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.nullElementCheck;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofCases;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.oneofWireLocal;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.sizeCall;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocal;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.enumPresent;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentCondition;
-import static io.github.rawvoid.protovia.processor.gen.WireTypes.presentRepeated;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.*;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.*;
+import static io.github.rawvoid.protovia.processor.model.Names.*;
 
 /**
  * Emits {@code computeSize} methods and related field-size logic.

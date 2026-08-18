@@ -19,6 +19,9 @@ package io.github.rawvoid.protovia.itest.model;
 import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoEnum
 public enum Kind {
     @ProtoEnumValue(0) UNSPECIFIED,

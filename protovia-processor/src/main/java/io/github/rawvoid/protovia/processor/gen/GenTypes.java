@@ -20,11 +20,7 @@ import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.ParameterizedTypeName;
 import com.palantir.javapoet.TypeName;
-import io.github.rawvoid.protovia.processor.model.EnumModel;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.MessageModel;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 
 import javax.lang.model.type.TypeMirror;
 

@@ -27,6 +27,8 @@ import java.util.Deque;
  * {@link #popAndMerge()} ORs this frame's failures into the parent so a nested
  * {@code parseEnum} cannot see another message's errors, but still marks the
  * outer parse failed.
+ *
+ * @author Rawvoid
  */
 final class Diagnostics {
 

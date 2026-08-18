@@ -18,5 +18,8 @@ package io.github.rawvoid.protovia.itest.model;
 
 import java.time.LocalDate;
 
+/**
+ * @author Rawvoid
+ */
 public record Born(LocalDate d) implements Life {
 }

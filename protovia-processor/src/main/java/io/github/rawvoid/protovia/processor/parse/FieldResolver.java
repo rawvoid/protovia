@@ -31,6 +31,8 @@ import javax.lang.model.type.TypeMirror;
 
 /**
  * Resolves a {@code @ProtoField} Java type into a {@link FieldModel}.
+ *
+ * @author Rawvoid
  */
 final class FieldResolver {
 

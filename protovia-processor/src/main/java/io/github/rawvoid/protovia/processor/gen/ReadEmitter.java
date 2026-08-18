@@ -19,39 +19,16 @@ package io.github.rawvoid.protovia.processor.gen;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.TypeName;
-import io.github.rawvoid.protovia.processor.model.AccessKind;
-import io.github.rawvoid.protovia.processor.model.EnumModel;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.MessageModel;
-import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 
 import javax.lang.model.element.Modifier;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.*;
 import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
 import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.UNKNOWN_FIELDS;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.WIRE_TYPE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.codecInstance;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.defaultValue;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.messageType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.newImpl;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.oneofCaseType;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.collectionEnsure;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.fromWire;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEnsure;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedEnsure;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.primitiveAdd;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.readCall;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.toArray;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wrapOptional;
 
 /**
  * Emits {@code readFrom} / {@code mergeFrom} and related field-read logic.
@@ -386,8 +363,8 @@ final class ReadEmitter {
         String existing = record
             ? field.localName
             : field.accessKind == AccessKind.FIELD
-                ? "msg." + field.fieldName
-                : field.readExpr.replace("value.", "msg.");
+            ? "msg." + field.fieldName
+            : field.readExpr.replace("value.", "msg.");
         b.beginControlFlow("if ($L != null)", existing);
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), existing);
         CodeBlock add = primitiveAdd(field, field.localName + "Builder", CodeBlock.of("item"));

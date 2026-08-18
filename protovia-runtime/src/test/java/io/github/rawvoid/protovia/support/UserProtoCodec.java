@@ -30,6 +30,8 @@ import java.util.Map;
 
 /**
  * Hand-written codec used to lock the runtime contract before APT exists.
+ *
+ * @author Rawvoid
  */
 public final class UserProtoCodec implements ProtoCodec<User> {
 

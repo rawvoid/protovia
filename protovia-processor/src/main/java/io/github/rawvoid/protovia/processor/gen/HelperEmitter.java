@@ -19,12 +19,7 @@ package io.github.rawvoid.protovia.processor.gen;
 import com.palantir.javapoet.CodeBlock;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.TypeName;
-import io.github.rawvoid.protovia.processor.model.EnumModel;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.MessageModel;
-import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import javax.lang.model.element.Modifier;
@@ -33,29 +28,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
-import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
-import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
-import static io.github.rawvoid.protovia.processor.model.Names.mapEntrySizeOf;
-import static io.github.rawvoid.protovia.processor.model.Names.mapEntryWrite;
-import static io.github.rawvoid.protovia.processor.model.Names.packedSizeOf;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_EXCEPTION;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_READER;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_WRITER;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.SIZE_CACHE;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.boxedType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumConstant;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.enumType;
-import static io.github.rawvoid.protovia.processor.gen.GenTypes.javaType;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.fromWire;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntryPartWrite;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapEntrySizeAdd;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapMissingDefault;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.mapPartAssign;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.packedElements;
-import static io.github.rawvoid.protovia.processor.gen.WireCodegen.wireLocalType;
+import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
+import static io.github.rawvoid.protovia.processor.gen.WireCodegen.*;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.gen.WireTypes.unpackedWire;
+import static io.github.rawvoid.protovia.processor.model.Names.*;
 
 /**
  * Builds enum / packed-size / map-entry helper methods for a codec.

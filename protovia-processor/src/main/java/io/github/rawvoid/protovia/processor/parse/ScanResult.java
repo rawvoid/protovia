@@ -23,6 +23,8 @@ import java.util.Map;
 /**
  * Members collected from one {@code @ProtoMessage}, plus the type's instance
  * methods so access can be resolved at bind time.
+ *
+ * @author Rawvoid
  */
 record ScanResult(List<Member> members, Map<String, ExecutableElement> methods) {
 }

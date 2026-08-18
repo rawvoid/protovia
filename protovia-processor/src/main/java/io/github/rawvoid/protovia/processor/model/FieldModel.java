@@ -17,11 +17,7 @@
 package io.github.rawvoid.protovia.processor.model;
 
 import io.github.rawvoid.protovia.ProtoType;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Singular;
+import lombok.*;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;

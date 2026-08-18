@@ -20,6 +20,9 @@ import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoEnum
 public enum Status {
     @ProtoEnumValue(0) UNKNOWN,

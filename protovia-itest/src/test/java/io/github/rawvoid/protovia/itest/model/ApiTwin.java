@@ -20,6 +20,9 @@ import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public class ApiTwin {
 

@@ -23,6 +23,8 @@ import javax.lang.model.type.TypeMirror;
 
 /**
  * A {@code ProtoAdapter<J, W>} that passed compile-time validation.
+ *
+ * @author Rawvoid
  */
 record ResolvedAdapter(TypeElement adapterType, TypeMirror j, TypeMirror w, ProtoType p) {
 }

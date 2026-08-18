@@ -18,25 +18,11 @@ package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
-import io.github.rawvoid.protovia.processor.model.AccessKind;
-import io.github.rawvoid.protovia.processor.model.FieldKind;
-import io.github.rawvoid.protovia.processor.model.FieldModel;
-import io.github.rawvoid.protovia.processor.model.Names;
-import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.*;
 import io.github.rawvoid.protovia.wire.WireType;
 
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.AnnotationValue;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.RecordComponentElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.IntersectionType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
+import javax.lang.model.element.*;
+import javax.lang.model.type.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,6 +30,8 @@ import java.util.Set;
 
 /**
  * Resolves a field-level {@code @ProtoOneof} and its {@code @ProtoOneof.Case}s.
+ *
+ * @author Rawvoid
  */
 final class OneofParser {
 
@@ -405,16 +393,6 @@ final class OneofParser {
         return type;
     }
 
-    private static AnnotationMirror caseMirror(Object item) {
-        if (item instanceof AnnotationMirror mirror) {
-            return mirror;
-        }
-        if (item instanceof AnnotationValue value && value.getValue() instanceof AnnotationMirror mirror) {
-            return mirror;
-        }
-        return null;
-    }
-
     private ProtoType protoType(AnnotationMirror caseMirror) {
         AnnotationValue value = adapters.annotationMember(caseMirror, "type");
         if (value == null) {
@@ -445,16 +423,6 @@ final class OneofParser {
         return env.renderType(ofType, pkg);
     }
 
-    private static String caseName(TypeElement caseType, TypeMirror ofType) {
-        if (caseType != null) {
-            return caseType.getSimpleName().toString();
-        }
-        if (ofType.getKind() == TypeKind.ARRAY) {
-            return "byte[]";
-        }
-        return ofType.toString();
-    }
-
     private String shapeMessage(TypeElement caseType, TypeMirror ofType) {
         return "oneof case " + caseName(caseType, ofType)
             + " must be a record, a @ProtoMessage, or a scalar/enum type";
@@ -483,6 +451,26 @@ final class OneofParser {
         return element.getKind() == ElementKind.ENUM
             || TypeClassifier.WELL_KNOWN_CODECS.containsKey(element.getQualifiedName().toString())
             || adapters.findAnnotation(element, AdapterResolver.PROTO_ADAPTED_ANN) != null;
+    }
+
+    private static AnnotationMirror caseMirror(Object item) {
+        if (item instanceof AnnotationMirror mirror) {
+            return mirror;
+        }
+        if (item instanceof AnnotationValue value && value.getValue() instanceof AnnotationMirror mirror) {
+            return mirror;
+        }
+        return null;
+    }
+
+    private static String caseName(TypeElement caseType, TypeMirror ofType) {
+        if (caseType != null) {
+            return caseType.getSimpleName().toString();
+        }
+        if (ofType.getKind() == TypeKind.ARRAY) {
+            return "byte[]";
+        }
+        return ofType.toString();
     }
 
     private static boolean isByteArray(TypeMirror type) {

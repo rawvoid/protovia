@@ -18,6 +18,9 @@ package io.github.rawvoid.protovia.support;
 
 import java.util.*;
 
+/**
+ * @author Rawvoid
+ */
 public class User {
 
     private String name;

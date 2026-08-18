@@ -24,16 +24,12 @@ import io.github.rawvoid.protovia.wire.WireType;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Accumulator for one {@code parseMessage} call.
+ *
+ * @author Rawvoid
  */
 final class MessageScope {
 

@@ -25,6 +25,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * @author Rawvoid
+ */
 @Data
 @Builder
 @NoArgsConstructor

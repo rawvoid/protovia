@@ -21,6 +21,9 @@ import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.annotation.ProtoOneof;
 import io.github.rawvoid.protovia.annotation.ProtoUnknown;
 
+/**
+ * @author Rawvoid
+ */
 @ProtoMessage
 public class KindPicker {
 
