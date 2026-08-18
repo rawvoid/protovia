@@ -166,6 +166,74 @@ A sibling message with no `@ProtoAdapters` still encodes `Instant` as Timestamp.
 LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 ```
 
+## oneof
+
+Declare a proto3 `oneof` by placing `@ProtoOneof` on a field, JavaBean getter, or record component. The oneof group itself has no field number; each `@ProtoOneof.Case(number, of)` assigns a field number on the parent message.
+
+**Polymorphic record wrappers (recommended):**
+
+```java
+@ProtoMessage
+public class Contact {
+  @ProtoField(number = 1)
+  private String name;
+
+  @ProtoOneof({
+    @ProtoOneof.Case(number = 10, of = Email.class),
+    @ProtoOneof.Case(number = 11, of = Home.class)
+  })
+  private Target target;
+  // getters / setters
+}
+
+public interface Target {} // sealed is optional
+
+public record Email(String value) implements Target {}
+public record Home(Address address) implements Target {}
+```
+
+Wire equivalent:
+
+```protobuf
+message Contact {
+  string name = 1;
+  oneof target {
+    string email = 10;
+    Address home = 11;
+  }
+}
+```
+
+- A 1-component record without `@ProtoMessage` (like `Email(String value)`) encodes directly as that scalar wire type (`string`), without an extra nested message envelope.
+- A case holding a `@ProtoMessage` type (like `Address`) encodes as a nested sub-message.
+
+**Naked scalar / message cases:**
+
+You can also use raw types directly without custom wrapper records by declaring a common supertype such as `Object`:
+
+```java
+@ProtoMessage
+public class Bag {
+  @ProtoOneof({
+    @ProtoOneof.Case(number = 10, of = String.class),
+    @ProtoOneof.Case(number = 11, of = Address.class)
+  })
+  private Object data;
+}
+```
+
+**Case-level type & adapter overrides:**
+
+Individual oneof cases can customize their scalar wire type or adapter:
+
+```java
+@ProtoOneof({
+  @ProtoOneof.Case(number = 10, of = Count.class, type = ProtoType.SINT32),
+  @ProtoOneof.Case(number = 11, of = Born.class, adapter = LocalDateEpochDay.class)
+})
+private Event event;
+```
+
 ## Entity rules
 
 **POJO**
@@ -206,24 +274,12 @@ LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 
 ```java
 ProtoVia.toBytes(message);
-ProtoVia.
-
-fromBytes(User .class, bytes);
-ProtoVia.
-
-write(outputStream, message);
-ProtoVia.
-
-read(User .class, inputStream);
-ProtoVia.
-
-sizeOf(message);
-ProtoVia.
-
-codec(User .class);
-ProtoVia.
-
-register(User .class, handWrittenCodec); // tests / override
+ProtoVia.fromBytes(User.class, bytes);
+ProtoVia.write(outputStream, message);
+ProtoVia.read(User.class, inputStream);
+ProtoVia.sizeOf(message);
+ProtoVia.codec(User.class);
+ProtoVia.register(User.class, handWrittenCodec); // tests / override
 
 ProtoAny packed = ProtoVia.pack(user);           // type.googleapis.com/<protoFullName>
 User back = ProtoVia.unpack(packed, User.class);
