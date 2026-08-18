@@ -907,6 +907,85 @@ class ProtoviaProcessorTest {
     }
 
     @Test
+    void oneofProtoMessageRecordIsSelfMessage() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Address",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record Address(",
+                    "  @ProtoField(number = 1) String city,",
+                    "  @ProtoField(number = 2) String street) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Bag",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Bag {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = String.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Address.class)",
+                    "  })",
+                    "  public Object data;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.BagProtoCodec")
+            .contentsAsUtf8String()
+            .contains("reader.readMessage(AddressProtoCodec.INSTANCE)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BagProtoCodec")
+            .contentsAsUtf8String()
+            .contains("AddressProtoCodec.INSTANCE.writeTo(writer, _c)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.BagProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("new Address(");
+    }
+
+    @Test
+    void oneofOneComponentProtoMessageRecordIsNotFlattened() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.City",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record City(@ProtoField(number = 1) String name) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Place",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public class Place {",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 1, of = City.class) })",
+                    "  public City where;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.PlaceProtoCodec")
+            .contentsAsUtf8String()
+            .contains("reader.readMessage(CityProtoCodec.INSTANCE)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PlaceProtoCodec")
+            .contentsAsUtf8String()
+            .contains("CityProtoCodec.INSTANCE.writeTo(writer, _c)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PlaceProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("new City(");
+        assertThat(compilation)
+            .generatedSourceFile("demo.PlaceProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("reader.readString()");
+    }
+
+    @Test
     void oneofAcceptsSealedSubset() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())

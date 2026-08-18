@@ -195,14 +195,14 @@ final class OneofParser {
         ProtoType declared,
         TypeElement fieldAdapter,
         String pkg) {
-        if (caseType != null && caseType.getKind() == ElementKind.RECORD) {
-            return recordShape(origin, fieldName, ofType, caseType, declared, fieldAdapter, pkg);
-        }
         if (caseType != null && caseType.getAnnotation(ProtoMessage.class) != null) {
             if (!rejectNonScalarOverrides(origin, declared, fieldAdapter)) {
                 return null;
             }
             return selfMessage(caseType, pkg);
+        }
+        if (caseType != null && caseType.getKind() == ElementKind.RECORD) {
+            return recordShape(origin, fieldName, ofType, caseType, declared, fieldAdapter, pkg);
         }
         if (env.isMap(ofType) || env.isOptional(ofType)
             || (env.isRepeatedContainer(ofType) && !isByteArray(ofType))

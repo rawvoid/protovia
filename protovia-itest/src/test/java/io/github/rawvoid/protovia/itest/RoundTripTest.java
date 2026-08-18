@@ -276,6 +276,19 @@ class RoundTripTest {
     }
 
     @Test
+    void oneofProtoMessageRecordRoundTrip() {
+        Bag address = new Bag();
+        address.data = new Address("Paris", "Rue");
+        Bag addressBack = ProtoVia.fromBytes(Bag.class, ProtoVia.toBytes(address));
+        assertEquals(new Address("Paris", "Rue"), addressBack.data);
+
+        Bag label = new Bag();
+        label.data = "ada@example.com";
+        Bag labelBack = ProtoVia.fromBytes(Bag.class, ProtoVia.toBytes(label));
+        assertEquals("ada@example.com", labelBack.data);
+    }
+
+    @Test
     void aliasReusesEmailAndHomeAtNumbersOneAndTwo() {
         Alias email = new Alias();
         email.target = new Email("ada@example.com");
