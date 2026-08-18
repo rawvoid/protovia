@@ -17,7 +17,7 @@
 package io.github.rawvoid.protovia;
 
 import io.github.rawvoid.protovia.support.User;
-import io.github.rawvoid.protovia.support.UserProtoCodec;
+import io.github.rawvoid.protovia.support.internal.UserProtoCodec;
 import io.github.rawvoid.protovia.wkt.Int32Value;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

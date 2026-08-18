@@ -147,8 +147,9 @@ final class OneofParser {
             diag.error(origin, "oneof case " + caseType.getSimpleName() + " cannot declare type parameters");
             return null;
         }
-        if (caseType != null && !env.isAccessibleFromCodec(caseType, pkg)) {
-            diag.error(origin, "oneof case " + caseType.getSimpleName() + " is not accessible from " + pkg);
+        String codecPkg = Names.codecPackageName(pkg);
+        if (caseType != null && !env.isAccessibleFromCodec(caseType, codecPkg)) {
+            diag.error(origin, "oneof case " + caseType.getSimpleName() + " is not accessible from " + codecPkg);
             return null;
         }
 
@@ -280,11 +281,7 @@ final class OneofParser {
 
     private OneofCaseModel selfMessage(TypeElement caseType, String pkg) {
         String typeName = Names.typeName(caseType, pkg);
-        String codec = Names.codecSimpleName(env.elements, caseType);
-        String codecPkg = Names.packageName(caseType);
-        if (!codecPkg.equals(pkg) && !codecPkg.isEmpty()) {
-            codec = codecPkg + "." + codec;
-        }
+        String codec = Names.codecFqcn(env.elements, caseType);
         FieldModel payload = FieldModel.builder()
             .kind(FieldKind.MESSAGE)
             .protoType(ProtoType.MESSAGE)

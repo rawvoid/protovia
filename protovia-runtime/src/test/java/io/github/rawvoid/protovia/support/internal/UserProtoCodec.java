@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package io.github.rawvoid.protovia.support;
+package io.github.rawvoid.protovia.support.internal;
 
 import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
+import io.github.rawvoid.protovia.support.User;
 import io.github.rawvoid.protovia.wire.CodedSize;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;

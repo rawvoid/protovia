@@ -36,9 +36,9 @@ public final class CodecGenerator {
 
     public String generate(MessageModel model) {
         TypeName msgType = messageType(model);
-        ClassName codecType = model.packageName.isEmpty()
+        ClassName codecType = model.codecPackageName.isEmpty()
             ? ClassName.get("", model.codecSimpleName)
-            : ClassName.get(model.packageName, model.codecSimpleName);
+            : ClassName.get(model.codecPackageName, model.codecSimpleName);
 
         TypeSpec.Builder type = TypeSpec.classBuilder(model.codecSimpleName)
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
@@ -78,7 +78,7 @@ public final class CodecGenerator {
         ReadEmitter.readMethods(model, msgType).forEach(type::addMethod);
         HelperEmitter.helpers(model).forEach(type::addMethod);
 
-        JavaFile file = JavaFile.builder(model.packageName, type.build())
+        JavaFile file = JavaFile.builder(model.codecPackageName, type.build())
             .skipJavaLangImports(true)
             .indent("    ")
             .build();

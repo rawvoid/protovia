@@ -131,6 +131,7 @@ public final class SchemaParser {
                 return null;
             }
             return scope.toModel(
+                Names.codecPackageName(type),
                 protoPackage,
                 protoMessageName,
                 typeName,

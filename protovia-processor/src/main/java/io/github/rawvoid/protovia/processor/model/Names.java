@@ -50,18 +50,30 @@ public final class Names {
         return e instanceof PackageElement pkg ? pkg.getQualifiedName().toString() : "";
     }
 
+    public static String codecPackageName(TypeElement type) {
+        return codecPackageName(packageName(type));
+    }
+
+    public static String codecPackageName(String entityPackage) {
+        return entityPackage.isEmpty() ? "internal" : entityPackage + ".internal";
+    }
+
     public static String binaryName(Elements elements, TypeElement type) {
         return elements.getBinaryName(type).toString();
     }
 
     public static String codecFqcn(Elements elements, TypeElement type) {
-        return binaryName(elements, type) + "ProtoCodec";
+        String binaryName = binaryName(elements, type);
+        String pkg = packageName(type);
+        String typePart = pkg.isEmpty() ? binaryName : binaryName.substring(pkg.length() + 1);
+        return codecPackageName(pkg) + "." + typePart + "ProtoCodec";
     }
 
     public static String codecSimpleName(Elements elements, TypeElement type) {
-        String fqcn = codecFqcn(elements, type);
-        int dot = fqcn.lastIndexOf('.');
-        return dot < 0 ? fqcn : fqcn.substring(dot + 1);
+        String binaryName = binaryName(elements, type);
+        String pkg = packageName(type);
+        String typePart = pkg.isEmpty() ? binaryName : binaryName.substring(pkg.length() + 1);
+        return typePart + "ProtoCodec";
     }
 
     public static String typeName(TypeElement type, String currentPackage) {

@@ -37,6 +37,7 @@ public final class MessageModel {
 
     public final TypeElement type;
     public final String packageName;
+    public final String codecPackageName;
     public final String protoPackage;
     public final String protoMessageName;
     public final String typeName;

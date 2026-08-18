@@ -103,13 +103,14 @@ final class MessageScope {
         recordComponents.add(new MessageModel.RecordComponentModel(name, type, field));
     }
 
-    MessageModel toModel(String protoPackage, String protoMessageName, String typeName, String codecSimpleName, boolean record) {
+    MessageModel toModel(String codecPackageName, String protoPackage, String protoMessageName, String typeName, String codecSimpleName, boolean record) {
         List<FieldModel> fields = new ArrayList<>(byNumber.values());
         fields.sort(Comparator.comparingInt(f -> f.number));
         fields.addAll(oneofs);
         return new MessageModel(
             type,
             pkg,
+            codecPackageName,
             protoPackage,
             protoMessageName,
             typeName,

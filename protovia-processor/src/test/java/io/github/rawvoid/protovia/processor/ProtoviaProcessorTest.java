@@ -56,8 +56,8 @@ class ProtoviaProcessorTest {
                     "public record City(@ProtoField(number = 1) String name) {}"));
 
         assertThat(compilation).succeeded();
-        assertThat(compilation).generatedSourceFile("demo.PersonProtoCodec");
-        assertThat(compilation).generatedSourceFile("demo.CityProtoCodec");
+        assertThat(compilation).generatedSourceFile("demo.internal.PersonProtoCodec");
+        assertThat(compilation).generatedSourceFile("demo.internal.CityProtoCodec");
     }
 
     @Test
@@ -259,15 +259,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("else if (target instanceof Home");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("ProtoException");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("unexpected type");
     }
@@ -315,7 +315,7 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("value.getTarget()");
     }
@@ -353,11 +353,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.MailProtoCodec")
+            .generatedSourceFile("demo.internal.MailProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_1");
         assertThat(compilation)
-            .generatedSourceFile("demo.MailProtoCodec")
+            .generatedSourceFile("demo.internal.MailProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_10");
     }
@@ -401,11 +401,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
-            .contains("import other.AddrProtoCodec");
+            .contains("import other.internal.AddrProtoCodec");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("AddrProtoCodec.INSTANCE");
     }
@@ -526,11 +526,11 @@ class ProtoviaProcessorTest {
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("else if (data instanceof Home");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain(" T ");
     }
@@ -554,15 +554,15 @@ class ProtoviaProcessorTest {
                     "  }) T data) {}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .generatedSourceFile("demo.internal.BoxRecordProtoCodec")
             .contentsAsUtf8String()
             .contains("Target data = existing != null ? existing.data() : null");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .generatedSourceFile("demo.internal.BoxRecordProtoCodec")
             .contentsAsUtf8String()
             .contains("return new BoxRecord(");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxRecordProtoCodec")
+            .generatedSourceFile("demo.internal.BoxRecordProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain(" T ");
     }
@@ -588,11 +588,11 @@ class ProtoviaProcessorTest {
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("value.getData()");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
     }
@@ -637,11 +637,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain(" T ");
     }
@@ -665,15 +665,15 @@ class ProtoviaProcessorTest {
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("Object data =");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain(" T ");
     }
@@ -711,11 +711,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("unexpected type");
     }
@@ -735,19 +735,19 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof String");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("readString()");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeStringNoTag(_c)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("new String(");
     }
@@ -923,11 +923,11 @@ class ProtoviaProcessorTest {
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("else if (target instanceof Home");
     }
@@ -959,15 +959,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BagProtoCodec")
+            .generatedSourceFile("demo.internal.BagProtoCodec")
             .contentsAsUtf8String()
             .contains("reader.readMessage(AddressProtoCodec.INSTANCE)");
         assertThat(compilation)
-            .generatedSourceFile("demo.BagProtoCodec")
+            .generatedSourceFile("demo.internal.BagProtoCodec")
             .contentsAsUtf8String()
             .contains("AddressProtoCodec.INSTANCE.writeTo(writer, _c)");
         assertThat(compilation)
-            .generatedSourceFile("demo.BagProtoCodec")
+            .generatedSourceFile("demo.internal.BagProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("new Address(");
     }
@@ -994,19 +994,19 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PlaceProtoCodec")
+            .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
             .contains("reader.readMessage(CityProtoCodec.INSTANCE)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PlaceProtoCodec")
+            .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
             .contains("CityProtoCodec.INSTANCE.writeTo(writer, _c)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PlaceProtoCodec")
+            .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("new City(");
         assertThat(compilation)
-            .generatedSourceFile("demo.PlaceProtoCodec")
+            .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("reader.readString()");
     }
@@ -1052,15 +1052,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Email");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("else if (target instanceof Home");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("instanceof Phone");
     }
@@ -1083,15 +1083,15 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof Integer");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeSInt32NoTag");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("readSInt32()");
     }
@@ -1116,15 +1116,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof LocalDate");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire(_c)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
     }
@@ -1144,11 +1144,11 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof byte[]");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeBytesNoTag");
     }
@@ -1184,37 +1184,37 @@ class ProtoviaProcessorTest {
                     "}")));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_10");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_11");
         assertThat(compilation)
-            .generatedSourceFile("demo.ContactProtoCodec")
+            .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("TAG_1 =");
         assertThat(compilation)
-            .generatedSourceFile("demo.AliasProtoCodec")
+            .generatedSourceFile("demo.internal.AliasProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_1");
         assertThat(compilation)
-            .generatedSourceFile("demo.AliasProtoCodec")
+            .generatedSourceFile("demo.internal.AliasProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_2");
         assertThat(compilation)
-            .generatedSourceFile("demo.AliasProtoCodec")
+            .generatedSourceFile("demo.internal.AliasProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("TAG_10");
         assertThat(compilation)
-            .generatedSourceFile("demo.AliasProtoCodec")
+            .generatedSourceFile("demo.internal.AliasProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("TAG_11");
     }
 
     @Test
-    void oneofAcceptsPackagePrivateCase() {
+    void oneofRejectsPackagePrivateCase() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(
@@ -1231,11 +1231,7 @@ class ProtoviaProcessorTest {
                     "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = LocalNote.class) })",
                     "  public Object note;",
                     "}"));
-        assertThat(compilation).succeeded();
-        assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
-            .contentsAsUtf8String()
-            .contains("instanceof LocalNote");
+        assertThat(compilation).hadErrorContaining("is not accessible");
     }
 
     @Test
@@ -1329,7 +1325,7 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.EnvProtoCodec")
+            .generatedSourceFile("demo.internal.EnvProtoCodec")
             .contentsAsUtf8String()
             .contains("UnknownFields.merge");
     }
@@ -1393,19 +1389,19 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("return \"example.v1.Box\";");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("AnyCodec.INSTANCE");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("Int32Value.INSTANCE");
         assertThat(compilation)
-            .generatedSourceFile("demo.BoxProtoCodec")
+            .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
             .contains("TimestampCodec.INSTANCE");
     }
@@ -1426,19 +1422,19 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("import io.github.rawvoid.protovia.collect.IntArrayList");
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("instanceof IntArrayList");
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("IntArrayList::new");
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("getInt(_i)");
     }
@@ -1459,11 +1455,11 @@ class ProtoviaProcessorTest {
                 "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("toIntArray()");
         assertThat(compilation)
-            .generatedSourceFile("demo.NumsProtoCodec")
+            .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
             .contains("toArray(new Integer[0])");
     }
@@ -1629,27 +1625,27 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("toWire(item)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("TAG_1_PACKED");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("fromWire(reader.readInt32())");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("ArrayList");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("addInt");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("IntArrayList");
     }
@@ -1673,23 +1669,23 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("toWire(item)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("CodedSize.int32(2, itemWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("writeInt32NoTag(itemWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("fromWire(reader.readInt32())");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("addInt");
     }
@@ -1888,23 +1884,23 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("if (birthDate != null)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("birthDate != 0");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("int birthDateWire =");
     }
@@ -1926,15 +1922,15 @@ class ProtoviaProcessorTest {
                     "  @ProtoField(number = 2, adapter = LocalDateEpochDay.class) LocalDate on) {}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .contains("value.on()");
     }
@@ -1957,19 +1953,19 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("isPresent()");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("birthDate.get()");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("birthDate != 0");
     }
@@ -1993,23 +1989,23 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.AuditProtoCodec")
+            .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
             .contains("InstantEpochMilli.INSTANCE.toWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.AuditProtoCodec")
+            .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
             .contains("InstantEpochMilli.INSTANCE.fromWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.AuditProtoCodec")
+            .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
             .contains("writeUInt64NoTag(createdWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.AuditProtoCodec")
+            .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
             .contains("TimestampCodec.INSTANCE");
         assertThat(compilation)
-            .generatedSourceFile("demo.AuditProtoCodec")
+            .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("TimestampCodec.INSTANCE.writeTo(writer, created)");
     }
@@ -2046,15 +2042,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeSInt32NoTag");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("CodedSize.sint32");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("readSInt32()");
     }
@@ -2078,30 +2074,30 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("int vWire = LocalDateEpochDay.INSTANCE.toWire(v)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("if (vWire != 0)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("int vWire = 0");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire(vWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("fromWire(\"\")");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("fromWire(0)");
-        String source = compilation.generatedSourceFile("demo.HolderProtoCodec")
+        String source = compilation.generatedSourceFile("demo.internal.HolderProtoCodec")
             .orElseThrow()
             .getCharContent(false)
             .toString();
@@ -2148,19 +2144,19 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("vWire.length != 0");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("if (vWire != 0)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("byte[] vWire = new byte[0]");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("UuidBytes.INSTANCE.fromWire(vWire)");
     }
@@ -2198,27 +2194,27 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("int dWire = LocalDateEpochDay.INSTANCE.toWire(_c.d())");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("CodedSize.int32(10, dWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeUInt32NoTag(TAG_10)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("writeInt32NoTag(dWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("new Born(LocalDateEpochDay.INSTANCE.fromWire(reader.readInt32()))");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("if (dWire != 0)");
     }
@@ -2244,15 +2240,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire(birth)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire(hired)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire");
     }
@@ -2279,11 +2275,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire(birth)");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateIso.INSTANCE.toWire(hired)");
     }
@@ -2308,7 +2304,7 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire");
     }
@@ -2343,23 +2339,23 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .contains("InstantEpochMilli.INSTANCE.toWire(created)");
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .contains("InstantEpochMilli.INSTANCE.toWire(updated)");
         assertThat(compilation)
-            .generatedSourceFile("demo.EventProtoCodec")
+            .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("TimestampCodec");
         assertThat(compilation)
-            .generatedSourceFile("demo.TimedProtoCodec")
+            .generatedSourceFile("demo.internal.TimedProtoCodec")
             .contentsAsUtf8String()
             .contains("TimestampCodec.INSTANCE");
         assertThat(compilation)
-            .generatedSourceFile("demo.TimedProtoCodec")
+            .generatedSourceFile("demo.internal.TimedProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("InstantEpochMilli");
     }
@@ -2383,15 +2379,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.CounterProtoCodec")
+            .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
             .contains("if (count != null)");
         assertThat(compilation)
-            .generatedSourceFile("demo.CounterProtoCodec")
+            .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("count != 0");
         assertThat(compilation)
-            .generatedSourceFile("demo.CounterProtoCodec")
+            .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
             .contains("AlwaysWriteInt.INSTANCE.toWire");
     }
@@ -2437,15 +2433,15 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.OrderProtoCodec")
+            .generatedSourceFile("demo.internal.OrderProtoCodec")
             .contentsAsUtf8String()
             .contains("MoneyCents.INSTANCE.toWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.OrderProtoCodec")
+            .generatedSourceFile("demo.internal.OrderProtoCodec")
             .contentsAsUtf8String()
             .contains("MoneyCents.INSTANCE.fromWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.OrderProtoCodec")
+            .generatedSourceFile("demo.internal.OrderProtoCodec")
             .contentsAsUtf8String()
             .contains("if (total != null)");
     }
@@ -2548,11 +2544,11 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.toWire");
         assertThat(compilation)
-            .generatedSourceFile("demo.PersonProtoCodec")
+            .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
             .contains("UuidString.INSTANCE.toWire");
     }
@@ -2580,22 +2576,22 @@ class ProtoviaProcessorTest {
                     "}"));
         assertThat(compilation).succeeded();
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("String kWire = \"\"");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("fromWire(\"\")");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("UuidString.INSTANCE.fromWire(kWire)");
         assertThat(compilation)
-            .generatedSourceFile("demo.HolderProtoCodec")
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .contains("LocalDateEpochDay.INSTANCE.fromWire(vWire)");
-        String source = compilation.generatedSourceFile("demo.HolderProtoCodec")
+        String source = compilation.generatedSourceFile("demo.internal.HolderProtoCodec")
             .orElseThrow()
             .getCharContent(false)
             .toString();

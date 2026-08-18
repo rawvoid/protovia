@@ -135,11 +135,7 @@ final class TypeClassifier {
             r.kind = FieldKind.MESSAGE;
             r.protoType = ProtoType.MESSAGE;
             r.messageType = element;
-            r.codecName = Names.codecSimpleName(env.elements, element);
-            String codecPkg = Names.packageName(element);
-            if (!codecPkg.equals(currentPkg) && !codecPkg.isEmpty()) {
-                r.codecName = codecPkg + "." + r.codecName;
-            }
+            r.codecName = Names.codecFqcn(env.elements, element);
             return r;
         }
         diag.error(origin, "unsupported type for field '" + name + "': " + element.getQualifiedName()

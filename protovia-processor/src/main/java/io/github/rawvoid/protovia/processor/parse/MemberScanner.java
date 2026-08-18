@@ -157,8 +157,9 @@ final class MemberScanner {
         Map<String, ExecutableElement> methods) {
         String setter = Names.setterName(property);
         ExecutableElement set = methods.get(setter);
-        if (set == null || set.getParameters().size() != 1) {
-            diag.error(method, "annotated getter '" + method.getSimpleName() + "' has no matching setter " + setter);
+        if (set == null || set.getParameters().size() != 1 || !set.getModifiers().contains(Modifier.PUBLIC)
+            || !method.getModifiers().contains(Modifier.PUBLIC)) {
+            diag.error(method, "annotated getter '" + method.getSimpleName() + "' has no matching public setter " + setter);
             return null;
         }
         return new Access(
@@ -179,19 +180,19 @@ final class MemberScanner {
         }
         ExecutableElement setter = methods.get(Names.setterName(name));
         boolean getterOk = getter != null && getter.getParameters().isEmpty()
-            && !getter.getModifiers().contains(Modifier.PRIVATE);
+            && getter.getModifiers().contains(Modifier.PUBLIC);
         boolean setterOk = setter != null && setter.getParameters().size() == 1
-            && !setter.getModifiers().contains(Modifier.PRIVATE);
+            && setter.getModifiers().contains(Modifier.PUBLIC);
         if (getterOk && setterOk) {
             return new Access(
                 AccessKind.GETTER_SETTER,
                 "value." + getter.getSimpleName() + "()",
                 setter.getSimpleName().toString());
         }
-        if (!field.getModifiers().contains(Modifier.PRIVATE)) {
+        if (field.getModifiers().contains(Modifier.PUBLIC)) {
             return new Access(AccessKind.FIELD, "value." + name, null);
         }
-        diag.error(field, "private field '" + name + "' needs a JavaBean getter and setter, or must not be private");
+        diag.error(field, "field '" + name + "' needs a public JavaBean getter and setter, or must be public");
         return null;
     }
 

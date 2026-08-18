@@ -28,7 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Resolves a {@link ProtoCodec} by convention {@code TypeName + "ProtoCodec.INSTANCE"},
+ * Resolves a {@link ProtoCodec} by convention {@code package + ".internal." + TypeName + "ProtoCodec.INSTANCE"},
  * with an optional manual {@link #register(Class, ProtoCodec) override}.
  * Well-known types ({@code Instant}, {@code Duration}, {@link ProtoAny}, wrappers)
  * are registered up front.
@@ -99,7 +99,11 @@ public final class CodecLookup {
 
     @SuppressWarnings("unchecked")
     private static <T> ProtoCodec<T> loadGenerated(Class<T> type) {
-        String codecName = type.getName() + "ProtoCodec";
+        String pkg = type.getPackageName();
+        String simpleBinaryName = pkg.isEmpty() ? type.getName() : type.getName().substring(pkg.length() + 1);
+        String codecName = pkg.isEmpty()
+            ? "internal." + simpleBinaryName + "ProtoCodec"
+            : pkg + ".internal." + simpleBinaryName + "ProtoCodec";
         try {
             Class<?> codecClass = Class.forName(codecName, true, type.getClassLoader());
             Field instance = codecClass.getField("INSTANCE");

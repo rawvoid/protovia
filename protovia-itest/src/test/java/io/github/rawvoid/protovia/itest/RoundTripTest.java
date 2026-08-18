@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoVia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
 import io.github.rawvoid.protovia.itest.model.*;
+import io.github.rawvoid.protovia.itest.model.internal.UserProtoCodec;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wkt.Int32Value;
