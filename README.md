@@ -182,8 +182,8 @@ LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 **oneof**
 
 - Mark the field `@ProtoOneof({ @ProtoOneof.Case(number, of), ... })`. The group has no field number; each `Case.number` belongs to the parent message.
-- `of` is a 0- or 1-component record, a `@ProtoMessage`, or a naked scalar / enum / `byte[]`. `sealed` is optional and is not consulted.
-- A one-component scalar record encodes as that scalar, not a nested message. A naked `String` case stores the string directly.
+- `of` is a 0- or 1-component record, a `@ProtoMessage` (class or record, including multi-component), or a naked scalar / enum / `byte[]`. `sealed` is optional and is not consulted.
+- A one-component scalar record without `@ProtoMessage` encodes as that scalar, not a nested message. A `@ProtoMessage` case is `readMessage` / `writeTo` on that instance. A naked `String` case stores the string directly.
 
 **Unknown fields**
 
