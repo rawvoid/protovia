@@ -461,7 +461,7 @@ class ProtoviaProcessorTest {
     void oneofRejectsUnassignableCases() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(withFieldOneof(
                 JavaFileObjects.forSourceLines(
                     "demo.Bad",
                     "package demo;",
@@ -483,7 +483,7 @@ class ProtoviaProcessorTest {
     void oneofErasesTypeVariableBound() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(withFieldOneof(
                 JavaFileObjects.forSourceLines(
                     "demo.Box",
                     "package demo;",
@@ -513,7 +513,7 @@ class ProtoviaProcessorTest {
     void oneofAcceptsTypeVariableOnGenericRecord() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(withFieldOneof(
                 JavaFileObjects.forSourceLines(
                     "demo.BoxRecord",
                     "package demo;",
@@ -545,7 +545,7 @@ class ProtoviaProcessorTest {
     void oneofAcceptsTypeVariableOnGetter() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(withFieldOneof(
                 JavaFileObjects.forSourceLines(
                     "demo.Box",
                     "package demo;",
@@ -572,14 +572,14 @@ class ProtoviaProcessorTest {
     }
 
     @Test
-    void oneofAcceptsIntersectionBoundWithOneSealed() {
+    void oneofAcceptsIntersectionBound() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(
                 JavaFileObjects.forSourceLines(
                     "demo.Target",
                     "package demo;",
-                    "public sealed interface Target permits Email, Home {}"),
+                    "public interface Target {}"),
                 JavaFileObjects.forSourceLines(
                     "demo.Email",
                     "package demo;",
@@ -624,7 +624,7 @@ class ProtoviaProcessorTest {
     void oneofErasesUnboundedTypeVariable() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
-            .compile(withOneofTarget(
+            .compile(withFieldOneof(
                 JavaFileObjects.forSourceLines(
                     "demo.Box",
                     "package demo;",
@@ -2643,30 +2643,6 @@ class ProtoviaProcessorTest {
                     "  public Map<String, Integer> scores;",
                     "}"));
         assertThat(compilation).hadErrorContaining("handles UUID, not Map");
-    }
-
-    private static java.util.List<javax.tools.JavaFileObject> withOneofTarget(
-        javax.tools.JavaFileObject extra) {
-        return java.util.List.of(
-            JavaFileObjects.forSourceLines(
-                "demo.Target",
-                "package demo;",
-                "public sealed interface Target permits Email, Home {}"),
-            JavaFileObjects.forSourceLines(
-                "demo.Email",
-                "package demo;",
-                "public record Email(String value) implements Target {}"),
-            JavaFileObjects.forSourceLines(
-                "demo.Addr",
-                "package demo;",
-                "import io.github.rawvoid.protovia.annotation.ProtoField;",
-                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
-                "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
-            JavaFileObjects.forSourceLines(
-                "demo.Home",
-                "package demo;",
-                "public record Home(Addr address) implements Target {}"),
-            extra);
     }
 
     private static java.util.List<javax.tools.JavaFileObject> withFieldOneof(
