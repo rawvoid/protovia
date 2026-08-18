@@ -44,7 +44,8 @@ public final class OneofCaseModel {
      */
     public final FieldModel payload;
     /**
-     * Record component accessor, e.g. {@code value()}, or {@code null} if the case is the message itself.
+     * Record component accessor, e.g. {@code value()}.
+     * {@code null} for an empty record, a self-message, or a naked payload.
      */
     public final String accessor;
     public final boolean selfMessage;
