@@ -33,21 +33,21 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * @author Rawvoid
  */
-class ProtoViaTest {
+class ProtoviaTest {
 
     @BeforeEach
     void register() {
-        ProtoVia.register(User.class, UserProtoCodec.INSTANCE);
-        ProtoVia.register(User.Address.class, UserProtoCodec.AddressProtoCodec.INSTANCE);
+        Protovia.register(User.class, UserProtoCodec.INSTANCE);
+        Protovia.register(User.Address.class, UserProtoCodec.AddressProtoCodec.INSTANCE);
     }
 
     @Test
     void roundTrip() {
         User user = sample();
-        byte[] bytes = ProtoVia.toBytes(user);
-        User back = ProtoVia.fromBytes(User.class, bytes);
+        byte[] bytes = Protovia.toBytes(user);
+        User back = Protovia.fromBytes(User.class, bytes);
         assertEquals(user, back);
-        assertEquals(bytes.length, ProtoVia.sizeOf(user));
+        assertEquals(bytes.length, Protovia.sizeOf(user));
     }
 
     @Test
@@ -55,9 +55,9 @@ class ProtoViaTest {
         User user = new User();
         user.setTags(null);
         user.setScores(null);
-        byte[] bytes = ProtoVia.toBytes(user);
+        byte[] bytes = Protovia.toBytes(user);
         assertEquals(0, bytes.length);
-        User back = ProtoVia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(User.class, bytes);
         assertNull(back.getName());
         assertEquals(0, back.getAge());
     }
@@ -68,9 +68,9 @@ class ProtoViaTest {
         user.setTags(null);
         user.setScores(null);
         user.setLevel(0);
-        byte[] bytes = ProtoVia.toBytes(user);
+        byte[] bytes = Protovia.toBytes(user);
         assertArrayEquals(new byte[]{0x30, 0x00}, bytes);
-        User back = ProtoVia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(User.class, bytes);
         assertEquals(0, back.getLevel());
     }
 
@@ -81,7 +81,7 @@ class ProtoViaTest {
         user.setAge(0);
         user.setTags(null);
         user.setScores(null);
-        byte[] bytes = ProtoVia.toBytes(user);
+        byte[] bytes = Protovia.toBytes(user);
         assertArrayEquals(new byte[]{0x0A, 0x01, 'a'}, bytes);
     }
 
@@ -89,8 +89,8 @@ class ProtoViaTest {
     void streamRoundTrip() {
         User user = sample();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ProtoVia.write(out, user);
-        User back = ProtoVia.read(User.class, new ByteArrayInputStream(out.toByteArray()));
+        Protovia.write(out, user);
+        User back = Protovia.read(User.class, new ByteArrayInputStream(out.toByteArray()));
         assertEquals(user, back);
     }
 
@@ -98,32 +98,32 @@ class ProtoViaTest {
     void readBoundedAtIntegerMaxValueReadsTheStream() throws Exception {
         byte[] payload = {0x0A, 0x01, 'n'};
         assertArrayEquals(payload,
-            ProtoVia.readBounded(new ByteArrayInputStream(payload), Integer.MAX_VALUE));
+            Protovia.readBounded(new ByteArrayInputStream(payload), Integer.MAX_VALUE));
     }
 
     @Test
     void packUnpackUserAndInstant() {
         User user = sample();
-        ProtoAny packed = ProtoVia.pack(user);
+        ProtoAny packed = Protovia.pack(user);
         assertEquals("type.googleapis.com/User", packed.typeUrl());
-        assertTrue(ProtoVia.is(packed, User.class));
-        assertEquals(user, ProtoVia.unpack(packed, User.class));
+        assertTrue(Protovia.is(packed, User.class));
+        assertEquals(user, Protovia.unpack(packed, User.class));
 
         Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
-        ProtoAny time = ProtoVia.pack(at);
+        ProtoAny time = Protovia.pack(at);
         assertEquals("type.googleapis.com/google.protobuf.Timestamp", time.typeUrl());
-        assertEquals(at, ProtoVia.unpack(time, Instant.class));
-        assertThrows(ProtoException.class, () -> ProtoVia.unpack(time, Int32Value.class));
+        assertEquals(at, Protovia.unpack(time, Instant.class));
+        assertThrows(ProtoException.class, () -> Protovia.unpack(time, Int32Value.class));
     }
 
     @Test
     void nullMessageRejected() {
-        assertThrows(NullPointerException.class, () -> ProtoVia.toBytes(null));
+        assertThrows(NullPointerException.class, () -> Protovia.toBytes(null));
     }
 
     @Test
     void missingCodec() {
-        assertThrows(ProtoException.class, () -> ProtoVia.toBytes("not-a-message"));
+        assertThrows(ProtoException.class, () -> Protovia.toBytes("not-a-message"));
     }
 
     @Test
@@ -132,14 +132,14 @@ class ProtoViaTest {
         user.setName("n");
         user.setTags(null);
         user.setScores(null);
-        byte[] known = ProtoVia.toBytes(user);
+        byte[] known = Protovia.toBytes(user);
         // append unknown field 15 string "x"
         byte[] extra = new byte[known.length + 3];
         System.arraycopy(known, 0, extra, 0, known.length);
         extra[known.length] = 0x7A; // field 15, LEN
         extra[known.length + 1] = 0x01;
         extra[known.length + 2] = 'x';
-        User back = ProtoVia.fromBytes(User.class, extra);
+        User back = Protovia.fromBytes(User.class, extra);
         assertEquals("n", back.getName());
     }
 

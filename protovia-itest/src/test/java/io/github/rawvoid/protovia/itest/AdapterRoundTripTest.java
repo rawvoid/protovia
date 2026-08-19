@@ -17,7 +17,7 @@
 package io.github.rawvoid.protovia.itest;
 
 import io.github.rawvoid.protovia.ProtoException;
-import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.Protovia;
 import io.github.rawvoid.protovia.itest.model.*;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wkt.DurationCodec;
@@ -44,9 +44,9 @@ class AdapterRoundTripTest {
     @Test
     void nullLocalDateIsOmitted() {
         Dated dated = new Dated();
-        byte[] bytes = ProtoVia.toBytes(dated);
+        byte[] bytes = Protovia.toBytes(dated);
         assertEquals(0, bytes.length);
-        Dated back = ProtoVia.fromBytes(Dated.class, bytes);
+        Dated back = Protovia.fromBytes(Dated.class, bytes);
         assertNull(back.birthDate);
     }
 
@@ -54,9 +54,9 @@ class AdapterRoundTripTest {
     void epochDayZeroIsAlwaysWritten() {
         Dated dated = new Dated();
         dated.birthDate = EPOCH;
-        byte[] bytes = ProtoVia.toBytes(dated);
+        byte[] bytes = Protovia.toBytes(dated);
         assertArrayEquals(new byte[]{0x18, 0x00}, bytes);
-        Dated back = ProtoVia.fromBytes(Dated.class, bytes);
+        Dated back = Protovia.fromBytes(Dated.class, bytes);
         assertEquals(EPOCH, back.birthDate);
     }
 
@@ -64,18 +64,18 @@ class AdapterRoundTripTest {
     void sampleLocalDateRoundTrips() {
         Dated dated = new Dated();
         dated.birthDate = SAMPLE;
-        Dated back = ProtoVia.fromBytes(Dated.class, ProtoVia.toBytes(dated));
+        Dated back = Protovia.fromBytes(Dated.class, Protovia.toBytes(dated));
         assertEquals(SAMPLE, back.birthDate);
     }
 
     @Test
     void recordLocalDateRoundTrips() {
         DatedRecord record = new DatedRecord("evt", SAMPLE);
-        assertEquals(record, ProtoVia.fromBytes(DatedRecord.class, ProtoVia.toBytes(record)));
+        assertEquals(record, Protovia.fromBytes(DatedRecord.class, Protovia.toBytes(record)));
         DatedRecord epoch = new DatedRecord("evt", EPOCH);
-        assertEquals(epoch, ProtoVia.fromBytes(DatedRecord.class, ProtoVia.toBytes(epoch)));
+        assertEquals(epoch, Protovia.fromBytes(DatedRecord.class, Protovia.toBytes(epoch)));
         DatedRecord empty = new DatedRecord(null, null);
-        assertEquals(empty, ProtoVia.fromBytes(DatedRecord.class, ProtoVia.toBytes(empty)));
+        assertEquals(empty, Protovia.fromBytes(DatedRecord.class, Protovia.toBytes(empty)));
     }
 
     @Test
@@ -83,7 +83,7 @@ class AdapterRoundTripTest {
         Dated dated = new Dated();
         dated.days = List.of(EPOCH, SAMPLE);
         dated.unpacked = List.of(SAMPLE, EPOCH);
-        Dated back = ProtoVia.fromBytes(Dated.class, ProtoVia.toBytes(dated));
+        Dated back = Protovia.fromBytes(Dated.class, Protovia.toBytes(dated));
         assertEquals(List.of(EPOCH, SAMPLE), back.days);
         assertEquals(List.of(SAMPLE, EPOCH), back.unpacked);
     }
@@ -92,8 +92,8 @@ class AdapterRoundTripTest {
     void mapValueOmittedZeroBecomesEpochDay() {
         Dated dated = new Dated();
         dated.dates.put("epoch", EPOCH);
-        byte[] bytes = ProtoVia.toBytes(dated);
-        Dated back = ProtoVia.fromBytes(Dated.class, bytes);
+        byte[] bytes = Protovia.toBytes(dated);
+        Dated back = Protovia.fromBytes(Dated.class, bytes);
         assertEquals(EPOCH, back.dates.get("epoch"));
     }
 
@@ -101,7 +101,7 @@ class AdapterRoundTripTest {
     void uuidToLocalDateMapRoundTrips() {
         Dated dated = new Dated();
         dated.byId.put(ID, SAMPLE);
-        Dated back = ProtoVia.fromBytes(Dated.class, ProtoVia.toBytes(dated));
+        Dated back = Protovia.fromBytes(Dated.class, Protovia.toBytes(dated));
         assertEquals(1, back.byId.size());
         assertEquals(SAMPLE, back.byId.get(ID));
     }
@@ -110,7 +110,7 @@ class AdapterRoundTripTest {
     void uuidFieldRoundTrips() {
         Dated dated = new Dated();
         dated.id = ID;
-        Dated back = ProtoVia.fromBytes(Dated.class, ProtoVia.toBytes(dated));
+        Dated back = Protovia.fromBytes(Dated.class, Protovia.toBytes(dated));
         assertEquals(ID, back.id);
     }
 
@@ -119,7 +119,7 @@ class AdapterRoundTripTest {
         ProtoWriter writer = ProtoWriter.growing();
         writer.writeString(7, "not-a-uuid");
         ProtoException ex = assertThrows(ProtoException.class,
-            () -> ProtoVia.fromBytes(Dated.class, writer.toByteArray()));
+            () -> Protovia.fromBytes(Dated.class, writer.toByteArray()));
         assertTrue(ex.getMessage().contains("not-a-uuid"));
         assertInstanceOf(IllegalArgumentException.class, ex.getCause());
     }
@@ -128,9 +128,9 @@ class AdapterRoundTripTest {
     void oneofBornEpochWritesTagAndZero() {
         DatedOneof msg = new DatedOneof();
         msg.event = new Born(EPOCH);
-        byte[] bytes = ProtoVia.toBytes(msg);
+        byte[] bytes = Protovia.toBytes(msg);
         assertArrayEquals(new byte[]{0x50, 0x00}, bytes);
-        DatedOneof back = ProtoVia.fromBytes(DatedOneof.class, bytes);
+        DatedOneof back = Protovia.fromBytes(DatedOneof.class, bytes);
         assertEquals(new Born(EPOCH), back.event);
     }
 
@@ -143,21 +143,21 @@ class AdapterRoundTripTest {
         audit.created = created;
         audit.published = published;
 
-        Audit back = ProtoVia.fromBytes(Audit.class, ProtoVia.toBytes(audit));
+        Audit back = Protovia.fromBytes(Audit.class, Protovia.toBytes(audit));
         assertEquals("a1", back.id);
         assertEquals(created, back.created);
         assertEquals(published, back.published);
 
         Audit onlyCreated = new Audit();
         onlyCreated.created = created;
-        byte[] createdBytes = ProtoVia.toBytes(onlyCreated);
+        byte[] createdBytes = Protovia.toBytes(onlyCreated);
         ProtoWriter expected = ProtoWriter.growing();
         expected.writeInt64(2, created.toEpochMilli());
         assertArrayEquals(expected.toByteArray(), createdBytes);
 
         Audit onlyPublished = new Audit();
         onlyPublished.published = published;
-        byte[] publishedBytes = ProtoVia.toBytes(onlyPublished);
+        byte[] publishedBytes = Protovia.toBytes(onlyPublished);
         assertEquals((byte) 0x1A, publishedBytes[0]);
         assertArrayEquals(
             encode(TimestampCodec.INSTANCE, published),
@@ -174,7 +174,7 @@ class AdapterRoundTripTest {
         event.updated = updated;
         event.ttl = ttl;
 
-        Event back = ProtoVia.fromBytes(Event.class, ProtoVia.toBytes(event));
+        Event back = Protovia.fromBytes(Event.class, Protovia.toBytes(event));
         assertEquals(created, back.created);
         assertEquals(updated, back.updated);
         assertEquals(ttl, back.ttl);
@@ -183,7 +183,7 @@ class AdapterRoundTripTest {
         expected.writeInt64(1, created.toEpochMilli());
         expected.writeInt64(2, updated.toEpochMilli());
         expected.writeInt64(3, ttl.toMillis());
-        assertArrayEquals(expected.toByteArray(), ProtoVia.toBytes(event));
+        assertArrayEquals(expected.toByteArray(), Protovia.toBytes(event));
     }
 
     @Test
@@ -193,10 +193,10 @@ class AdapterRoundTripTest {
         Timed timed = new Timed();
         timed.at = at;
         timed.wait = wait;
-        byte[] bytes = ProtoVia.toBytes(timed);
+        byte[] bytes = Protovia.toBytes(timed);
         assertEquals((byte) 0x0A, bytes[0]);
 
-        Timed back = ProtoVia.fromBytes(Timed.class, bytes);
+        Timed back = Protovia.fromBytes(Timed.class, bytes);
         assertEquals(at, back.at);
         assertEquals(wait, back.wait);
         assertArrayEquals(encode(TimestampCodec.INSTANCE, at),
@@ -210,7 +210,7 @@ class AdapterRoundTripTest {
         User user = new User();
         user.setName("Ada");
         user.setAge(36);
-        User back = ProtoVia.fromBytes(User.class, ProtoVia.toBytes(user));
+        User back = Protovia.fromBytes(User.class, Protovia.toBytes(user));
         assertEquals(user, back);
     }
 

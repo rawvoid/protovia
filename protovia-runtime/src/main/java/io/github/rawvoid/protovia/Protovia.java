@@ -33,7 +33,7 @@ import java.util.Objects;
  *
  * @author Rawvoid
  */
-public final class ProtoVia {
+public final class Protovia {
 
     public static final int DEFAULT_MAX_MESSAGE_SIZE = ProtoReader.DEFAULT_MAX_MESSAGE_SIZE;
     public static final int DEFAULT_MAX_DEPTH = ProtoReader.DEFAULT_MAX_DEPTH;
@@ -41,7 +41,7 @@ public final class ProtoVia {
     private static volatile int maxMessageSize = DEFAULT_MAX_MESSAGE_SIZE;
     private static volatile int maxDepth = DEFAULT_MAX_DEPTH;
 
-    private ProtoVia() {
+    private Protovia() {
     }
 
     /**
@@ -54,7 +54,7 @@ public final class ProtoVia {
         if (maxMessageSize <= 0) {
             throw new IllegalArgumentException("maxMessageSize must be positive");
         }
-        ProtoVia.maxMessageSize = maxMessageSize;
+        Protovia.maxMessageSize = maxMessageSize;
     }
 
     /**
@@ -66,7 +66,7 @@ public final class ProtoVia {
         if (maxDepth <= 0) {
             throw new IllegalArgumentException("maxDepth must be positive");
         }
-        ProtoVia.maxDepth = maxDepth;
+        Protovia.maxDepth = maxDepth;
     }
 
     public static int maxMessageSize() {

@@ -16,7 +16,7 @@
 
 package io.github.rawvoid.protovia.itest;
 
-import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.Protovia;
 import io.github.rawvoid.protovia.itest.model.RichAdaptersModel;
 import org.junit.jupiter.api.Test;
 
@@ -56,8 +56,8 @@ class RichAdaptersRoundTripTest {
             .offsetDateTime(OffsetDateTime.of(2026, 8, 18, 15, 47, 5, 123_000_000, ZoneOffset.ofHours(8)))
             .build();
 
-        byte[] bytes = ProtoVia.toBytes(model);
-        RichAdaptersModel back = ProtoVia.fromBytes(RichAdaptersModel.class, bytes);
+        byte[] bytes = Protovia.toBytes(model);
+        RichAdaptersModel back = Protovia.fromBytes(RichAdaptersModel.class, bytes);
 
         assertEquals(model.uuidBytes, back.uuidBytes);
         assertEquals(model.amount, back.amount);
@@ -79,10 +79,10 @@ class RichAdaptersRoundTripTest {
     @Test
     void nullFieldsHandledGracefully() {
         RichAdaptersModel model = new RichAdaptersModel();
-        byte[] bytes = ProtoVia.toBytes(model);
+        byte[] bytes = Protovia.toBytes(model);
         assertEquals(0, bytes.length);
 
-        RichAdaptersModel back = ProtoVia.fromBytes(RichAdaptersModel.class, bytes);
+        RichAdaptersModel back = Protovia.fromBytes(RichAdaptersModel.class, bytes);
         assertNull(back.uuidBytes);
         assertNull(back.amount);
         assertNull(back.bigInt);

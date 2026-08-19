@@ -23,7 +23,7 @@ import java.util.Arrays;
 
 /**
  * {@code google.protobuf.Any}: a type URL plus the serialized payload.
- * {@code pack}/{@code unpack} by {@code Class} live on {@code ProtoVia} so this
+ * {@code pack}/{@code unpack} by {@code Class} live on {@code Protovia} so this
  * type does not depend on codec lookup. Use {@link #unpack(ProtoCodec)} when
  * you already have a codec.
  *

@@ -37,8 +37,8 @@ public enum Status {
   @ProtoEnumValue(1) ACTIVE
 }
 
-byte[] bytes = ProtoVia.toBytes(user);
-User back = ProtoVia.fromBytes(User.class, bytes);
+byte[] bytes = Protovia.toBytes(user);
+User back = Protovia.fromBytes(User.class, bytes);
 ```
 
 The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …).
@@ -48,7 +48,7 @@ The bytes are readable by official Protocol Buffers implementations (Go, Python,
 | Artifact             | Role                                                |
 |----------------------|-----------------------------------------------------|
 | `protovia-api`       | Annotations, `ProtoType`, `ProtoCodec`, wire types  |
-| `protovia-runtime`   | `ProtoVia` facade and codec lookup                  |
+| `protovia-runtime`   | `Protovia` facade and codec lookup                  |
 | `protovia-processor` | Annotation processor that generates `XxxProtoCodec` |
 | `protovia-itest`     | End-to-end + official protobuf interop tests        |
 
@@ -84,7 +84,7 @@ annotationProcessor("io.github.rawvoid:protovia-processor:1.0-SNAPSHOT")
 
 1. You mark types with `@ProtoMessage` / `@ProtoEnum` and members with `@ProtoField(number = N)`.
 2. At compile time the processor writes `UserProtoCodec` in the **same package** (nested types become `Outer$InnerProtoCodec`).
-3. `ProtoVia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields.
+3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields.
 
 Generated codecs:
 
@@ -306,21 +306,21 @@ private Event event;
 ## API
 
 ```java
-ProtoVia.toBytes(message);
-ProtoVia.fromBytes(User.class, bytes);
-ProtoVia.write(outputStream, message);
-ProtoVia.read(User.class, inputStream);
-ProtoVia.sizeOf(message);
-ProtoVia.codec(User.class);
-ProtoVia.register(User.class, handWrittenCodec); // tests / override
+Protovia.toBytes(message);
+Protovia.fromBytes(User.class, bytes);
+Protovia.write(outputStream, message);
+Protovia.read(User.class, inputStream);
+Protovia.sizeOf(message);
+Protovia.codec(User.class);
+Protovia.register(User.class, handWrittenCodec); // tests / override
 
-ProtoAny packed = ProtoVia.pack(user);           // type.googleapis.com/<protoFullName>
-User back = ProtoVia.unpack(packed, User.class);
+ProtoAny packed = Protovia.pack(user);           // type.googleapis.com/<protoFullName>
+User back = Protovia.unpack(packed, User.class);
 ```
 
 `pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. `Integer` stays int32; use `Int32Value` when you need the wrapper message.
 
-Default safety limits: 64 MiB per message, nesting depth 100. Override with `ProtoVia.setMaxMessageSize` / `setMaxDepth`.
+Default safety limits: 64 MiB per message, nesting depth 100. Override with `Protovia.setMaxMessageSize` / `setMaxDepth`.
 
 ## Not in this release
 

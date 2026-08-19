@@ -28,7 +28,7 @@
 
     <artifactId>protovia-runtime</artifactId>
     <name>protovia-runtime</name>
-    <description>Wire format, codecs, and ProtoVia facade</description>
+    <description>Wire format, codecs, and Protovia facade</description>
 
     <dependencies>
         <dependency>

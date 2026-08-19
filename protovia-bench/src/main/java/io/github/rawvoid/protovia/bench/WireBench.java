@@ -16,7 +16,7 @@
 
 package io.github.rawvoid.protovia.bench;
 
-import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.Protovia;
 import io.github.rawvoid.protovia.bench.model.User;
 import org.openjdk.jmh.annotations.*;
 
@@ -60,7 +60,7 @@ public class WireBench {
 
     @Benchmark
     public byte[] protoviaSerializeSmall() {
-        return ProtoVia.toBytes(protoviaSmall);
+        return Protovia.toBytes(protoviaSmall);
     }
 
     @Benchmark
@@ -70,7 +70,7 @@ public class WireBench {
 
     @Benchmark
     public byte[] protoviaSerializeCjk() {
-        return ProtoVia.toBytes(protoviaCjk);
+        return Protovia.toBytes(protoviaCjk);
     }
 
     @Benchmark
@@ -80,7 +80,7 @@ public class WireBench {
 
     @Benchmark
     public byte[] protoviaSerializePacked() {
-        return ProtoVia.toBytes(protoviaPacked);
+        return Protovia.toBytes(protoviaPacked);
     }
 
     @Benchmark
@@ -90,7 +90,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializeSmall() {
-        return ProtoVia.fromBytes(User.class, smallBytes);
+        return Protovia.fromBytes(User.class, smallBytes);
     }
 
     @Benchmark
@@ -101,7 +101,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializeCjk() {
-        return ProtoVia.fromBytes(User.class, cjkBytes);
+        return Protovia.fromBytes(User.class, cjkBytes);
     }
 
     @Benchmark
@@ -111,7 +111,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializePacked() {
-        return ProtoVia.fromBytes(User.class, packedBytes);
+        return Protovia.fromBytes(User.class, packedBytes);
     }
 
     @Benchmark

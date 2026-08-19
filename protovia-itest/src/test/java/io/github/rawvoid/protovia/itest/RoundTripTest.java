@@ -17,7 +17,7 @@
 package io.github.rawvoid.protovia.itest;
 
 import io.github.rawvoid.protovia.ProtoException;
-import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.Protovia;
 import io.github.rawvoid.protovia.collect.IntArrayList;
 import io.github.rawvoid.protovia.itest.model.*;
 import io.github.rawvoid.protovia.itest.model.internal.UserProtoCodec;
@@ -38,8 +38,8 @@ class RoundTripTest {
     @Test
     void pojoRoundTrip() {
         User user = sampleUser();
-        byte[] bytes = ProtoVia.toBytes(user);
-        User back = ProtoVia.fromBytes(User.class, bytes);
+        byte[] bytes = Protovia.toBytes(user);
+        User back = Protovia.fromBytes(User.class, bytes);
         assertEquals(user, back);
     }
 
@@ -53,8 +53,8 @@ class RoundTripTest {
             map("math", 99),
             Status.ACTIVE,
             Optional.of(0));
-        byte[] bytes = ProtoVia.toBytes(record);
-        UserRecord back = ProtoVia.fromBytes(UserRecord.class, bytes);
+        byte[] bytes = Protovia.toBytes(record);
+        UserRecord back = Protovia.fromBytes(UserRecord.class, bytes);
         assertEquals(record, back);
     }
 
@@ -63,12 +63,12 @@ class RoundTripTest {
         Carrier carrier = new Carrier();
         carrier.name = "box";
         carrier.count = new Int32Value(0);
-        carrier.extra = ProtoVia.pack(new Int32Value(7));
-        Carrier back = ProtoVia.fromBytes(Carrier.class, ProtoVia.toBytes(carrier));
+        carrier.extra = Protovia.pack(new Int32Value(7));
+        Carrier back = Protovia.fromBytes(Carrier.class, Protovia.toBytes(carrier));
         assertEquals("box", back.name);
         assertEquals(new Int32Value(0), back.count);
-        assertEquals(new Int32Value(7), ProtoVia.unpack(back.extra, Int32Value.class));
-        assertEquals("example.v1.Carrier", ProtoVia.codec(Carrier.class).protoFullName());
+        assertEquals(new Int32Value(7), Protovia.unpack(back.extra, Int32Value.class));
+        assertEquals("example.v1.Carrier", Protovia.codec(Carrier.class).protoFullName());
     }
 
     @Test
@@ -77,7 +77,7 @@ class RoundTripTest {
         user.setName("");
         user.setAge(0);
         user.setStatus(Status.UNKNOWN);
-        byte[] bytes = ProtoVia.toBytes(user);
+        byte[] bytes = Protovia.toBytes(user);
         assertEquals(0, bytes.length);
     }
 
@@ -85,9 +85,9 @@ class RoundTripTest {
     void optionalZeroIsWritten() {
         User user = new User();
         user.setLevel(0);
-        byte[] bytes = ProtoVia.toBytes(user);
+        byte[] bytes = Protovia.toBytes(user);
         assertArrayEquals(new byte[]{0x40, 0x00}, bytes);
-        User back = ProtoVia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(User.class, bytes);
         assertEquals(0, back.getLevel());
     }
 
@@ -97,9 +97,9 @@ class RoundTripTest {
         extra.writeEnum(1, 1);
         extra.writeEnum(1, 99);
         extra.writeEnum(1, 2);
-        Flags back = ProtoVia.fromBytes(Flags.class, extra.toByteArray());
+        Flags back = Protovia.fromBytes(Flags.class, extra.toByteArray());
         assertEquals(List.of(Status.ACTIVE, Status.BANNED), back.flags);
-        Flags again = ProtoVia.fromBytes(Flags.class, ProtoVia.toBytes(back));
+        Flags again = Protovia.fromBytes(Flags.class, Protovia.toBytes(back));
         assertEquals(List.of(Status.ACTIVE, Status.BANNED), again.flags);
         assertTrue(again.unknownFields.serializedSize() > 0);
     }
@@ -108,12 +108,12 @@ class RoundTripTest {
     void unknownEnumIsSkipped() {
         User user = new User();
         user.setName("n");
-        byte[] known = ProtoVia.toBytes(user);
+        byte[] known = Protovia.toBytes(user);
         byte[] extra = new byte[known.length + 2];
         System.arraycopy(known, 0, extra, 0, known.length);
         extra[known.length] = 0x38; // field 7 enum
         extra[known.length + 1] = 0x63; // 99
-        User back = ProtoVia.fromBytes(User.class, extra);
+        User back = Protovia.fromBytes(User.class, extra);
         assertEquals("n", back.getName());
         assertEquals(Status.UNRECOGNIZED, back.getStatus());
     }
@@ -123,13 +123,13 @@ class RoundTripTest {
         Envelope env = new Envelope();
         env.name = "n";
         ProtoWriter extra = ProtoWriter.growing();
-        extra.writeRawBytes(ProtoVia.toBytes(env), 0, ProtoVia.toBytes(env).length);
+        extra.writeRawBytes(Protovia.toBytes(env), 0, Protovia.toBytes(env).length);
         extra.writeInt32(7, 99);
-        Envelope back = ProtoVia.fromBytes(Envelope.class, extra.toByteArray());
+        Envelope back = Protovia.fromBytes(Envelope.class, extra.toByteArray());
         assertEquals(Status.UNRECOGNIZED, back.status);
-        Envelope again = ProtoVia.fromBytes(Envelope.class, ProtoVia.toBytes(back));
+        Envelope again = Protovia.fromBytes(Envelope.class, Protovia.toBytes(back));
         assertEquals(Status.UNRECOGNIZED, again.status);
-        ProtoReader r = new ProtoReader(ProtoVia.toBytes(back));
+        ProtoReader r = new ProtoReader(Protovia.toBytes(back));
         int raw = -1;
         int tag;
         while ((tag = r.readTag()) != 0) {
@@ -152,8 +152,8 @@ class RoundTripTest {
         NodeA a2 = new NodeA();
         a2.name = "a2";
         b.next = a2;
-        byte[] bytes = ProtoVia.toBytes(a);
-        NodeA back = ProtoVia.fromBytes(NodeA.class, bytes);
+        byte[] bytes = Protovia.toBytes(a);
+        NodeA back = Protovia.fromBytes(NodeA.class, bytes);
         assertEquals("a", back.name);
         assertEquals("b", back.next.name);
         assertEquals("a2", back.next.next.name);
@@ -169,7 +169,7 @@ class RoundTripTest {
         second.setRanks(List.of(3));
         first.setScores(Map.of("math", 1));
         second.setScores(Map.of("math", 99, "eng", 70));
-        User back = ProtoVia.fromBytes(User.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
+        User back = Protovia.fromBytes(User.class, concat(Protovia.toBytes(first), Protovia.toBytes(second)));
         assertEquals("Paris", back.getAddress().city());
         assertEquals("Rue", back.getAddress().street());
         assertEquals(List.of(1, 2, 3), back.getRanks());
@@ -189,7 +189,7 @@ class RoundTripTest {
         incoming.setRanks(List.of(3));
         incoming.setScores(Map.of("math", 99, "eng", 70));
 
-        UserProtoCodec.INSTANCE.mergeFrom(new ProtoReader(ProtoVia.toBytes(incoming)), existing);
+        UserProtoCodec.INSTANCE.mergeFrom(new ProtoReader(Protovia.toBytes(incoming)), existing);
         assertEquals(List.of("a", "b"), existing.getTags());
         assertEquals(List.of(1, 2, 3), existing.getRanks());
         assertEquals(99, existing.getScores().get("math"));
@@ -201,7 +201,7 @@ class RoundTripTest {
     void concatenatedRecordsMergeFields() {
         Address first = new Address("Paris", null);
         Address second = new Address(null, "Rue");
-        Address back = ProtoVia.fromBytes(Address.class, concat(ProtoVia.toBytes(first), ProtoVia.toBytes(second)));
+        Address back = Protovia.fromBytes(Address.class, concat(Protovia.toBytes(first), Protovia.toBytes(second)));
         assertEquals("Paris", back.city());
         assertEquals("Rue", back.street());
     }
@@ -219,14 +219,14 @@ class RoundTripTest {
         ApiRS<Target> email = new ApiRS<>();
         email.success = true;
         email.data = new Email("ada@example.com");
-        ApiRS<Target> emailBack = ProtoVia.fromBytes(ApiRS.class, ProtoVia.toBytes(email));
+        ApiRS<Target> emailBack = Protovia.fromBytes(ApiRS.class, Protovia.toBytes(email));
         assertTrue(emailBack.success);
         assertEquals(new Email("ada@example.com"), emailBack.data);
 
         ApiRS<Target> home = new ApiRS<>();
         home.success = true;
         home.data = new Home(new Address("Paris", "Rue"));
-        ApiRS<Target> homeBack = ProtoVia.fromBytes(ApiRS.class, ProtoVia.toBytes(home));
+        ApiRS<Target> homeBack = Protovia.fromBytes(ApiRS.class, Protovia.toBytes(home));
         assertTrue(homeBack.success);
         assertEquals(new Home(new Address("Paris", "Rue")), homeBack.data);
     }
@@ -234,10 +234,10 @@ class RoundTripTest {
     @Test
     void genericOneofRecordRoundTrip() {
         ApiRecordRS<Target> email = new ApiRecordRS<>(true, new Email("ada@example.com"));
-        assertEquals(email, ProtoVia.fromBytes(ApiRecordRS.class, ProtoVia.toBytes(email)));
+        assertEquals(email, Protovia.fromBytes(ApiRecordRS.class, Protovia.toBytes(email)));
 
         ApiRecordRS<Target> home = new ApiRecordRS<>(true, new Home(new Address("Paris", "Rue")));
-        assertEquals(home, ProtoVia.fromBytes(ApiRecordRS.class, ProtoVia.toBytes(home)));
+        assertEquals(home, Protovia.fromBytes(ApiRecordRS.class, Protovia.toBytes(home)));
     }
 
     @Test
@@ -248,9 +248,9 @@ class RoundTripTest {
         ApiTwin twin = new ApiTwin();
         twin.success = true;
         twin.data = new Email("ada@example.com");
-        assertArrayEquals(ProtoVia.toBytes(twin), ProtoVia.toBytes(generic));
+        assertArrayEquals(Protovia.toBytes(twin), Protovia.toBytes(generic));
 
-        ApiTwin decoded = ProtoVia.fromBytes(ApiTwin.class, ProtoVia.toBytes(generic));
+        ApiTwin decoded = Protovia.fromBytes(ApiTwin.class, Protovia.toBytes(generic));
         assertTrue(decoded.success);
         assertEquals(new Email("ada@example.com"), decoded.data);
     }
@@ -258,13 +258,13 @@ class RoundTripTest {
     @Test
     void genericOneofOmitsDefaultsAndWritesEmptyScalar() {
         ApiRS<Target> empty = new ApiRS<>();
-        assertEquals(0, ProtoVia.toBytes(empty).length);
+        assertEquals(0, Protovia.toBytes(empty).length);
 
         ApiRS<Target> blank = new ApiRS<>();
         blank.data = new Email("");
-        byte[] bytes = ProtoVia.toBytes(blank);
+        byte[] bytes = Protovia.toBytes(blank);
         assertTrue(bytes.length > 0);
-        ApiRS<Target> back = ProtoVia.fromBytes(ApiRS.class, bytes);
+        ApiRS<Target> back = Protovia.fromBytes(ApiRS.class, bytes);
         assertFalse(back.success);
         assertEquals(new Email(""), back.data);
     }
@@ -274,7 +274,7 @@ class RoundTripTest {
         Contact c = new Contact();
         c.name = "Ada";
         c.target = new Email("ada@example.com");
-        Contact back = ProtoVia.fromBytes(Contact.class, ProtoVia.toBytes(c));
+        Contact back = Protovia.fromBytes(Contact.class, Protovia.toBytes(c));
         assertEquals("Ada", back.name);
         assertEquals(new Email("ada@example.com"), back.target);
     }
@@ -283,12 +283,12 @@ class RoundTripTest {
     void oneofProtoMessageRecordRoundTrip() {
         Bag address = new Bag();
         address.data = new Address("Paris", "Rue");
-        Bag addressBack = ProtoVia.fromBytes(Bag.class, ProtoVia.toBytes(address));
+        Bag addressBack = Protovia.fromBytes(Bag.class, Protovia.toBytes(address));
         assertEquals(new Address("Paris", "Rue"), addressBack.data);
 
         Bag label = new Bag();
         label.data = "ada@example.com";
-        Bag labelBack = ProtoVia.fromBytes(Bag.class, ProtoVia.toBytes(label));
+        Bag labelBack = Protovia.fromBytes(Bag.class, Protovia.toBytes(label));
         assertEquals("ada@example.com", labelBack.data);
     }
 
@@ -296,12 +296,12 @@ class RoundTripTest {
     void aliasReusesEmailAndHomeAtNumbersOneAndTwo() {
         Alias email = new Alias();
         email.target = new Email("ada@example.com");
-        Alias emailBack = ProtoVia.fromBytes(Alias.class, ProtoVia.toBytes(email));
+        Alias emailBack = Protovia.fromBytes(Alias.class, Protovia.toBytes(email));
         assertEquals(new Email("ada@example.com"), emailBack.target);
 
         Alias home = new Alias();
         home.target = new Home(new Address("Paris", "Rue"));
-        Alias homeBack = ProtoVia.fromBytes(Alias.class, ProtoVia.toBytes(home));
+        Alias homeBack = Protovia.fromBytes(Alias.class, Protovia.toBytes(home));
         assertEquals(new Home(new Address("Paris", "Rue")), homeBack.target);
     }
 
@@ -309,9 +309,9 @@ class RoundTripTest {
     void oneofUnexpectedRuntimeTypeIsRejected() {
         Contact c = new Contact();
         c.target = new Phone("1");
-        ProtoException toBytes = assertThrows(ProtoException.class, () -> ProtoVia.toBytes(c));
+        ProtoException toBytes = assertThrows(ProtoException.class, () -> Protovia.toBytes(c));
         assertTrue(toBytes.getMessage().contains("unexpected type"));
-        ProtoException size = assertThrows(ProtoException.class, () -> ProtoVia.sizeOf(c));
+        ProtoException size = assertThrows(ProtoException.class, () -> Protovia.sizeOf(c));
         assertTrue(size.getMessage().contains("unexpected type"));
     }
 
@@ -319,9 +319,9 @@ class RoundTripTest {
     void oneofEmptyEmailIsWritten() {
         Contact c = new Contact();
         c.target = new Email("");
-        byte[] bytes = ProtoVia.toBytes(c);
+        byte[] bytes = Protovia.toBytes(c);
         assertTrue(bytes.length > 0);
-        Contact back = ProtoVia.fromBytes(Contact.class, bytes);
+        Contact back = Protovia.fromBytes(Contact.class, bytes);
         assertEquals(new Email(""), back.target);
     }
 
@@ -331,12 +331,12 @@ class RoundTripTest {
         email.target = new Email("a@b.c");
         Contact home = new Contact();
         home.target = new Home(new Address("Paris", "Rue"));
-        byte[] first = ProtoVia.toBytes(email);
-        byte[] second = ProtoVia.toBytes(home);
+        byte[] first = Protovia.toBytes(email);
+        byte[] second = Protovia.toBytes(home);
         byte[] both = new byte[first.length + second.length];
         System.arraycopy(first, 0, both, 0, first.length);
         System.arraycopy(second, 0, both, first.length, second.length);
-        Contact back = ProtoVia.fromBytes(Contact.class, both);
+        Contact back = Protovia.fromBytes(Contact.class, both);
         assertEquals(new Home(new Address("Paris", "Rue")), back.target);
     }
 
@@ -345,7 +345,7 @@ class RoundTripTest {
         Picker picker = new Picker();
         picker.name = "Ada";
         picker.choice = new Picker.StatusPick(Status.ACTIVE);
-        Picker back = ProtoVia.fromBytes(Picker.class, ProtoVia.toBytes(picker));
+        Picker back = Protovia.fromBytes(Picker.class, Protovia.toBytes(picker));
         assertEquals("Ada", back.name);
         assertEquals(new Picker.StatusPick(Status.ACTIVE), back.choice);
     }
@@ -355,14 +355,14 @@ class RoundTripTest {
         ProtoWriter extra = ProtoWriter.growing();
         extra.writeString(1, "n");
         extra.writeInt32(10, 99);
-        PickerEnvelope back = ProtoVia.fromBytes(PickerEnvelope.class, extra.toByteArray());
+        PickerEnvelope back = Protovia.fromBytes(PickerEnvelope.class, extra.toByteArray());
         assertEquals("n", back.name);
         assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), back.choice);
         assertFalse(back.unknownFields.isEmpty());
 
-        PickerEnvelope again = ProtoVia.fromBytes(PickerEnvelope.class, ProtoVia.toBytes(back));
+        PickerEnvelope again = Protovia.fromBytes(PickerEnvelope.class, Protovia.toBytes(back));
         assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), again.choice);
-        assertEquals(99, readEnumAt(ProtoVia.toBytes(again), 10));
+        assertEquals(99, readEnumAt(Protovia.toBytes(again), 10));
     }
 
     @Test
@@ -370,13 +370,13 @@ class RoundTripTest {
         ProtoWriter extra = ProtoWriter.growing();
         extra.writeString(1, "n");
         extra.writeInt32(10, 99);
-        Picker back = ProtoVia.fromBytes(Picker.class, extra.toByteArray());
+        Picker back = Protovia.fromBytes(Picker.class, extra.toByteArray());
         assertEquals("n", back.name);
         assertEquals(new Picker.StatusPick(Status.UNRECOGNIZED), back.choice);
 
-        byte[] rewritten = ProtoVia.toBytes(back);
+        byte[] rewritten = Protovia.toBytes(back);
         assertEquals(-1, readEnumAt(rewritten, 10));
-        Picker again = ProtoVia.fromBytes(Picker.class, rewritten);
+        Picker again = Protovia.fromBytes(Picker.class, rewritten);
         assertEquals("n", again.name);
         assertNull(again.choice);
     }
@@ -385,54 +385,54 @@ class RoundTripTest {
     void oneofUnknownEnumClosedRewrittenViaUnknownFields() {
         ProtoWriter extra = ProtoWriter.growing();
         extra.writeInt32(10, 99);
-        KindPicker back = ProtoVia.fromBytes(KindPicker.class, extra.toByteArray());
+        KindPicker back = Protovia.fromBytes(KindPicker.class, extra.toByteArray());
         assertNull(back.choice);
         assertFalse(back.unknownFields.isEmpty());
 
-        KindPicker again = ProtoVia.fromBytes(KindPicker.class, ProtoVia.toBytes(back));
+        KindPicker again = Protovia.fromBytes(KindPicker.class, Protovia.toBytes(back));
         assertNull(again.choice);
-        assertEquals(99, readEnumAt(ProtoVia.toBytes(again), 10));
+        assertEquals(99, readEnumAt(Protovia.toBytes(again), 10));
     }
 
     @Test
     void oneofUnknownEnumClosedWithoutUnknownFieldsIsDropped() {
         ProtoWriter extra = ProtoWriter.growing();
         extra.writeInt32(10, 99);
-        KindPickerBare back = ProtoVia.fromBytes(KindPickerBare.class, extra.toByteArray());
+        KindPickerBare back = Protovia.fromBytes(KindPickerBare.class, extra.toByteArray());
         assertNull(back.choice);
-        assertEquals(0, ProtoVia.toBytes(back).length);
+        assertEquals(0, Protovia.toBytes(back).length);
     }
 
     @Test
     void oneofUnrecognizedSentinelConstructedByUserIsNotWritten() {
         Picker picker = new Picker();
         picker.choice = new Picker.StatusPick(Status.UNRECOGNIZED);
-        assertEquals(0, ProtoVia.toBytes(picker).length);
+        assertEquals(0, Protovia.toBytes(picker).length);
 
         PickerEnvelope env = new PickerEnvelope();
         env.choice = new Picker.StatusPick(null);
-        assertEquals(0, ProtoVia.toBytes(env).length);
+        assertEquals(0, Protovia.toBytes(env).length);
     }
 
     @Test
     void unknownFieldsRoundTrip() {
         Envelope env = new Envelope();
         env.name = "keep";
-        byte[] known = ProtoVia.toBytes(env);
+        byte[] known = Protovia.toBytes(env);
 
         ProtoWriter extra = ProtoWriter.growing();
         extra.writeRawBytes(known, 0, known.length);
         extra.writeInt32(15, 42);
         extra.writeString(16, "x");
 
-        Envelope back = ProtoVia.fromBytes(Envelope.class, extra.toByteArray());
+        Envelope back = Protovia.fromBytes(Envelope.class, extra.toByteArray());
         assertEquals("keep", back.name);
         assertTrue(back.unknownFields != null && !back.unknownFields.isEmpty());
 
-        Envelope again = ProtoVia.fromBytes(Envelope.class, ProtoVia.toBytes(back));
+        Envelope again = Protovia.fromBytes(Envelope.class, Protovia.toBytes(back));
         assertEquals("keep", again.name);
 
-        ProtoReader r = new ProtoReader(ProtoVia.toBytes(back));
+        ProtoReader r = new ProtoReader(Protovia.toBytes(back));
         int extraInt = 0;
         String extraStr = null;
         int tag;
@@ -452,12 +452,12 @@ class RoundTripTest {
     void userWithoutUnknownSlotStillSkips() {
         User user = new User();
         user.setName("n");
-        byte[] known = ProtoVia.toBytes(user);
+        byte[] known = Protovia.toBytes(user);
         byte[] extra = new byte[known.length + 2];
         System.arraycopy(known, 0, extra, 0, known.length);
         extra[known.length] = 0x78;
         extra[known.length + 1] = 0x01;
-        User back = ProtoVia.fromBytes(User.class, extra);
+        User back = Protovia.fromBytes(User.class, extra);
         assertEquals("n", back.getName());
     }
 
@@ -466,7 +466,7 @@ class RoundTripTest {
         User user = new User();
         user.setRanks(List.of(3, 270));
         user.setUnpacked(List.of(1, 2));
-        User back = ProtoVia.fromBytes(User.class, ProtoVia.toBytes(user));
+        User back = Protovia.fromBytes(User.class, Protovia.toBytes(user));
         assertEquals(List.of(3, 270), back.getRanks());
         assertEquals(List.of(1, 2), back.getUnpacked());
         assertTrue(back.getRanks() instanceof IntArrayList);

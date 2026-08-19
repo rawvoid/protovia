@@ -19,7 +19,7 @@ package io.github.rawvoid.protovia.itest;
 import com.google.protobuf.DescriptorProtos;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.DynamicMessage;
-import io.github.rawvoid.protovia.ProtoVia;
+import io.github.rawvoid.protovia.Protovia;
 import io.github.rawvoid.protovia.itest.model.Audit;
 import io.github.rawvoid.protovia.itest.model.Dated;
 import io.github.rawvoid.protovia.itest.model.Event;
@@ -45,7 +45,7 @@ class AdapterInteropTest {
         Descriptors.Descriptor desc = datedDescriptor(false);
         Dated dated = new Dated();
         dated.birthDate = EPOCH;
-        byte[] bytes = ProtoVia.toBytes(dated);
+        byte[] bytes = Protovia.toBytes(dated);
         assertArrayEquals(new byte[]{0x18, 0x00}, bytes);
 
         DynamicMessage parsed = DynamicMessage.parseFrom(desc, bytes);
@@ -60,7 +60,7 @@ class AdapterInteropTest {
             .build();
         assertEquals(0, official.toByteArray().length);
 
-        Dated back = ProtoVia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
         assertNull(back.birthDate);
     }
 
@@ -69,13 +69,13 @@ class AdapterInteropTest {
         Descriptors.Descriptor desc = datedDescriptor(false);
         Dated dated = new Dated();
         dated.birthDate = SAMPLE;
-        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(dated));
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(dated));
         assertEquals(20678, parsed.getField(desc.findFieldByName("birthDate")));
 
         DynamicMessage official = DynamicMessage.newBuilder(desc)
             .setField(desc.findFieldByName("birthDate"), 20678)
             .build();
-        Dated back = ProtoVia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
         assertEquals(SAMPLE, back.birthDate);
     }
 
@@ -84,7 +84,7 @@ class AdapterInteropTest {
         Descriptors.Descriptor desc = datedDescriptor(true);
         Dated dated = new Dated();
         dated.birthDate = EPOCH;
-        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(dated));
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(dated));
         assertEquals(0, parsed.getField(desc.findFieldByName("birthDate")));
         assertTrue(parsed.hasField(desc.findFieldByName("birthDate")));
     }
@@ -99,7 +99,7 @@ class AdapterInteropTest {
                     .setField(entry.findFieldByName("key"), "epoch")
                     .build())
             .build();
-        Dated back = ProtoVia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
         assertEquals(EPOCH, back.dates.get("epoch"));
     }
 
@@ -111,7 +111,7 @@ class AdapterInteropTest {
 
         Dated dated = new Dated();
         dated.byId.put(id, SAMPLE);
-        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(dated));
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(dated));
         DynamicMessage parsedEntry = (DynamicMessage) parsed.getRepeatedField(
             desc.findFieldByName("byId"), 0);
         assertEquals(id.toString(), parsedEntry.getField(entry.findFieldByName("key")));
@@ -124,7 +124,7 @@ class AdapterInteropTest {
                     .setField(entry.findFieldByName("value"), 20678)
                     .build())
             .build();
-        Dated back = ProtoVia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
         assertEquals(SAMPLE, back.byId.get(id));
     }
 
@@ -139,7 +139,7 @@ class AdapterInteropTest {
         audit.id = "a1";
         audit.created = created;
         audit.published = published;
-        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(audit));
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(audit));
         assertEquals("a1", parsed.getField(desc.findFieldByName("id")));
         assertEquals(created.toEpochMilli(), parsed.getField(desc.findFieldByName("created")));
         DynamicMessage ts = (DynamicMessage) parsed.getField(desc.findFieldByName("published"));
@@ -150,7 +150,7 @@ class AdapterInteropTest {
         DynamicMessage official = DynamicMessage.newBuilder(desc)
             .setField(desc.findFieldByName("created"), created.toEpochMilli())
             .build();
-        Audit back = ProtoVia.fromBytes(Audit.class, official.toByteArray());
+        Audit back = Protovia.fromBytes(Audit.class, official.toByteArray());
         assertEquals(created, back.created);
         assertNull(back.published);
     }
@@ -166,7 +166,7 @@ class AdapterInteropTest {
         event.updated = updated;
         event.ttl = ttl;
 
-        DynamicMessage parsed = DynamicMessage.parseFrom(desc, ProtoVia.toBytes(event));
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(event));
         assertEquals(created.toEpochMilli(), parsed.getField(desc.findFieldByName("created")));
         assertEquals(updated.toEpochMilli(), parsed.getField(desc.findFieldByName("updated")));
         assertEquals(ttl.toMillis(), parsed.getField(desc.findFieldByName("ttl")));
@@ -176,7 +176,7 @@ class AdapterInteropTest {
             .setField(desc.findFieldByName("updated"), updated.toEpochMilli())
             .setField(desc.findFieldByName("ttl"), ttl.toMillis())
             .build();
-        Event back = ProtoVia.fromBytes(Event.class, official.toByteArray());
+        Event back = Protovia.fromBytes(Event.class, official.toByteArray());
         assertEquals(created, back.created);
         assertEquals(updated, back.updated);
         assertEquals(ttl, back.ttl);
