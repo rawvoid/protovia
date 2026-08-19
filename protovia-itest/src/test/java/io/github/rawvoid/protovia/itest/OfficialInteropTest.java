@@ -90,7 +90,7 @@ class OfficialInteropTest {
         builder.addRepeatedField(userDescriptor.findFieldByName("scores"), math);
 
         byte[] bytes = builder.build().toByteArray();
-        User back = Protovia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(bytes, User.class);
         assertEquals("Ada", back.getName());
         assertEquals(36, back.getAge());
         assertEquals(-7L, back.getScore());
@@ -125,7 +125,7 @@ class OfficialInteropTest {
         Timed timed = new Timed();
         timed.at = at;
         timed.wait = wait;
-        Timed back = Protovia.fromBytes(Timed.class, Protovia.toBytes(timed));
+        Timed back = Protovia.fromBytes(Protovia.toBytes(timed), Timed.class);
         assertEquals(at, back.at);
         assertEquals(wait, back.wait);
     }
@@ -173,7 +173,7 @@ class OfficialInteropTest {
                     .setField(addrDesc.findFieldByName("street"), "Rue")
                     .build())
             .build();
-        Contact back = Protovia.fromBytes(Contact.class, official.toByteArray());
+        Contact back = Protovia.fromBytes(official.toByteArray(), Contact.class);
         assertEquals("Ada", back.name);
         assertEquals(new Home(new Address("Paris", "Rue")), back.target);
     }
@@ -218,7 +218,7 @@ class OfficialInteropTest {
                     .setField(addrDesc.findFieldByName("street"), "Rue")
                     .build())
             .build();
-        Alias back = Protovia.fromBytes(Alias.class, official.toByteArray());
+        Alias back = Protovia.fromBytes(official.toByteArray(), Alias.class);
         assertEquals(new Home(new Address("Paris", "Rue")), back.target);
     }
 
@@ -241,7 +241,7 @@ class OfficialInteropTest {
             .build();
         Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
             DescriptorProtos.FileDescriptorProto.newBuilder()
-                .setName("api.proto")
+                .setName("apirs.proto")
                 .setSyntax("proto3")
                 .addMessageType(address)
                 .addMessageType(api)
@@ -265,7 +265,7 @@ class OfficialInteropTest {
                     .setField(addrDesc.findFieldByName("street"), "Rue")
                     .build())
             .build();
-        ApiRS<Target> back = Protovia.fromBytes(ApiRS.class, official.toByteArray());
+        ApiRS<Target> back = Protovia.fromBytes(official.toByteArray(), ApiRS.class);
         assertTrue(back.success);
         assertEquals(new Home(new Address("Paris", "Rue")), back.data);
     }
@@ -301,7 +301,7 @@ class OfficialInteropTest {
         DynamicMessage official = DynamicMessage.newBuilder(desc)
             .setField(desc.findFieldByName("kind"), kindDesc.findValueByNumber(99))
             .build();
-        KindPicker captured = Protovia.fromBytes(KindPicker.class, official.toByteArray());
+        KindPicker captured = Protovia.fromBytes(official.toByteArray(), KindPicker.class);
         assertNull(captured.choice);
         DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(captured));
         assertEquals(99, ((Descriptors.EnumValueDescriptor) parsed.getField(desc.findFieldByName("kind"))).getNumber());
@@ -331,7 +331,7 @@ class OfficialInteropTest {
             .setField(desc.findFieldByName("name"), "Ada")
             .setField(desc.findFieldByName("secret"), 99)
             .build();
-        Envelope captured = Protovia.fromBytes(Envelope.class, richer.toByteArray());
+        Envelope captured = Protovia.fromBytes(richer.toByteArray(), Envelope.class);
         assertEquals("Ada", captured.name);
         DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(captured));
         assertEquals(99, parsed.getField(desc.findFieldByName("secret")));
@@ -353,7 +353,7 @@ class OfficialInteropTest {
                 .setSeconds(at.getEpochSecond())
                 .setNanos(at.getNano())
                 .build());
-        ProtoAny back = Protovia.fromBytes(ProtoAny.class, officialPack.toByteArray());
+        ProtoAny back = Protovia.fromBytes(officialPack.toByteArray(), ProtoAny.class);
         assertTrue(Protovia.is(back, Instant.class));
         assertEquals(at, Protovia.unpack(back, Instant.class));
     }
@@ -372,7 +372,7 @@ class OfficialInteropTest {
 
         DynamicMessage officialUser = DynamicMessage.parseFrom(userDescriptor, Protovia.toBytes(user));
         com.google.protobuf.Any officialPack = com.google.protobuf.Any.pack(officialUser);
-        User back = Protovia.unpack(Protovia.fromBytes(ProtoAny.class, officialPack.toByteArray()), User.class);
+        User back = Protovia.unpack(Protovia.fromBytes(officialPack.toByteArray(), ProtoAny.class), User.class);
         assertEquals("Ada", back.getName());
         assertEquals(36, back.getAge());
     }
@@ -408,7 +408,7 @@ class OfficialInteropTest {
             Protovia.toBytes(carrier.extra));
         assertEquals(7, officialAny.unpack(com.google.protobuf.Int32Value.class).getValue());
 
-        Carrier back = Protovia.fromBytes(Carrier.class, bytes);
+        Carrier back = Protovia.fromBytes(bytes, Carrier.class);
         assertEquals("box", back.name);
         assertEquals(new Int32Value(0), back.count);
         assertEquals(new Int32Value(7), Protovia.unpack(back.extra, Int32Value.class));
@@ -420,7 +420,7 @@ class OfficialInteropTest {
         byte[] empty = Protovia.toBytes(new User());
         DynamicMessage parsed = DynamicMessage.parseFrom(userDescriptor, empty);
         assertTrue(parsed.getUnknownFields().asMap().isEmpty());
-        User back = Protovia.fromBytes(User.class, DynamicMessage.newBuilder(userDescriptor).build().toByteArray());
+        User back = Protovia.fromBytes(DynamicMessage.newBuilder(userDescriptor).build().toByteArray(), User.class);
         assertEquals(0, back.getAge());
     }
 

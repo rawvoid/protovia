@@ -38,7 +38,7 @@ public enum Status {
 }
 
 byte[] bytes = Protovia.toBytes(user);
-User back = Protovia.fromBytes(User.class, bytes);
+User back = Protovia.fromBytes(bytes, User.class);
 ```
 
 The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …).
@@ -307,9 +307,9 @@ private Event event;
 
 ```java
 Protovia.toBytes(message);
-Protovia.fromBytes(User.class, bytes);
+Protovia.fromBytes(bytes, User.class);
 Protovia.write(outputStream, message);
-Protovia.read(User.class, inputStream);
+Protovia.read(inputStream, User.class);
 Protovia.sizeOf(message);
 Protovia.codec(User.class);
 Protovia.register(User.class, handWrittenCodec); // tests / override

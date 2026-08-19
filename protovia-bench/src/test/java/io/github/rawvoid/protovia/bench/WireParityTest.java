@@ -29,7 +29,7 @@ class WireParityTest {
 
     @Test
     void officialBytesAreReadableByProtovia() throws Exception {
-        User back = Protovia.fromBytes(User.class, Samples.officialSmall().toByteArray());
+        User back = Protovia.fromBytes(Samples.officialSmall().toByteArray(), User.class);
         assertEquals("Ada", back.name);
         assertEquals(36, back.age);
         assertEquals("Paris", back.address.city);
@@ -52,13 +52,13 @@ class WireParityTest {
 
     @Test
     void cjkAndPackedRoundTrip() throws Exception {
-        User cjk = Protovia.fromBytes(User.class, Samples.officialCjk().toByteArray());
+        User cjk = Protovia.fromBytes(Samples.officialCjk().toByteArray(), User.class);
         assertEquals(Samples.CJK_BIO, cjk.bio);
         io.github.rawvoid.protovia.bench.official.User officialCjk =
             io.github.rawvoid.protovia.bench.official.User.parseFrom(Protovia.toBytes(Samples.protoviaCjk()));
         assertEquals(Samples.CJK_BIO, officialCjk.getBio());
 
-        User packed = Protovia.fromBytes(User.class, Samples.officialPacked().toByteArray());
+        User packed = Protovia.fromBytes(Samples.officialPacked().toByteArray(), User.class);
         assertEquals(256, packed.ranks.size());
         assertEquals(255, packed.ranks.get(255));
     }

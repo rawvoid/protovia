@@ -45,7 +45,7 @@ class ProtoviaTest {
     void roundTrip() {
         User user = sample();
         byte[] bytes = Protovia.toBytes(user);
-        User back = Protovia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(bytes, User.class);
         assertEquals(user, back);
         assertEquals(bytes.length, Protovia.sizeOf(user));
     }
@@ -57,7 +57,7 @@ class ProtoviaTest {
         user.setScores(null);
         byte[] bytes = Protovia.toBytes(user);
         assertEquals(0, bytes.length);
-        User back = Protovia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(bytes, User.class);
         assertNull(back.getName());
         assertEquals(0, back.getAge());
     }
@@ -70,7 +70,7 @@ class ProtoviaTest {
         user.setLevel(0);
         byte[] bytes = Protovia.toBytes(user);
         assertArrayEquals(new byte[]{0x30, 0x00}, bytes);
-        User back = Protovia.fromBytes(User.class, bytes);
+        User back = Protovia.fromBytes(bytes, User.class);
         assertEquals(0, back.getLevel());
     }
 
@@ -90,7 +90,7 @@ class ProtoviaTest {
         User user = sample();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Protovia.write(out, user);
-        User back = Protovia.read(User.class, new ByteArrayInputStream(out.toByteArray()));
+        User back = Protovia.read(new ByteArrayInputStream(out.toByteArray()), User.class);
         assertEquals(user, back);
     }
 
@@ -139,8 +139,18 @@ class ProtoviaTest {
         extra[known.length] = 0x7A; // field 15, LEN
         extra[known.length + 1] = 0x01;
         extra[known.length + 2] = 'x';
-        User back = Protovia.fromBytes(User.class, extra);
+        User back = Protovia.fromBytes(extra, User.class);
         assertEquals("n", back.getName());
+    }
+
+    @Test
+    void sliceFromBytes() {
+        User user = sample();
+        byte[] full = Protovia.toBytes(user);
+        byte[] padded = new byte[full.length + 10];
+        System.arraycopy(full, 0, padded, 4, full.length);
+        User back = Protovia.fromBytes(padded, 4, full.length, User.class);
+        assertEquals(user, back);
     }
 
     private static User sample() {

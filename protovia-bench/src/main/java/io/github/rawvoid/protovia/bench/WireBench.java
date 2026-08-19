@@ -90,7 +90,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializeSmall() {
-        return Protovia.fromBytes(User.class, smallBytes);
+        return Protovia.fromBytes(smallBytes, User.class);
     }
 
     @Benchmark
@@ -101,7 +101,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializeCjk() {
-        return Protovia.fromBytes(User.class, cjkBytes);
+        return Protovia.fromBytes(cjkBytes, User.class);
     }
 
     @Benchmark
@@ -111,7 +111,7 @@ public class WireBench {
 
     @Benchmark
     public User protoviaDeserializePacked() {
-        return Protovia.fromBytes(User.class, packedBytes);
+        return Protovia.fromBytes(packedBytes, User.class);
     }
 
     @Benchmark

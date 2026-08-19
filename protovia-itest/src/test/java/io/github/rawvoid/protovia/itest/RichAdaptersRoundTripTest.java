@@ -57,7 +57,7 @@ class RichAdaptersRoundTripTest {
             .build();
 
         byte[] bytes = Protovia.toBytes(model);
-        RichAdaptersModel back = Protovia.fromBytes(RichAdaptersModel.class, bytes);
+        RichAdaptersModel back = Protovia.fromBytes(bytes, RichAdaptersModel.class);
 
         assertEquals(model.uuidBytes, back.uuidBytes);
         assertEquals(model.amount, back.amount);
@@ -82,7 +82,7 @@ class RichAdaptersRoundTripTest {
         byte[] bytes = Protovia.toBytes(model);
         assertEquals(0, bytes.length);
 
-        RichAdaptersModel back = Protovia.fromBytes(RichAdaptersModel.class, bytes);
+        RichAdaptersModel back = Protovia.fromBytes(bytes, RichAdaptersModel.class);
         assertNull(back.uuidBytes);
         assertNull(back.amount);
         assertNull(back.bigInt);

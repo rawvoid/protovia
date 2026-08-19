@@ -127,23 +127,23 @@ public final class Protovia {
     }
 
     /**
-     * @param type entity class
      * @param data complete message bytes
+     * @param type entity class
      * @return decoded instance
      */
-    public static <T> T fromBytes(Class<T> type, byte[] data) {
+    public static <T> T fromBytes(byte[] data, Class<T> type) {
         Objects.requireNonNull(data, "data");
-        return fromBytes(type, data, 0, data.length);
+        return fromBytes(data, 0, data.length, type);
     }
 
     /**
-     * @param type   entity class
      * @param data   buffer holding the message
      * @param offset start index in {@code data}
      * @param length number of bytes to parse
+     * @param type   entity class
      * @return decoded instance
      */
-    public static <T> T fromBytes(Class<T> type, byte[] data, int offset, int length) {
+    public static <T> T fromBytes(byte[] data, int offset, int length, Class<T> type) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(data, "data");
         ProtoCodec<T> codec = codec(type);
@@ -174,16 +174,16 @@ public final class Protovia {
      * one message. Same boundary as official {@code parseFrom(InputStream)};
      * there is no delimited / multi-message variant.
      *
-     * @param type entity class
      * @param in   source
+     * @param type entity class
      * @return decoded instance
      */
-    public static <T> T read(Class<T> type, InputStream in) {
+    public static <T> T read(InputStream in, Class<T> type) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(in, "in");
         try {
             byte[] data = readBounded(in, maxMessageSize);
-            return fromBytes(type, data);
+            return fromBytes(data, type);
         } catch (IOException e) {
             throw new ProtoException("failed to read protobuf message", e);
         }

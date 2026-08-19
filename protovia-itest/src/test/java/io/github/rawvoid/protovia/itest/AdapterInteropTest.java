@@ -60,7 +60,7 @@ class AdapterInteropTest {
             .build();
         assertEquals(0, official.toByteArray().length);
 
-        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(official.toByteArray(), Dated.class);
         assertNull(back.birthDate);
     }
 
@@ -75,7 +75,7 @@ class AdapterInteropTest {
         DynamicMessage official = DynamicMessage.newBuilder(desc)
             .setField(desc.findFieldByName("birthDate"), 20678)
             .build();
-        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(official.toByteArray(), Dated.class);
         assertEquals(SAMPLE, back.birthDate);
     }
 
@@ -99,7 +99,7 @@ class AdapterInteropTest {
                     .setField(entry.findFieldByName("key"), "epoch")
                     .build())
             .build();
-        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(official.toByteArray(), Dated.class);
         assertEquals(EPOCH, back.dates.get("epoch"));
     }
 
@@ -124,7 +124,7 @@ class AdapterInteropTest {
                     .setField(entry.findFieldByName("value"), 20678)
                     .build())
             .build();
-        Dated back = Protovia.fromBytes(Dated.class, official.toByteArray());
+        Dated back = Protovia.fromBytes(official.toByteArray(), Dated.class);
         assertEquals(SAMPLE, back.byId.get(id));
     }
 
@@ -150,7 +150,7 @@ class AdapterInteropTest {
         DynamicMessage official = DynamicMessage.newBuilder(desc)
             .setField(desc.findFieldByName("created"), created.toEpochMilli())
             .build();
-        Audit back = Protovia.fromBytes(Audit.class, official.toByteArray());
+        Audit back = Protovia.fromBytes(official.toByteArray(), Audit.class);
         assertEquals(created, back.created);
         assertNull(back.published);
     }
@@ -176,7 +176,7 @@ class AdapterInteropTest {
             .setField(desc.findFieldByName("updated"), updated.toEpochMilli())
             .setField(desc.findFieldByName("ttl"), ttl.toMillis())
             .build();
-        Event back = Protovia.fromBytes(Event.class, official.toByteArray());
+        Event back = Protovia.fromBytes(official.toByteArray(), Event.class);
         assertEquals(created, back.created);
         assertEquals(updated, back.updated);
         assertEquals(ttl, back.ttl);
