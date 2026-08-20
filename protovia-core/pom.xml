@@ -29,6 +29,7 @@
     <artifactId>protovia-core</artifactId>
     <name>protovia-core</name>
     <description>Lightweight compile-time Protobuf for Java: wire format, codecs, adapters, and Protovia facade</description>
+    <url>https://github.com/rawvoid/protovia</url>
 
     <dependencies>
         <dependency>

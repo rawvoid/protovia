@@ -83,19 +83,4 @@ final class FieldRequest {
         this.number = number;
         this.site = site;
     }
-
-    FieldModel.Builder baseBuilder() {
-        return FieldModel.builder()
-            .number(number)
-            .name(name)
-            .localName(Names.safeLocal(name))
-            .optional(optional)
-            .packed(packed)
-            .javaOptional(javaOptional)
-            .accessKind(accessKind)
-            .readExpr(readExpr)
-            .setterName(setter)
-            .fieldName(fieldName)
-            .origin(origin);
-    }
 }

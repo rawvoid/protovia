@@ -103,7 +103,18 @@ final class FieldResolver {
         if (resolved == null) {
             return null;
         }
-        return req.baseBuilder()
+        return FieldModel.builder()
+            .number(req.number)
+            .name(req.name)
+            .localName(Names.safeLocal(req.name))
+            .optional(req.optional)
+            .packed(req.packed)
+            .javaOptional(req.javaOptional)
+            .accessKind(req.accessKind)
+            .readExpr(req.readExpr)
+            .setterName(req.setter)
+            .fieldName(req.fieldName)
+            .origin(req.origin)
             .kind(resolved.kind)
             .protoType(resolved.protoType)
             .primitive(req.type.getKind().isPrimitive())

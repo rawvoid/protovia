@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.Names;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -119,7 +120,18 @@ final class AdapterResolver {
         if (protoType == null) {
             return null;
         }
-        return req.baseBuilder()
+        return FieldModel.builder()
+            .number(req.number)
+            .name(req.name)
+            .localName(Names.safeLocal(req.name))
+            .optional(req.optional)
+            .packed(req.packed)
+            .javaOptional(req.javaOptional)
+            .accessKind(req.accessKind)
+            .readExpr(req.readExpr)
+            .setterName(req.setter)
+            .fieldName(req.fieldName)
+            .origin(req.origin)
             .kind(FieldKind.SCALAR)
             .protoType(protoType)
             .primitive(false)

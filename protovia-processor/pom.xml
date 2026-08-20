@@ -29,6 +29,7 @@
     <artifactId>protovia-processor</artifactId>
     <name>protovia-processor</name>
     <description>Compile-time ProtoCodec generator</description>
+    <url>https://github.com/rawvoid/protovia</url>
 
     <dependencies>
         <dependency>
