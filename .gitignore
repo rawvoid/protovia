@@ -41,6 +41,7 @@ build/
 
 ### Maven ###
 dependency-reduced-pom.xml
+pom.xml.versionsBackup
 
 ### Local Docs ###
 docs/
