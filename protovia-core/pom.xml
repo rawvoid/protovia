@@ -32,10 +32,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.github.rawvoid</groupId>
-            <artifactId>protovia-annotations</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

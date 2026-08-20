@@ -30,7 +30,6 @@
     <url>https://github.com/rawvoid/protovia</url>
 
     <modules>
-        <module>protovia-annotations</module>
         <module>protovia-core</module>
         <module>protovia-processor</module>
         <module>protovia-itest</module>
@@ -60,11 +59,6 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.github.rawvoid</groupId>
-                <artifactId>protovia-annotations</artifactId>
-                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.rawvoid</groupId>

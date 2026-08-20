@@ -45,19 +45,16 @@ The bytes are readable by official Protocol Buffers implementations (Go, Python,
 
 ## Modules
 
-| Artifact               | Role                                                |
-|------------------------|-----------------------------------------------------|
-| `protovia-annotations` | Annotations, `ProtoType`, `ProtoAdapter` interface  |
-| `protovia-core`        | Core engine, wire format, adapters, `Protovia` facade |
-| `protovia-processor`   | Annotation processor that generates `XxxProtoCodec` |
-| `protovia-itest`       | End-to-end + official protobuf interop tests        |
-| `protovia-bench`       | JMH benchmarks against official `protobuf-java`     |
+| Artifact             | Role                                                |
+|----------------------|-----------------------------------------------------|
+| `protovia-core`      | Annotations, core engine, wire format, adapters, `Protovia` facade |
+| `protovia-processor` | Annotation processor that generates `XxxProtoCodec` |
+| `protovia-itest`     | End-to-end + official protobuf interop tests        |
+| `protovia-bench`     | JMH benchmarks against official `protobuf-java`     |
 
 Runtime has **no third-party dependencies**.
 
 ## Maven
-
-In your application / service:
 
 ```xml
 <dependency>
@@ -73,17 +70,7 @@ In your application / service:
 </dependency>
 ```
 
-In a pure DTO / schema module (zero runtime dependencies):
-
-```xml
-<dependency>
-  <groupId>io.github.rawvoid</groupId>
-  <artifactId>protovia-annotations</artifactId>
-  <version>1.0-SNAPSHOT</version>
-</dependency>
-```
-
-`protovia-core` brings `protovia-annotations` transitively. The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
+The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
 
 Gradle:
 

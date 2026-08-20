@@ -33,12 +33,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.rawvoid</groupId>
-            <artifactId>protovia-annotations</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.github.rawvoid</groupId>
             <artifactId>protovia-core</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
