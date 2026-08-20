@@ -189,7 +189,7 @@ final class ReadEmitter {
         for (OneofCaseModel c : field.oneofCases) {
             b.beginControlFlow("case $L ->", c.tagConstant);
             if (c.empty()) {
-                b.addStatement("int _old = reader.beginPacked()");
+                b.addStatement("int _old = reader.pushLengthDelimited()");
                 b.beginControlFlow("while (reader.readTag() != 0)");
                 b.addStatement("reader.skipField()");
                 b.endControlFlow();
@@ -244,7 +244,7 @@ final class ReadEmitter {
         if (field.packable()) {
             b.beginControlFlow("case $L, $L_PACKED ->", tag, tag);
             b.beginControlFlow("if (reader.wireType() == $T.LEN)", WIRE_TYPE);
-            b.addStatement("int oldLimit = reader.beginPacked()");
+            b.addStatement("int oldLimit = reader.pushLengthDelimited()");
             ensureRepeated(b, field, record);
             ensurePackedCapacity(b, field, record);
             b.beginControlFlow("while (reader.remaining() > 0)");

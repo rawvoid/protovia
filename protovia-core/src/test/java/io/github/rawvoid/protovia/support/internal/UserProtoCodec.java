@@ -184,7 +184,7 @@ public final class UserProtoCodec implements ProtoCodec<User> {
     private static void readMapEntry(ProtoReader reader, Map<String, Integer> target) {
         String key = "";
         int value = 0;
-        int old = reader.beginPacked();
+        int old = reader.pushLengthDelimited();
         int tag;
         while ((tag = reader.readTag()) != 0) {
             switch (tag) {

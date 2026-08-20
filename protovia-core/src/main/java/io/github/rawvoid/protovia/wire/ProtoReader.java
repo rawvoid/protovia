@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 /**
  * proto3 decoder over a byte slice. Not thread-safe.
@@ -42,7 +43,7 @@ public final class ProtoReader {
     private int depth;
 
     public ProtoReader(byte[] data) {
-        this(data, 0, data.length, DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_DEPTH);
+        this(Objects.requireNonNull(data, "data"), 0, data.length, DEFAULT_MAX_MESSAGE_SIZE, DEFAULT_MAX_DEPTH);
     }
 
     public ProtoReader(byte[] data, int offset, int length) {
@@ -57,9 +58,7 @@ public final class ProtoReader {
      * @param maxDepth       cap on nested message / group depth
      */
     public ProtoReader(byte[] data, int offset, int length, int maxMessageSize, int maxDepth) {
-        if (data == null) {
-            throw new ProtoException("data is null");
-        }
+        Objects.requireNonNull(data, "data");
         if (offset < 0 || length < 0 || offset > data.length || length > data.length - offset) {
             throw new ProtoException("invalid slice offset=" + offset + " length=" + length);
         }
@@ -315,10 +314,11 @@ public final class ProtoReader {
     }
 
     /**
-     * Reads a packed repeated block: consumes the length prefix and pushes the limit.
-     * Caller must {@link #popLimit(int)} after draining {@link #remaining()}.
+     * Consumes a length prefix and restricts subsequent reads to that span.
+     * Used for packed repeated scalars, map entries, and empty length-delimited
+     * messages. Caller must {@link #popLimit(int)} after draining {@link #remaining()}.
      */
-    public int beginPacked() {
+    public int pushLengthDelimited() {
         int length = readRawVarint32();
         return pushLimit(length);
     }

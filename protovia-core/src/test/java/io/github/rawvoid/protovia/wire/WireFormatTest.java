@@ -154,7 +154,7 @@ class WireFormatTest {
 
         ProtoReader r = reader(actual);
         assertEquals(WireType.tag(4, WireType.LEN), r.readTag());
-        int old = r.beginPacked();
+        int old = r.pushLengthDelimited();
         assertEquals(3, r.readInt32());
         assertEquals(270, r.readInt32());
         assertEquals(0, r.remaining());
@@ -229,6 +229,14 @@ class WireFormatTest {
         byte[] data = new byte[8];
         assertThrows(ProtoException.class, () -> new ProtoReader(data, 4, Integer.MAX_VALUE));
         assertThrows(ProtoException.class, () -> new ProtoReader(data, Integer.MAX_VALUE, 4));
+    }
+
+    @Test
+    void constructorRejectsNullBufferWithNpe() {
+        assertThrows(NullPointerException.class, () -> new ProtoReader(null));
+        assertThrows(NullPointerException.class, () -> new ProtoReader(null, 0, 0));
+        assertThrows(NullPointerException.class,
+            () -> new ProtoReader(null, 0, 0, ProtoReader.DEFAULT_MAX_MESSAGE_SIZE, ProtoReader.DEFAULT_MAX_DEPTH));
     }
 
     @Test

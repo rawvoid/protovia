@@ -235,7 +235,7 @@ final class HelperEmitter {
         } else {
             body.addStatement("$T v = $L", boxedType(value), mapMissingDefault(value));
         }
-        body.addStatement("int oldLimit = reader.beginPacked()");
+        body.addStatement("int oldLimit = reader.pushLengthDelimited()");
         body.addStatement("int tag");
         body.beginControlFlow("while ((tag = reader.readTag()) != 0)");
         body.beginControlFlow("switch (tag)");
