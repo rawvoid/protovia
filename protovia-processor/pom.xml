@@ -37,7 +37,7 @@
         </dependency>
         <dependency>
             <groupId>io.github.rawvoid</groupId>
-            <artifactId>protovia</artifactId>
+            <artifactId>protovia-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

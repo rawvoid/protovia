@@ -26,7 +26,7 @@ import lombok.experimental.Accessors;
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.PROTO_LISTS;
 
 /**
- * Specialized primitive list types from {@code protovia}.
+ * Specialized primitive list types from {@code protovia-core}.
  *
  * @author Rawvoid
  */

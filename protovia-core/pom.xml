@@ -26,8 +26,8 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>protovia</artifactId>
-    <name>protovia</name>
+    <artifactId>protovia-core</artifactId>
+    <name>protovia-core</name>
     <description>Lightweight compile-time Protobuf for Java: wire format, codecs, adapters, and Protovia facade</description>
 
     <dependencies>

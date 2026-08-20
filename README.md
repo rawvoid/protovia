@@ -48,7 +48,7 @@ The bytes are readable by official Protocol Buffers implementations (Go, Python,
 | Artifact               | Role                                                |
 |------------------------|-----------------------------------------------------|
 | `protovia-annotations` | Annotations, `ProtoType`, `ProtoAdapter` interface  |
-| `protovia`             | Core engine, wire format, adapters, `Protovia` facade |
+| `protovia-core`        | Core engine, wire format, adapters, `Protovia` facade |
 | `protovia-processor`   | Annotation processor that generates `XxxProtoCodec` |
 | `protovia-itest`       | End-to-end + official protobuf interop tests        |
 | `protovia-bench`       | JMH benchmarks against official `protobuf-java`     |
@@ -62,7 +62,7 @@ In your application / service:
 ```xml
 <dependency>
   <groupId>io.github.rawvoid</groupId>
-  <artifactId>protovia</artifactId>
+  <artifactId>protovia-core</artifactId>
   <version>1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
@@ -83,12 +83,12 @@ In a pure DTO / schema module (zero runtime dependencies):
 </dependency>
 ```
 
-`protovia` brings `protovia-annotations` transitively. The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
+`protovia-core` brings `protovia-annotations` transitively. The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.rawvoid:protovia:1.0-SNAPSHOT")
+implementation("io.github.rawvoid:protovia-core:1.0-SNAPSHOT")
 annotationProcessor("io.github.rawvoid:protovia-processor:1.0-SNAPSHOT")
 ```
 
