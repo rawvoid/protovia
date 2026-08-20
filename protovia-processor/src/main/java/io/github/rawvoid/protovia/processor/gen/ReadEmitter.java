@@ -279,9 +279,10 @@ final class ReadEmitter {
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
-            b.addStatement("msg.$L = $L", field.fieldName, collectionEnsure("msg." + field.fieldName, field));
+            String access = field.accessOn("msg");
+            b.addStatement("$L = $L", access, collectionEnsure(access, field));
         } else {
-            b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", javaType(field), field.localName, field.accessOn("msg"));
             b.addStatement("$L = $L", field.localName, collectionEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -289,7 +290,7 @@ final class ReadEmitter {
 
     private static void unknownInit(CodeBlock.Builder b, MessageModel model) {
         MessageModel.UnknownField u = model.unknown;
-        String current = u.readExpr().replace("value.", "msg.");
+        String current = u.accessOn("msg");
         b.addStatement("$T $L = $L != null ? $L : $T.EMPTY",
             UNKNOWN_FIELDS, u.localName(), current, current, UNKNOWN_FIELDS);
     }
@@ -306,7 +307,7 @@ final class ReadEmitter {
     private static void unknownStore(CodeBlock.Builder b, MessageModel model) {
         MessageModel.UnknownField u = model.unknown;
         if (u.accessKind() == AccessKind.FIELD) {
-            b.addStatement("msg.$L = $L", u.fieldName(), u.localName());
+            b.addStatement("$L = $L", u.accessOn("msg"), u.localName());
         } else {
             b.addStatement("msg.$L($L)", u.setterName(), u.localName());
         }
@@ -345,26 +346,20 @@ final class ReadEmitter {
             return;
         }
         if (field.javaOptional) {
-            String getter = field.accessKind == AccessKind.FIELD
-                ? "msg." + field.fieldName
-                : field.readExpr.replace("value.", "msg.");
+            String getter = field.accessOn("msg");
             b.addStatement("$T _cur = $L", javaType(field), getter);
             assign(b, field, "msg", wrapOptional(field,
                 CodeBlock.of("reader.readMessage($L, _cur != null && _cur.isPresent() ? _cur.get() : null)", codec)));
             return;
         }
-        String current = field.accessKind == AccessKind.FIELD
-            ? "msg." + field.fieldName
-            : field.readExpr.replace("value.", "msg.");
+        String current = field.accessOn("msg");
         assign(b, field, "msg", CodeBlock.of("reader.readMessage($L, $L)", codec, current));
     }
 
     private static void seedArrayBuilder(CodeBlock.Builder b, FieldModel field, boolean record) {
         String existing = record
             ? field.localName
-            : field.accessKind == AccessKind.FIELD
-            ? "msg." + field.fieldName
-            : field.readExpr.replace("value.", "msg.");
+            : field.accessOn("msg");
         b.beginControlFlow("if ($L != null)", existing);
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), existing);
         CodeBlock add = primitiveAdd(field, field.localName + "Builder", CodeBlock.of("item"));
@@ -428,7 +423,7 @@ final class ReadEmitter {
         if (record || field.accessKind != AccessKind.FIELD) {
             return field.localName;
         }
-        return "msg." + field.fieldName;
+        return field.accessOn("msg");
     }
 
     private static void ensureMap(CodeBlock.Builder b, FieldModel field, boolean record) {
@@ -439,9 +434,10 @@ final class ReadEmitter {
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
-            b.addStatement("msg.$L = $L", field.fieldName, mapEnsure("msg." + field.fieldName, field));
+            String access = field.accessOn("msg");
+            b.addStatement("$L = $L", access, mapEnsure(access, field));
         } else {
-            b.addStatement("$T $L = $L", javaType(field), field.localName, field.readExpr.replace("value.", "msg."));
+            b.addStatement("$T $L = $L", javaType(field), field.localName, field.accessOn("msg"));
             b.addStatement("$L = $L", field.localName, mapEnsure(field.localName, field));
             assign(b, field, "msg", field.localName);
         }
@@ -452,7 +448,7 @@ final class ReadEmitter {
             return field.localName;
         }
         if (field.accessKind == AccessKind.FIELD) {
-            return "msg." + field.fieldName;
+            return field.accessOn("msg");
         }
         return field.localName;
     }
@@ -467,7 +463,7 @@ final class ReadEmitter {
 
     private static void assign(CodeBlock.Builder b, FieldModel field, String target, Object expr) {
         if (field.accessKind == AccessKind.FIELD) {
-            b.addStatement("$L.$L = $L", target, field.fieldName, expr);
+            b.addStatement("$L = $L", field.accessOn(target), expr);
         } else {
             b.addStatement("$L.$L($L)", target, field.setterName, expr);
         }

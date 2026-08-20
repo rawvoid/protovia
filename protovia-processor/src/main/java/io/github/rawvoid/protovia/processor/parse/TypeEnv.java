@@ -232,6 +232,29 @@ final class TypeEnv {
         return true;
     }
 
+    /**
+     * Whether generated code in {@code codecPkg} can mention {@code type},
+     * including type arguments of a {@code DeclaredType}.
+     */
+    boolean typeVisibleFromCodec(TypeMirror type, String codecPkg) {
+        if (type.getKind() == TypeKind.ARRAY) {
+            return typeVisibleFromCodec(((ArrayType) type).getComponentType(), codecPkg);
+        }
+        if (!(type instanceof DeclaredType declared)) {
+            return true;
+        }
+        TypeElement element = asTypeElement(declared);
+        if (element != null && !isAccessibleFromCodec(element, codecPkg)) {
+            return false;
+        }
+        for (TypeMirror arg : declared.getTypeArguments()) {
+            if (!typeVisibleFromCodec(arg, codecPkg)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     boolean isResolvedType(TypeMirror type) {
         TypeKind kind = type.getKind();
         return kind != TypeKind.WILDCARD && kind != TypeKind.TYPEVAR && kind != TypeKind.ERROR;

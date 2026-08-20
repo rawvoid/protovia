@@ -95,6 +95,24 @@ class ReservedTest {
     }
 
     @Test
+    void addAllUnionsNumbersNamesAndRanges() {
+        Reserved parent = Reserved.builder()
+            .addNumber(4)
+            .addRange(10, 12)
+            .addName("legacy")
+            .build();
+        Reserved union = Reserved.builder()
+            .addAll(parent)
+            .addNumber(5)
+            .build();
+        assertTrue(union.containsNumber(4));
+        assertTrue(union.containsNumber(5));
+        assertTrue(union.containsNumber(11));
+        assertTrue(union.containsName("legacy"));
+        assertSame(Reserved.EMPTY, Reserved.builder().addAll(Reserved.EMPTY).build());
+    }
+
+    @Test
     void protoIdent() {
         assertTrue(ProtoIdent.isIdentifier("name"));
         assertTrue(ProtoIdent.isIdentifier("_x"));

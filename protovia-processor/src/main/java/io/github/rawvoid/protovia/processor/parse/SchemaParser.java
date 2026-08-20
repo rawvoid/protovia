@@ -16,22 +16,21 @@
 
 package io.github.rawvoid.protovia.processor.parse;
 
-import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
-import io.github.rawvoid.protovia.annotation.ProtoOneof;
-import io.github.rawvoid.protovia.annotation.ProtoUnknown;
+import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.Reserved;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -50,6 +49,7 @@ public final class SchemaParser {
     private final FieldResolver fields;
     private final OneofParser oneofs;
     private final MemberScanner scanner;
+    private final InheritanceWalker inheritance;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.env = new TypeEnv(types, elements);
@@ -61,6 +61,7 @@ public final class SchemaParser {
         this.fields = new FieldResolver(env, diag, classifier, adapters);
         this.oneofs = new OneofParser(env, diag, fields, adapters);
         this.scanner = new MemberScanner(diag);
+        this.inheritance = new InheritanceWalker(env, diag);
     }
 
     /**
@@ -104,7 +105,6 @@ public final class SchemaParser {
             && !type.getModifiers().contains(Modifier.STATIC)) {
             diag.error(type, "non-static inner @ProtoMessage is not supported");
         }
-        checkInheritance(type);
 
         boolean record = type.getKind() == ElementKind.RECORD;
         if (!record) {
@@ -121,13 +121,29 @@ public final class SchemaParser {
         ExportNames.requirePackage(diag, type, protoPackage);
         ExportNames.require(diag, type, protoMessageName);
 
+        List<InheritanceWalker.SuperType> supers = inheritance.collect(type);
         MessageScope scope = new MessageScope(type, pkg);
-        scope.reserved = reserved.parse(type, ReservedParser.Scope.MESSAGE);
+        Reserved.Builder reservedUnion = Reserved.builder();
+        for (InheritanceWalker.SuperType superType : supers) {
+            reservedUnion.addAll(reserved.parse(superType.element(), ReservedParser.Scope.MESSAGE));
+        }
+        reservedUnion.addAll(reserved.parse(type, ReservedParser.Scope.MESSAGE));
+        scope.reserved = reservedUnion.build();
         adapters.enter(type);
         try {
+            for (InheritanceWalker.SuperType superType : supers) {
+                ScanResult scanned = scanner.scan(superType.element());
+                for (Member member : scanned.members()) {
+                    Member specialized = inheritance.specialize(superType.declared(), member);
+                    if (specialized == null) {
+                        continue;
+                    }
+                    dispatch(specialized, scope, scanned.methods(), superType);
+                }
+            }
             ScanResult scanned = scanner.scan(type);
             for (Member member : scanned.members()) {
-                dispatch(member, scope, scanned.methods());
+                dispatch(member, scope, scanned.methods(), null);
             }
             if (scope.byNumber.isEmpty() && scope.oneofs.isEmpty()) {
                 diag.error(type, "@ProtoMessage " + type.getSimpleName() + " has no @ProtoField or @ProtoOneof members");
@@ -151,7 +167,11 @@ public final class SchemaParser {
      * Role check, then bind. A field-origin role occupies the property name
      * whether or not bind succeeds, so a getter cannot also claim it.
      */
-    private void dispatch(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+    private void dispatch(
+        Member member,
+        MessageScope scope,
+        Map<String, ExecutableElement> methods,
+        InheritanceWalker.SuperType superType) {
         if (member.recordComponent() && !member.roles().any()) {
             scope.addComponent(member.name(), member.type(), null);
             return;
@@ -163,7 +183,7 @@ public final class SchemaParser {
             scope.annotatedViaField.add(member.name());
         }
         if (member.roles().unknown()) {
-            bindUnknown(member, scope, methods);
+            bindUnknown(member, scope, methods, superType);
             return;
         }
         if (member.roles().oneof()) {
@@ -171,11 +191,11 @@ public final class SchemaParser {
             if (member.protoOneofAnn() == null) {
                 return;
             }
-            bindOneof(member, scope, methods);
+            bindOneof(member, scope, methods, superType);
             return;
         }
         if (member.protoField() != null) {
-            bindField(member, scope, methods);
+            bindField(member, scope, methods, superType);
         }
     }
 
@@ -209,7 +229,11 @@ public final class SchemaParser {
         return true;
     }
 
-    private void bindUnknown(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+    private void bindUnknown(
+        Member member,
+        MessageScope scope,
+        Map<String, ExecutableElement> methods,
+        InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && member.name() == null) {
             diag.error(member.origin(), "@ProtoUnknown on a method must be a JavaBean getter");
             return;
@@ -220,7 +244,7 @@ public final class SchemaParser {
         if (!scope.checkUnknownType(member.origin(), member.type(), env, diag)) {
             return;
         }
-        Access access = scanner.resolveAccess(member, methods);
+        Access access = resolveAccess(member, scope, methods, superType);
         if (access == null) {
             return;
         }
@@ -230,14 +254,18 @@ public final class SchemaParser {
         }
     }
 
-    private void bindOneof(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+    private void bindOneof(
+        Member member,
+        MessageScope scope,
+        Map<String, ExecutableElement> methods,
+        InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && badMethodGetter(member, "@ProtoOneof")) {
             return;
         }
         if (alreadyAnnotatedOnGetter(member, scope)) {
             return;
         }
-        Access access = scanner.resolveAccess(member, methods);
+        Access access = resolveAccess(member, scope, methods, superType);
         if (access == null) {
             return;
         }
@@ -253,7 +281,8 @@ public final class SchemaParser {
             scope.pkg,
             scope.taken,
             scope.reserved);
-        if (oneof != null && scope.claimOneof(oneof, diag)) {
+        if (oneof != null && scope.claimJava(oneof.origin, oneof.name, diag)
+            && scope.claimOneof(oneof, diag)) {
             scope.oneofs.add(oneof);
             if (member.recordComponent()) {
                 scope.addComponent(member.name(), oneof.javaType, oneof);
@@ -261,14 +290,42 @@ public final class SchemaParser {
         }
     }
 
-    private void bindField(Member member, MessageScope scope, Map<String, ExecutableElement> methods) {
+    private Access resolveAccess(
+        Member member,
+        MessageScope scope,
+        Map<String, ExecutableElement> methods,
+        InheritanceWalker.SuperType superType) {
+        String inheritedOwner = superType == null
+            ? null
+            : env.renderType(superType.declared(), "");
+        Access access = scanner.resolveAccess(member, methods, inheritedOwner);
+        if (access == null) {
+            return null;
+        }
+        if (superType != null
+            && access.kind() == AccessKind.FIELD
+            && !env.typeVisibleFromCodec(superType.declared(), Names.codecPackageName(scope.type))) {
+            diag.error(member.origin(), "inherited field '" + member.name()
+                + "' on " + superType.element().getSimpleName()
+                + " is not accessible from " + Names.codecPackageName(scope.type)
+                + "; make the superclass public, or provide a public getter and setter");
+            return null;
+        }
+        return access;
+    }
+
+    private void bindField(
+        Member member,
+        MessageScope scope,
+        Map<String, ExecutableElement> methods,
+        InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && badMethodGetter(member, "@ProtoField")) {
             return;
         }
         if (alreadyAnnotatedOnGetter(member, scope)) {
             return;
         }
-        Access access = scanner.resolveAccess(member, methods);
+        Access access = resolveAccess(member, scope, methods, superType);
         if (access == null) {
             return;
         }
@@ -302,31 +359,6 @@ public final class SchemaParser {
             return true;
         }
         return false;
-    }
-
-    private void checkInheritance(TypeElement type) {
-        TypeMirror superType = type.getSuperclass();
-        while (superType != null && superType.getKind() != TypeKind.NONE
-            && !env.types.isSameType(superType, env.objectType)) {
-            TypeElement superElement = env.asTypeElement(superType);
-            if (superElement == null) {
-                break;
-            }
-            if (superElement.getAnnotation(ProtoMessage.class) != null) {
-                diag.error(type, "inheritance of @ProtoMessage types is not supported");
-                return;
-            }
-            for (Element enclosed : superElement.getEnclosedElements()) {
-                if (enclosed.getAnnotation(ProtoField.class) != null
-                    || enclosed.getAnnotation(ProtoOneof.class) != null
-                    || enclosed.getAnnotation(ProtoUnknown.class) != null) {
-                    diag.error(type, "superclass " + superElement.getSimpleName()
-                        + " has proto members; inheritance is not supported");
-                    return;
-                }
-            }
-            superType = superElement.getSuperclass();
-        }
     }
 
     private void checkNoArgConstructor(TypeElement type) {

@@ -294,6 +294,15 @@ private Event event;
 - `of` is a 0- or 1-component record, a `@ProtoMessage` (class or record, including multi-component), or a naked scalar / enum / `byte[]`. `sealed` is optional and is not consulted.
 - A one-component scalar record without `@ProtoMessage` encodes as that scalar, not a nested message. A `@ProtoMessage` case is `readMessage` / `writeTo` on that instance. A naked `String` case stores the string directly.
 
+**Inheritance**
+
+- A concrete `@ProtoMessage` class may extend a non-message class or abstract class. Superclass `@ProtoField` / `@ProtoOneof` / `@ProtoUnknown` members are merged into the leaf codec as one flat proto3 message.
+- The superclass must **not** be `@ProtoMessage`. No codec is generated for it; this is not wire polymorphism.
+- Duplicate field numbers, proto export names, or Java property names across the hierarchy fail compilation. There is no override and no same-name coexistence.
+- Inherited members need a public getter+setter or a public field (the generated codec lives in `.internal`). Field access casts to the superclass, so that type must be public; a package-private mixin must expose public getters and setters.
+- Generic bases work when the leaf binds the type arguments (`class UserPage extends PageResult<User> {}`). Raw / wildcard superclasses fail.
+- Prefer numbers 1–15 on shared bases, 16+ on leaves. If you change only annotations on a superclass and the leaf codec does not rebuild, clean rebuild (Isolating APT).
+
 **Unknown fields**
 
 - Opt in with `@ProtoUnknown UnknownFields` to capture and write back unknown tags.
@@ -325,7 +334,7 @@ Default safety limits: 64 MiB per message, nesting depth 100. Override with `Pro
 
 ## Not in this release
 
-`.proto` import/export, proto2 required/default, `Struct` / `Value`, inheritance, Lombok-specific integration.
+`.proto` import/export, proto2 required/default, `Struct` / `Value`, Lombok-specific integration.
 
 ## Build
 

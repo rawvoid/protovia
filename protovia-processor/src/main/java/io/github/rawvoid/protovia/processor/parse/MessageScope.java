@@ -40,6 +40,7 @@ final class MessageScope {
     final Map<Integer, FieldModel> byNumber = new LinkedHashMap<>();
     final Set<Integer> taken = new HashSet<>();
     final Set<String> claimed = new HashSet<>();
+    final Set<String> claimedJava = new HashSet<>();
     final List<FieldModel> oneofs = new ArrayList<>();
     final List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
     final Set<String> annotatedViaField = new HashSet<>();
@@ -68,7 +69,26 @@ final class MessageScope {
         if (!claimName(field.origin, field.exportName(), diag)) {
             return false;
         }
+        if (!claimJava(field.origin, field.name, diag)) {
+            return false;
+        }
         byNumber.put(field.number, field);
+        return true;
+    }
+
+    /**
+     * Claims a Java property name so inherited hiding cannot produce two slots.
+     *
+     * @return {@code false} if the property is already claimed
+     */
+    boolean claimJava(Element origin, String javaName, Diagnostics diag) {
+        if (javaName == null || javaName.isEmpty()) {
+            return true;
+        }
+        if (!claimedJava.add(javaName)) {
+            diag.error(origin, "duplicate Java property '" + javaName + "'");
+            return false;
+        }
         return true;
     }
 
@@ -124,6 +144,9 @@ final class MessageScope {
         }
         if (unknown != null) {
             diag.error(origin, "at most one @ProtoUnknown per message");
+            return false;
+        }
+        if (!claimJava(origin, name, diag)) {
             return false;
         }
         unknown = new MessageModel.UnknownField(

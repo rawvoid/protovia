@@ -68,5 +68,13 @@ public final class MessageModel {
         String readExpr,
         String setterName,
         String fieldName) {
+
+        /**
+         * @param instance generated local holding the message ({@code value} or {@code msg})
+         * @return field or getter access on that instance
+         */
+        public String accessOn(String instance) {
+            return Names.rewriteReceiver(readExpr, fieldName, instance);
+        }
     }
 }

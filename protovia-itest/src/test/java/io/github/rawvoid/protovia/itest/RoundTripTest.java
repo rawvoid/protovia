@@ -26,6 +26,7 @@ import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wkt.Int32Value;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -471,6 +472,55 @@ class RoundTripTest {
         assertEquals(List.of(1, 2), back.getUnpacked());
         assertTrue(back.getRanks() instanceof IntArrayList);
         assertTrue(back.getUnpacked() instanceof IntArrayList);
+    }
+
+    @Test
+    void inheritedAccountRoundTripMatchesTwin() {
+        Instant created = Instant.parse("2020-01-02T03:04:05.006Z");
+        Account account = new Account();
+        account.id = 7;
+        account.createdAt = created;
+        account.name = "Ada";
+        AccountTwin twin = new AccountTwin();
+        twin.id = 7;
+        twin.createdAt = created;
+        twin.name = "Ada";
+        byte[] bytes = Protovia.toBytes(account);
+        assertArrayEquals(Protovia.toBytes(twin), bytes);
+        Account back = Protovia.fromBytes(bytes, Account.class);
+        assertEquals(7, back.id);
+        assertEquals(created, back.createdAt);
+        assertEquals("Ada", back.name);
+    }
+
+    @Test
+    void inheritedSiblingIsADifferentMessage() {
+        Account account = new Account();
+        account.id = 1;
+        account.name = "same";
+        Ticket ticket = new Ticket();
+        ticket.id = 1;
+        ticket.title = "same";
+        assertNotEquals(Account.class, Ticket.class);
+        assertArrayEquals(Protovia.toBytes(account), Protovia.toBytes(ticket));
+        Ticket asTicket = Protovia.fromBytes(Protovia.toBytes(account), Ticket.class);
+        assertEquals("same", asTicket.title);
+        assertEquals(1, asTicket.id);
+    }
+
+    @Test
+    void genericPageRoundTripMatchesTwin() {
+        UserPage page = new UserPage();
+        page.items = List.of(sampleUser());
+        page.total = 1;
+        UserPageTwin twin = new UserPageTwin();
+        twin.items = List.of(sampleUser());
+        twin.total = 1;
+        byte[] bytes = Protovia.toBytes(page);
+        assertArrayEquals(Protovia.toBytes(twin), bytes);
+        UserPage back = Protovia.fromBytes(bytes, UserPage.class);
+        assertEquals(1, back.total);
+        assertEquals(sampleUser(), back.items.getFirst());
     }
 
     private static User sampleUser() {
