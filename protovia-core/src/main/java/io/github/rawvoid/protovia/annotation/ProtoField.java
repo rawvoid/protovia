@@ -39,6 +39,13 @@ public @interface ProtoField {
     int number();
 
     /**
+     * Protobuf field name used by {@code .proto} export and JSON.
+     * Defaults to the Java member name. Must be a proto identifier and
+     * not a proto keyword. Does not affect the wire format.
+     */
+    String name() default "";
+
+    /**
      * Wire type. {@link ProtoType#AUTO} infers from the Java type.
      */
     ProtoType type() default ProtoType.AUTO;

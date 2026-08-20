@@ -32,4 +32,10 @@ public @interface ProtoEnum {
      * Protobuf enum name. Defaults to the Java simple class name.
      */
     String name() default "";
+
+    /**
+     * Protobuf package for {@code .proto} export.
+     * Full name is {@code packageName + "." + name} when package is non-empty.
+     */
+    String packageName() default "";
 }

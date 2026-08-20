@@ -321,7 +321,7 @@ class ProtoviaProcessorTest {
     }
 
     @Test
-    void fieldAndOneofCaseSharingANameStillCompile() {
+    void fieldAndOneofCaseWithDistinctExportNamesCompile() {
         Compilation compilation = javac()
             .withProcessors(new ProtoviaProcessor())
             .compile(
@@ -346,7 +346,7 @@ class ProtoviaProcessorTest {
                     "@ProtoMessage public class Mail {",
                     "  @ProtoField(number = 1) public String email;",
                     "  @ProtoOneof({",
-                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class, name = \"mail\"),",
                     "    @ProtoOneof.Case(number = 11, of = Home.class)",
                     "  })",
                     "  public Target target;",
@@ -473,7 +473,7 @@ class ProtoviaProcessorTest {
                 "@ProtoMessage",
                 "public record Box(",
                 "  @ProtoField(number = 10) String name,",
-                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) }) Object data) {",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class, name = \"text\") }) Object data) {",
                 "  @ProtoOneof({ @ProtoOneof.Case(number = 11, of = Integer.class) })",
                 "  public Object data() { return data; }",
                 "}"));
@@ -730,7 +730,7 @@ class ProtoviaProcessorTest {
                 "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                 "@ProtoMessage public class Holder {",
-                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) })",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class, name = \"text\") })",
                 "  public Object data;",
                 "}"));
         assertThat(compilation).succeeded();
@@ -799,8 +799,8 @@ class ProtoviaProcessorTest {
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                 "@ProtoMessage public class Holder {",
                 "  @ProtoOneof({",
-                "    @ProtoOneof.Case(number = 10, of = String.class),",
-                "    @ProtoOneof.Case(number = 11, of = String.class)",
+                "    @ProtoOneof.Case(number = 10, of = String.class, name = \"a\"),",
+                "    @ProtoOneof.Case(number = 11, of = String.class, name = \"b\")",
                 "  })",
                 "  public Object data;",
                 "}"));
@@ -952,7 +952,7 @@ class ProtoviaProcessorTest {
                     "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                     "@ProtoMessage public class Bag {",
                     "  @ProtoOneof({",
-                    "    @ProtoOneof.Case(number = 10, of = String.class),",
+                    "    @ProtoOneof.Case(number = 10, of = String.class, name = \"text\"),",
                     "    @ProtoOneof.Case(number = 11, of = Address.class)",
                     "  })",
                     "  public Object data;",
@@ -1139,7 +1139,7 @@ class ProtoviaProcessorTest {
                 "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                 "@ProtoMessage public class Holder {",
-                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = byte[].class) })",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = byte[].class, name = \"blob\") })",
                 "  public Object data;",
                 "}"));
         assertThat(compilation).succeeded();
@@ -2701,7 +2701,7 @@ class ProtoviaProcessorTest {
                 "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
                 "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
                 "@ProtoMessage public class Bad {",
-                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class) })",
+                "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = String.class, name = \"text\") })",
                 "  public " + fieldDecl + ";",
                 "}"));
     }

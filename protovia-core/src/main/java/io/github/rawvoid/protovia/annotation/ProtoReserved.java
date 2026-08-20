@@ -34,7 +34,7 @@ import java.lang.annotation.Target;
  * public class User { ... }
  * }</pre>
  *
- * {@code names} are proto export names (today: Java member / enum constant names).
+ * {@code names} are proto export names (field / oneof / enum constant names).
  * Overlapping declarations are idempotent. Reusing a reserved number or name
  * on a current field, oneof case, or enum constant fails compilation.
  *

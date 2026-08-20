@@ -95,15 +95,18 @@ final class OneofParser {
             return null;
         }
 
+        String protoName = ExportNames.orDefault(stringMember(oneofAnn, "name"), name);
+        ExportNames.require(diag, origin, protoName);
+
         TypeMirror erased = env.types.erasure(type);
         List<OneofCaseModel> cases = new ArrayList<>(parsed.size());
         for (ParsedCase parsedCase : parsed) {
             cases.add(parsedCase.model);
         }
-        rejectReservedNames(origin, name, cases, reserved);
         return FieldModel.builder()
             .number(0)
             .name(name)
+            .protoName(protoName)
             .localName(Names.safeLocal(name))
             .kind(FieldKind.ONEOF)
             .accessKind(accessKind)
@@ -115,22 +118,6 @@ final class OneofParser {
             .oneofCases(cases)
             .origin(origin)
             .build();
-    }
-
-    private void rejectReservedNames(
-        Element origin,
-        String groupName,
-        List<OneofCaseModel> cases,
-        Reserved reserved) {
-        if (reserved.containsName(groupName)) {
-            diag.error(origin, "proto name '" + groupName + "' is reserved");
-        }
-        for (OneofCaseModel oneofCase : cases) {
-            String protoName = Names.oneofCaseProtoName(oneofCase);
-            if (reserved.containsName(protoName)) {
-                diag.error(origin, "proto name '" + protoName + "' is reserved");
-            }
-        }
     }
 
     private ParsedCase parseCase(
@@ -196,7 +183,21 @@ final class OneofParser {
             diag.error(origin, "duplicate field number " + number);
             return null;
         }
-        return new ParsedCase(model.toBuilder().number(number).tagConstant(Names.tagConstant(number)).build(), ofType);
+        String protoName = ExportNames.orDefault(stringMember(caseMirror, "name"), Names.oneofCaseProtoName(model));
+        ExportNames.require(diag, origin, protoName);
+        return new ParsedCase(model.toBuilder()
+            .number(number)
+            .tagConstant(Names.tagConstant(number))
+            .protoName(protoName)
+            .build(), ofType);
+    }
+
+    private String stringMember(AnnotationMirror mirror, String member) {
+        AnnotationValue value = adapters.annotationMember(mirror, member);
+        if (value == null || !(value.getValue() instanceof String s)) {
+            return "";
+        }
+        return s;
     }
 
     private OneofCaseModel shape(
@@ -228,7 +229,7 @@ final class OneofParser {
         }
         boolean message = payload.kind == FieldKind.MESSAGE;
         return new OneofCaseModel(
-            0, caseType, typeName(caseType, ofType, pkg), null, payload, null, message);
+            0, caseType, typeName(caseType, ofType, pkg), null, payload, null, message, "");
     }
 
     private OneofCaseModel recordShape(
@@ -244,7 +245,7 @@ final class OneofParser {
             if (!rejectNonScalarOverrides(origin, declared, fieldAdapter)) {
                 return null;
             }
-            return new OneofCaseModel(0, caseType, Names.typeName(caseType, pkg), null, null, null, false);
+            return new OneofCaseModel(0, caseType, Names.typeName(caseType, pkg), null, null, null, false, "");
         }
         if (components.size() != 1) {
             diag.error(origin, "oneof case record " + caseType.getSimpleName() + " must have 0 or 1 component");
@@ -271,7 +272,7 @@ final class OneofParser {
             return null;
         }
         return new OneofCaseModel(
-            0, caseType, Names.typeName(caseType, pkg), null, payload, component.getSimpleName() + "()", false);
+            0, caseType, Names.typeName(caseType, pkg), null, payload, component.getSimpleName() + "()", false, "");
     }
 
     private FieldModel resolvePayload(
@@ -313,7 +314,7 @@ final class OneofParser {
             .javaTypeName(typeName)
             .javaType(caseType.asType())
             .build();
-        return new OneofCaseModel(0, caseType, typeName, null, payload, null, true);
+        return new OneofCaseModel(0, caseType, typeName, null, payload, null, true, "");
     }
 
     private boolean rejectNonScalarOverrides(Element origin, ProtoType declared, TypeElement fieldAdapter) {

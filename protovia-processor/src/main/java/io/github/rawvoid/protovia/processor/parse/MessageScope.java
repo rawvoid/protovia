@@ -19,6 +19,7 @@ package io.github.rawvoid.protovia.processor.parse;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.processor.model.Reserved;
 import io.github.rawvoid.protovia.wire.WireType;
 
@@ -64,16 +65,42 @@ final class MessageScope {
             diag.error(field.origin, "duplicate field number " + field.number);
             return false;
         }
-        if (reserved.containsName(field.name)) {
-            diag.error(field.origin, "proto name '" + field.name + "' is reserved");
-            return false;
-        }
-        if (!claimed.add(field.name)) {
-            diag.error(field.origin, "duplicate proto field name '" + field.name + "'");
+        if (!claimName(field.origin, field.exportName(), diag)) {
             return false;
         }
         byNumber.put(field.number, field);
         return true;
+    }
+
+    /**
+     * Claims a proto export name for uniqueness and reserved checks.
+     *
+     * @return {@code false} if the name is reserved or already claimed
+     */
+    boolean claimName(Element origin, String protoName, Diagnostics diag) {
+        if (reserved.containsName(protoName)) {
+            diag.error(origin, "proto name '" + protoName + "' is reserved");
+            return false;
+        }
+        if (!claimed.add(protoName)) {
+            diag.error(origin, "duplicate proto field name '" + protoName + "'");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Claims the oneof group name, each case name, and empty-placeholder type names.
+     */
+    boolean claimOneof(FieldModel oneof, Diagnostics diag) {
+        boolean ok = claimName(oneof.origin, oneof.exportName(), diag);
+        for (OneofCaseModel oneofCase : oneof.oneofCases) {
+            ok &= claimName(oneof.origin, oneofCase.exportName(), diag);
+            if (oneofCase.empty() && oneofCase.type != null) {
+                ok &= claimName(oneof.origin, oneofCase.type.getSimpleName().toString(), diag);
+            }
+        }
+        return ok;
     }
 
     boolean checkUnknownType(Element origin, TypeMirror type, TypeEnv env, Diagnostics diag) {

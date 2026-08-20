@@ -36,6 +36,10 @@ public final class EnumModel {
 
     public final TypeElement type;
     public final String typeName;
+    @Builder.Default
+    public final String protoPackage = "";
+    @Builder.Default
+    public final String protoEnumName = "";
     @Singular
     public final List<Constant> constants;
     /**
@@ -44,6 +48,16 @@ public final class EnumModel {
     public final String unrecognized;
     @Builder.Default
     public final Reserved reserved = Reserved.EMPTY;
+
+    /**
+     * @return {@code package.name} or just {@code name} when the proto package is empty
+     */
+    public String protoFullName() {
+        String name = protoEnumName == null || protoEnumName.isEmpty()
+            ? type.getSimpleName().toString()
+            : protoEnumName;
+        return protoPackage == null || protoPackage.isEmpty() ? name : protoPackage + "." + name;
+    }
 
     public record Constant(String name, int number) {
     }

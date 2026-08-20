@@ -141,7 +141,7 @@ public final class Names {
     }
 
     /**
-     * Default proto field name of a oneof case (no {@code name} override yet).
+     * Default proto field name of a oneof case when {@code Case.name} is blank.
      */
     public static String oneofCaseProtoName(OneofCaseModel c) {
         if (c.selfMessage || c.empty()) {

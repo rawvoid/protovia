@@ -34,7 +34,7 @@ import lombok.NoArgsConstructor;
 public class Bag {
 
     @ProtoOneof({
-        @ProtoOneof.Case(number = 10, of = String.class),
+        @ProtoOneof.Case(number = 10, of = String.class, name = "text"),
         @ProtoOneof.Case(number = 11, of = Address.class)
     })
     public Object data;

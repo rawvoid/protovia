@@ -247,12 +247,14 @@ You can also use raw types directly without custom wrapper records by declaring 
 @ProtoMessage
 public class Bag {
   @ProtoOneof({
-    @ProtoOneof.Case(number = 10, of = String.class),
+    @ProtoOneof.Case(number = 10, of = String.class, name = "text"),
     @ProtoOneof.Case(number = 11, of = Address.class)
   })
   private Object data;
 }
 ```
+
+Naked `String` and `byte[]` default to proto names `string` / `bytes`, which are keywords — set `name` to override.
 
 **Case-level type & adapter overrides:**
 

@@ -49,8 +49,20 @@ public final class OneofCaseModel {
      */
     public final String accessor;
     public final boolean selfMessage;
+    /**
+     * Protobuf export name. Empty means {@link Names#oneofCaseProtoName(OneofCaseModel)}.
+     */
+    @Builder.Default
+    public final String protoName = "";
 
     public boolean empty() {
         return !selfMessage && payload == null;
+    }
+
+    /**
+     * @return proto export name, falling back to the default case naming rule
+     */
+    public String exportName() {
+        return protoName == null || protoName.isEmpty() ? Names.oneofCaseProtoName(this) : protoName;
     }
 }
