@@ -140,6 +140,33 @@ public final class Names {
         return "TAG_" + fieldNumber;
     }
 
+    /**
+     * Default proto field name of a oneof case (no {@code name} override yet).
+     */
+    public static String oneofCaseProtoName(OneofCaseModel c) {
+        if (c.selfMessage || c.empty()) {
+            return decapitalize(caseTypeSimpleName(c));
+        }
+        if (c.payload != null && c.payload.kind == FieldKind.MESSAGE && c.accessor != null) {
+            return stripAccessor(c.accessor);
+        }
+        if (c.type != null) {
+            return decapitalize(c.type.getSimpleName().toString());
+        }
+        return "bytes";
+    }
+
+    private static String caseTypeSimpleName(OneofCaseModel c) {
+        if (c.type != null) {
+            return c.type.getSimpleName().toString();
+        }
+        return c.typeName;
+    }
+
+    private static String stripAccessor(String accessor) {
+        return accessor.endsWith("()") ? accessor.substring(0, accessor.length() - 2) : accessor;
+    }
+
     public static String enumNumberOf(EnumModel model) {
         return "numberOf" + sanitizeTypeName(model.typeName);
     }

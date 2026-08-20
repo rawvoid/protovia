@@ -19,6 +19,7 @@ package io.github.rawvoid.protovia.processor.parse;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.Reserved;
 import io.github.rawvoid.protovia.wire.WireType;
 
 import javax.lang.model.element.Element;
@@ -42,6 +43,7 @@ final class MessageScope {
     final List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
     final Set<String> annotatedViaField = new HashSet<>();
     MessageModel.UnknownField unknown;
+    Reserved reserved = Reserved.EMPTY;
 
     MessageScope(TypeElement type, String pkg) {
         this.type = type;
@@ -54,8 +56,16 @@ final class MessageScope {
                 + " (must be in [1, 536870911] and not in [19000, 19999])");
             return false;
         }
+        if (reserved.containsNumber(field.number)) {
+            diag.error(field.origin, "field number " + field.number + " is reserved");
+            return false;
+        }
         if (!taken.add(field.number)) {
             diag.error(field.origin, "duplicate field number " + field.number);
+            return false;
+        }
+        if (reserved.containsName(field.name)) {
+            diag.error(field.origin, "proto name '" + field.name + "' is reserved");
             return false;
         }
         if (!claimed.add(field.name)) {
@@ -118,6 +128,7 @@ final class MessageScope {
             record,
             fields,
             recordComponents,
-            unknown);
+            unknown,
+            reserved);
     }
 }

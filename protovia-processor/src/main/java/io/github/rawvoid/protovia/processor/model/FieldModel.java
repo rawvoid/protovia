@@ -30,7 +30,7 @@ import java.util.List;
  * @author Rawvoid
  */
 @Getter
-@Builder(builderClassName = "Builder", toBuilder = true)
+@Builder(toBuilder = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class FieldModel {
 

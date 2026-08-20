@@ -165,7 +165,7 @@ final class FieldResolver {
         }
         TypeElement impl = array ? null : env.collectionImpl(type, element);
         boolean packed = ann.packed() && isPackable(element);
-        FieldModel.Builder b = FieldModel.builder()
+        var builder = FieldModel.builder()
             .number(ann.number())
             .name(name)
             .localName(Names.safeLocal(name))
@@ -186,9 +186,9 @@ final class FieldResolver {
             .origin(origin)
             .array(array);
         if (array) {
-            b.arrayComponentType(env.renderType(elementType, pkg));
+            builder.arrayComponentType(env.renderType(elementType, pkg));
         }
-        return b.build();
+        return builder.build();
     }
 
     private FieldModel resolveMap(

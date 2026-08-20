@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
 import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.Reserved;
 
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
@@ -38,9 +39,11 @@ import java.util.Set;
 final class EnumParser {
 
     private final Diagnostics diag;
+    private final ReservedParser reserved;
 
-    EnumParser(Diagnostics diag) {
+    EnumParser(Diagnostics diag, ReservedParser reserved) {
         this.diag = diag;
+        this.reserved = reserved;
     }
 
     /**
@@ -60,6 +63,7 @@ final class EnumParser {
             diag.error(type, "@ProtoEnum is only valid on enum types");
             return null;
         }
+        Reserved reservedNumbers = reserved.parse(type, ReservedParser.Scope.ENUM);
         List<EnumModel.Constant> constants = new ArrayList<>();
         Set<Integer> numbers = new HashSet<>();
         boolean hasZero = false;
@@ -93,7 +97,14 @@ final class EnumParser {
             if (number == 0) {
                 hasZero = true;
             }
-            constants.add(new EnumModel.Constant(constant.getSimpleName().toString(), number));
+            String constantName = constant.getSimpleName().toString();
+            if (reservedNumbers.containsNumber(number)) {
+                diag.error(constant, "enum number " + number + " is reserved");
+            }
+            if (reservedNumbers.containsName(constantName)) {
+                diag.error(constant, "proto name '" + constantName + "' is reserved");
+            }
+            constants.add(new EnumModel.Constant(constantName, number));
         }
         if (!hasZero) {
             diag.error(type, "proto3 enum " + type.getSimpleName() + " must have a constant with number 0");
@@ -102,6 +113,6 @@ final class EnumParser {
             return null;
         }
         String pkg = Names.packageName(type);
-        return new EnumModel(type, Names.typeName(type, pkg), constants, unrecognized);
+        return new EnumModel(type, Names.typeName(type, pkg), constants, unrecognized, reservedNumbers);
     }
 }
