@@ -128,6 +128,28 @@ public final class Names {
         return primitiveBoolean ? "is" + cap : "get" + cap;
     }
 
+    /**
+     * Rewrites a generated read expression so it targets {@code instance}
+     * instead of {@code value}. Inherited field access uses
+     * {@code ((Owner) value).name}.
+     */
+    public static String rewriteReceiver(String readExpr, String fieldName, String instance) {
+        if (readExpr == null) {
+            return instance + "." + fieldName;
+        }
+        if (readExpr.startsWith("((")) {
+            int idx = readExpr.indexOf(") value).");
+            if (idx >= 0) {
+                return readExpr.substring(0, idx) + ") " + instance + ")."
+                    + readExpr.substring(idx + ") value).".length());
+            }
+        }
+        if (readExpr.startsWith("value.")) {
+            return instance + readExpr.substring("value".length());
+        }
+        return instance + "." + fieldName;
+    }
+
     public static String setterName(String property) {
         return "set" + capitalize(property);
     }

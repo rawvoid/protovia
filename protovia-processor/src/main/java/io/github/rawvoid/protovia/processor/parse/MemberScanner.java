@@ -30,8 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Walks a {@code @ProtoMessage} and collects members. Does not resolve access
- * or report bind errors — that happens in {@link SchemaParser} after role checks.
+ * Walks a {@code @ProtoMessage} or mixin superclass and collects members.
+ * Does not resolve access or report bind errors — that happens in
+ * {@link SchemaParser} after role checks.
  *
  * @author Rawvoid
  */
@@ -50,7 +51,25 @@ final class MemberScanner {
         return scanPojo(type);
     }
 
-    Access resolveAccess(Member member, Map<String, ExecutableElement> methods) {
+    /**
+     * @param inheritedOwner rendered declaring type when flattening (may include type
+     *                       arguments); {@code null} for the leaf
+     */
+    Access resolveAccess(
+        Member member,
+        Map<String, ExecutableElement> methods,
+        String inheritedOwner) {
+        Access access = resolveAccess0(member, methods);
+        if (access == null || inheritedOwner == null || access.kind() != AccessKind.FIELD) {
+            return access;
+        }
+        return new Access(
+            AccessKind.FIELD,
+            "((" + inheritedOwner + ") value)." + member.name(),
+            null);
+    }
+
+    private Access resolveAccess0(Member member, Map<String, ExecutableElement> methods) {
         if (member.recordComponent()) {
             return new Access(AccessKind.RECORD, "value." + member.name() + "()", null);
         }

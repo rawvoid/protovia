@@ -114,6 +114,16 @@ public final class Reserved {
             return this;
         }
 
+        public Builder addAll(Reserved other) {
+            if (other == null || other.isEmpty()) {
+                return this;
+            }
+            numbers.addAll(other.numbers());
+            ranges.addAll(other.ranges());
+            names.addAll(other.names());
+            return this;
+        }
+
         public Reserved build() {
             if (numbers.isEmpty() && ranges.isEmpty() && names.isEmpty()) {
                 return EMPTY;

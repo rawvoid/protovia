@@ -32,7 +32,8 @@ import java.util.*;
 
 /**
  * Discovers and validates {@code ProtoAdapter}s. Priority: field / oneof case
- * → message {@code @ProtoAdapters} → package-info → {@code @ProtoAdapted} on {@code J}.
+ * → leaf {@code @ProtoAdapters} → ancestor {@code @ProtoAdapters} (near to far)
+ * → leaf package-info → {@code @ProtoAdapted} on {@code J}.
  *
  * @author Rawvoid
  */
@@ -271,8 +272,30 @@ final class AdapterResolver {
         List<ResolvedAdapter> list = new ArrayList<>();
         PackageElement pkg = env.elements.getPackageOf(messageType);
         addAdapters(list, adaptersFrom(pkg), pkg);
+        for (TypeElement ancestor : classAncestorsFarToNear(messageType)) {
+            addAdapters(list, adaptersFrom(ancestor), ancestor);
+        }
         addAdapters(list, adaptersFrom(messageType), messageType);
         return list;
+    }
+
+    private List<TypeElement> classAncestorsFarToNear(TypeElement leaf) {
+        List<TypeElement> nearToFar = new ArrayList<>();
+        TypeMirror superType = leaf.getSuperclass();
+        while (superType.getKind() != TypeKind.NONE) {
+            TypeElement el = env.asTypeElement(superType);
+            if (el == null) {
+                break;
+            }
+            String qn = el.getQualifiedName().toString();
+            if (qn.equals("java.lang.Object") || qn.equals("java.lang.Record") || qn.equals("java.lang.Enum")) {
+                break;
+            }
+            nearToFar.add(el);
+            superType = el.getSuperclass();
+        }
+        Collections.reverse(nearToFar);
+        return nearToFar;
     }
 
     private void addAdapters(List<ResolvedAdapter> discovery, List<TypeElement> adapters, Element origin) {

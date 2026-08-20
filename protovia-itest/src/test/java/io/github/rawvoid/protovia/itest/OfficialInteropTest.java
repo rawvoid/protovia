@@ -339,6 +339,44 @@ class OfficialInteropTest {
     }
 
     @Test
+    void inheritedAccountInteropsWithDynamicMessage() throws Exception {
+        DescriptorProtos.DescriptorProto account = DescriptorProtos.DescriptorProto.newBuilder()
+            .setName("Account")
+            .addField(field("id", 1, DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT64))
+            .addField(field("created_at", 2, DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT64))
+            .addField(field("name", 16, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
+            .build();
+        Descriptors.FileDescriptor fd = Descriptors.FileDescriptor.buildFrom(
+            DescriptorProtos.FileDescriptorProto.newBuilder()
+                .setName("account.proto")
+                .setSyntax("proto3")
+                .addMessageType(account)
+                .build(),
+            new Descriptors.FileDescriptor[0]);
+        Descriptors.Descriptor desc = fd.findMessageTypeByName("Account");
+
+        Instant created = Instant.parse("2020-01-02T03:04:05.006Z");
+        Account sent = new Account();
+        sent.id = 7;
+        sent.createdAt = created;
+        sent.name = "Ada";
+        DynamicMessage parsed = DynamicMessage.parseFrom(desc, Protovia.toBytes(sent));
+        assertEquals(7L, parsed.getField(desc.findFieldByName("id")));
+        assertEquals(created.toEpochMilli(), parsed.getField(desc.findFieldByName("created_at")));
+        assertEquals("Ada", parsed.getField(desc.findFieldByName("name")));
+
+        DynamicMessage official = DynamicMessage.newBuilder(desc)
+            .setField(desc.findFieldByName("id"), 7L)
+            .setField(desc.findFieldByName("created_at"), created.toEpochMilli())
+            .setField(desc.findFieldByName("name"), "Ada")
+            .build();
+        Account back = Protovia.fromBytes(official.toByteArray(), Account.class);
+        assertEquals(7, back.id);
+        assertEquals(created, back.createdAt);
+        assertEquals("Ada", back.name);
+    }
+
+    @Test
     void anyPacksInstantAgainstOfficial() throws Exception {
         Instant at = Instant.parse("2020-01-02T03:04:05.006Z");
         ProtoAny packed = Protovia.pack(at);
