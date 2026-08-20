@@ -61,7 +61,7 @@
         </dependency>
         <dependency>
             <groupId>io.github.rawvoid</groupId>
-            <artifactId>protovia-runtime</artifactId>
+            <artifactId>protovia</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.rawvoid</groupId>

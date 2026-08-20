@@ -45,38 +45,50 @@ The bytes are readable by official Protocol Buffers implementations (Go, Python,
 
 ## Modules
 
-| Artifact             | Role                                                |
-|----------------------|-----------------------------------------------------|
-| `protovia-api`       | Annotations, `ProtoType`, `ProtoCodec`, wire types  |
-| `protovia-runtime`   | `Protovia` facade and codec lookup                  |
-| `protovia-processor` | Annotation processor that generates `XxxProtoCodec` |
-| `protovia-itest`     | End-to-end + official protobuf interop tests        |
+| Artifact               | Role                                                |
+|------------------------|-----------------------------------------------------|
+| `protovia-annotations` | Annotations, `ProtoType`, `ProtoAdapter` interface  |
+| `protovia`             | Core engine, wire format, adapters, `Protovia` facade |
+| `protovia-processor`   | Annotation processor that generates `XxxProtoCodec` |
+| `protovia-itest`       | End-to-end + official protobuf interop tests        |
+| `protovia-bench`       | JMH benchmarks against official `protobuf-java`     |
 
 Runtime has **no third-party dependencies**.
 
 ## Maven
 
-```xml
+In your application / service:
 
+```xml
 <dependency>
   <groupId>io.github.rawvoid</groupId>
-  <artifactId>protovia-runtime</artifactId>
+  <artifactId>protovia</artifactId>
   <version>1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
-<groupId>io.github.rawvoid</groupId>
-<artifactId>protovia-processor</artifactId>
-<version>1.0-SNAPSHOT</version>
-<scope>provided</scope>
+  <groupId>io.github.rawvoid</groupId>
+  <artifactId>protovia-processor</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <scope>provided</scope>
 </dependency>
 ```
 
-`protovia-runtime` brings `protovia-api` transitively. The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
+In a pure DTO / schema module (zero runtime dependencies):
+
+```xml
+<dependency>
+  <groupId>io.github.rawvoid</groupId>
+  <artifactId>protovia-annotations</artifactId>
+  <version>1.0-SNAPSHOT</version>
+</dependency>
+```
+
+`protovia` brings `protovia-annotations` transitively. The processor is discovered via `META-INF/services` once it is on the compiler classpath (Maven `provided` is enough for a published jar).
 
 Gradle:
 
 ```kotlin
-implementation("io.github.rawvoid:protovia-runtime:1.0-SNAPSHOT")
+implementation("io.github.rawvoid:protovia:1.0-SNAPSHOT")
 annotationProcessor("io.github.rawvoid:protovia-processor:1.0-SNAPSHOT")
 ```
 

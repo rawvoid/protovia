@@ -30,8 +30,8 @@
     <url>https://github.com/rawvoid/protovia</url>
 
     <modules>
-        <module>protovia-api</module>
-        <module>protovia-runtime</module>
+        <module>protovia-annotations</module>
+        <module>protovia</module>
         <module>protovia-processor</module>
         <module>protovia-itest</module>
         <module>protovia-bench</module>
@@ -63,12 +63,12 @@
             </dependency>
             <dependency>
                 <groupId>io.github.rawvoid</groupId>
-                <artifactId>protovia-api</artifactId>
+                <artifactId>protovia-annotations</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.rawvoid</groupId>
-                <artifactId>protovia-runtime</artifactId>
+                <artifactId>protovia</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

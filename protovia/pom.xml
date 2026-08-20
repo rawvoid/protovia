@@ -26,9 +26,9 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>protovia-processor</artifactId>
-    <name>protovia-processor</name>
-    <description>Compile-time ProtoCodec generator</description>
+    <artifactId>protovia</artifactId>
+    <name>protovia</name>
+    <description>Lightweight compile-time Protobuf for Java: wire format, codecs, adapters, and Protovia facade</description>
 
     <dependencies>
         <dependency>
@@ -36,46 +36,9 @@
             <artifactId>protovia-annotations</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.github.rawvoid</groupId>
-            <artifactId>protovia</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.palantir.javapoet</groupId>
-            <artifactId>javapoet</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.google.testing.compile</groupId>
-            <artifactId>compile-testing</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>
