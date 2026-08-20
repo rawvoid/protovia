@@ -118,6 +118,8 @@ public final class SchemaParser {
         String protoMessageName = meta == null || meta.name().isBlank()
             ? type.getSimpleName().toString()
             : meta.name().trim();
+        ExportNames.requirePackage(diag, type, protoPackage);
+        ExportNames.require(diag, type, protoMessageName);
 
         MessageScope scope = new MessageScope(type, pkg);
         scope.reserved = reserved.parse(type, ReservedParser.Scope.MESSAGE);
@@ -251,7 +253,7 @@ public final class SchemaParser {
             scope.pkg,
             scope.taken,
             scope.reserved);
-        if (oneof != null && scope.claimed.add(member.name())) {
+        if (oneof != null && scope.claimOneof(oneof, diag)) {
             scope.oneofs.add(oneof);
             if (member.recordComponent()) {
                 scope.addComponent(member.name(), oneof.javaType, oneof);

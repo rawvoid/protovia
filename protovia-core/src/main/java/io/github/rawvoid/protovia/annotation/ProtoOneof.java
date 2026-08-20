@@ -42,6 +42,13 @@ import java.lang.annotation.*;
 public @interface ProtoOneof {
 
     /**
+     * Protobuf oneof group name used by {@code .proto} export.
+     * Defaults to the Java member name. Must be a proto identifier and
+     * not a proto keyword. The group itself has no field number.
+     */
+    String name() default "";
+
+    /**
      * Cases in declaration order. At least one is required
      * (proto3 allows a single-field oneof). An empty array is rejected.
      */
@@ -69,6 +76,14 @@ public @interface ProtoOneof {
          * {@code of} types in one oneof are rejected.
          */
         Class<?> of();
+
+        /**
+         * Protobuf field name of this case used by {@code .proto} export.
+         * Defaults from the Java payload shape (type simple name, or the
+         * message component name). Must be a proto identifier and not a
+         * proto keyword.
+         */
+        String name() default "";
 
         /**
          * Wire type of this case's scalar payload.

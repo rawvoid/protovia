@@ -100,11 +100,26 @@ class ReservedTest {
         assertTrue(ProtoIdent.isIdentifier("_x"));
         assertTrue(ProtoIdent.isIdentifier("legacy_tag"));
         assertTrue(ProtoIdent.isIdentifier("A1"));
+        assertTrue(ProtoIdent.isIdentifier("string"));
         assertFalse(ProtoIdent.isIdentifier(""));
         assertFalse(ProtoIdent.isIdentifier(null));
         assertFalse(ProtoIdent.isIdentifier("1abc"));
         assertFalse(ProtoIdent.isIdentifier("legacy-tag"));
         assertFalse(ProtoIdent.isIdentifier("foo.bar"));
         assertFalse(ProtoIdent.isIdentifier("a b"));
+        assertTrue(ProtoIdent.isKeyword("string"));
+        assertTrue(ProtoIdent.isKeyword("message"));
+        assertFalse(ProtoIdent.isKeyword("name"));
+        assertFalse(ProtoIdent.isKeyword("String"));
+        assertTrue(ProtoIdent.isExportName("display_name"));
+        assertFalse(ProtoIdent.isExportName("string"));
+        assertFalse(ProtoIdent.isExportName("1abc"));
+        assertTrue(ProtoIdent.isPackageName("example"));
+        assertTrue(ProtoIdent.isPackageName("example.v1"));
+        assertFalse(ProtoIdent.isPackageName(""));
+        assertFalse(ProtoIdent.isPackageName(".v1"));
+        assertFalse(ProtoIdent.isPackageName("example."));
+        assertFalse(ProtoIdent.isPackageName("example..v1"));
+        assertFalse(ProtoIdent.isPackageName("1example.v1"));
     }
 }

@@ -16,19 +16,32 @@
 
 package io.github.rawvoid.protovia.processor.model;
 
+import java.util.Set;
+
 /**
- * Proto3 identifier: {@code [_A-Za-z][_A-Za-z0-9]*}.
+ * Proto3 identifiers, export names, and dotted package names.
  *
  * @author Rawvoid
  */
 public final class ProtoIdent {
+
+    /**
+     * proto3 keywords and scalar type names. Identifiers, but illegal as
+     * export names. Reserved names may still use them.
+     */
+    private static final Set<String> KEYWORDS = Set.of(
+        "syntax", "import", "option", "package", "message", "enum", "service",
+        "rpc", "returns", "stream", "reserved", "to", "max", "optional",
+        "repeated", "required", "oneof", "map", "group", "extensions", "extend",
+        "double", "float", "int32", "int64", "uint32", "uint64", "sint32", "sint64",
+        "fixed32", "fixed64", "sfixed32", "sfixed64", "bool", "string", "bytes");
 
     private ProtoIdent() {
     }
 
     /**
      * @param name candidate proto name
-     * @return {@code true} if {@code name} is a proto identifier
+     * @return {@code true} if {@code name} is {@code [_A-Za-z][_A-Za-z0-9]*}
      */
     public static boolean isIdentifier(String name) {
         if (name == null || name.isEmpty()) {
@@ -42,6 +55,43 @@ public final class ProtoIdent {
             if (!isIdentPart(name.charAt(i))) {
                 return false;
             }
+        }
+        return true;
+    }
+
+    /**
+     * @param name candidate proto name
+     * @return {@code true} if {@code name} is a proto keyword or scalar type name
+     */
+    public static boolean isKeyword(String name) {
+        return name != null && KEYWORDS.contains(name);
+    }
+
+    /**
+     * Field, oneof, message, and enum names that may appear in a {@code .proto}.
+     */
+    public static boolean isExportName(String name) {
+        return isIdentifier(name) && !isKeyword(name);
+    }
+
+    /**
+     * Dotted proto package. Empty is not a package name; callers treat blank
+     * as “no package”.
+     */
+    public static boolean isPackageName(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        int start = 0;
+        int n = name.length();
+        for (int i = 0; i <= n; i++) {
+            if (i < n && name.charAt(i) != '.') {
+                continue;
+            }
+            if (i == start || !isIdentifier(name.substring(start, i))) {
+                return false;
+            }
+            start = i + 1;
         }
         return true;
     }

@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.processor.parse;
 
+import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
 import io.github.rawvoid.protovia.processor.model.EnumModel;
@@ -109,10 +110,25 @@ final class EnumParser {
         if (!hasZero) {
             diag.error(type, "proto3 enum " + type.getSimpleName() + " must have a constant with number 0");
         }
+        ProtoEnum meta = type.getAnnotation(ProtoEnum.class);
+        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String protoEnumName = meta == null || meta.name().isBlank()
+            ? type.getSimpleName().toString()
+            : meta.name().trim();
+        ExportNames.requirePackage(diag, type, protoPackage);
+        ExportNames.require(diag, type, protoEnumName);
         if (diag.failed()) {
             return null;
         }
         String pkg = Names.packageName(type);
-        return new EnumModel(type, Names.typeName(type, pkg), constants, unrecognized, reservedNumbers);
+        return EnumModel.builder()
+            .type(type)
+            .typeName(Names.typeName(type, pkg))
+            .protoPackage(protoPackage)
+            .protoEnumName(protoEnumName)
+            .constants(constants)
+            .unrecognized(unrecognized)
+            .reserved(reservedNumbers)
+            .build();
     }
 }

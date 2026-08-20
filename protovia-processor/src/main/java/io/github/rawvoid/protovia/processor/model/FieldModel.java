@@ -36,6 +36,11 @@ public final class FieldModel {
 
     public final int number;
     public final String name;
+    /**
+     * Protobuf export name. Empty means {@link #name}.
+     */
+    @Builder.Default
+    public final String protoName = "";
     public final String localName;
     public final FieldKind kind;
     public final ProtoType protoType;
@@ -66,6 +71,13 @@ public final class FieldModel {
     public final String arrayComponentType;
     @Singular("oneofCase")
     public final List<OneofCaseModel> oneofCases;
+
+    /**
+     * @return proto export name, falling back to the Java member name
+     */
+    public String exportName() {
+        return protoName == null || protoName.isEmpty() ? name : protoName;
+    }
 
     public boolean packable() {
         if (kind != FieldKind.REPEATED || element == null) {

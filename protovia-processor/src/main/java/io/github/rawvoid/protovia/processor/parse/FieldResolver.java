@@ -68,26 +68,37 @@ final class FieldResolver {
         }
         boolean optional = ann.optional() || javaOptional;
         TypeElement fieldAdapter = adapters.adapterFrom(adapters.protoFieldHost(origin), AdapterResolver.PROTO_FIELD_ANN);
+        FieldModel field;
         if (env.isMap(effective)) {
             if (optional) {
                 diag.error(origin, "map field '" + name + "' cannot be optional");
                 return null;
             }
-            return resolveMap(
+            field = resolveMap(
                 origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional, fieldAdapter);
-        }
-        if (env.isRepeatedContainer(effective)) {
+        } else if (env.isRepeatedContainer(effective)) {
             if (optional) {
                 diag.error(origin, "repeated field '" + name + "' cannot be optional");
                 return null;
             }
-            return resolveRepeated(
+            field = resolveRepeated(
                 origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional, fieldAdapter);
+        } else {
+            field = resolveSingular(new FieldRequest(
+                origin, name, effective, ann.type(), optional, ann.packed(),
+                accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
+                fieldAdapter, ann.number(), AdapterSite.SINGULAR));
         }
-        return resolveSingular(new FieldRequest(
-            origin, name, effective, ann.type(), optional, ann.packed(),
-            accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
-            fieldAdapter, ann.number(), AdapterSite.SINGULAR));
+        return attachProtoName(origin, ann.name(), name, field);
+    }
+
+    private FieldModel attachProtoName(Element origin, String declared, String javaName, FieldModel field) {
+        if (field == null) {
+            return null;
+        }
+        String protoName = ExportNames.orDefault(declared, javaName);
+        ExportNames.require(diag, origin, protoName);
+        return field.toBuilder().protoName(protoName).build();
     }
 
     FieldModel resolveSingular(FieldRequest req) {
