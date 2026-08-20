@@ -59,4 +59,18 @@ public final class WireType {
             && number <= MAX_FIELD_NUMBER
             && (number < RESERVED_NUMBER_MIN || number > RESERVED_NUMBER_MAX);
     }
+
+    /**
+     * Inclusive {@code [from, to]} of valid field numbers that does not
+     * cross {@code [19000, 19999]}.
+     */
+    public static boolean isValidFieldNumberRange(int from, int to) {
+        if (from > to) {
+            return false;
+        }
+        if (!isValidFieldNumber(from) || !isValidFieldNumber(to)) {
+            return false;
+        }
+        return to < RESERVED_NUMBER_MIN || from > RESERVED_NUMBER_MAX;
+    }
 }

@@ -57,7 +57,8 @@ final class OneofParser {
         String setter,
         String fieldName,
         String pkg,
-        Set<Integer> taken) {
+        Set<Integer> taken,
+        Reserved reserved) {
         AnnotationMirror oneofAnn = protoOneof != null
             ? protoOneof
             : adapters.findAnnotation(origin, AdapterResolver.PROTO_ONEOF_ANN);
@@ -84,7 +85,7 @@ final class OneofParser {
                 diag.error(origin, "oneof '" + name + "' has an unreadable @ProtoOneof value");
                 return null;
             }
-            ParsedCase parsedCase = parseCase(origin, name, type, caseMirror, pkg, taken, carrierOk);
+            ParsedCase parsedCase = parseCase(origin, name, type, caseMirror, pkg, taken, reserved, carrierOk);
             if (parsedCase != null) {
                 parsed.add(parsedCase);
             }
@@ -99,6 +100,7 @@ final class OneofParser {
         for (ParsedCase parsedCase : parsed) {
             cases.add(parsedCase.model);
         }
+        rejectReservedNames(origin, name, cases, reserved);
         return FieldModel.builder()
             .number(0)
             .name(name)
@@ -115,6 +117,22 @@ final class OneofParser {
             .build();
     }
 
+    private void rejectReservedNames(
+        Element origin,
+        String groupName,
+        List<OneofCaseModel> cases,
+        Reserved reserved) {
+        if (reserved.containsName(groupName)) {
+            diag.error(origin, "proto name '" + groupName + "' is reserved");
+        }
+        for (OneofCaseModel oneofCase : cases) {
+            String protoName = Names.oneofCaseProtoName(oneofCase);
+            if (reserved.containsName(protoName)) {
+                diag.error(origin, "proto name '" + protoName + "' is reserved");
+            }
+        }
+    }
+
     private ParsedCase parseCase(
         Element origin,
         String fieldName,
@@ -122,6 +140,7 @@ final class OneofParser {
         AnnotationMirror caseMirror,
         String pkg,
         Set<Integer> taken,
+        Reserved reserved,
         boolean checkAssignability) {
         TypeMirror ofType = ofType(caseMirror, origin);
         if (ofType == null) {
@@ -164,6 +183,10 @@ final class OneofParser {
         int number = number(caseMirror);
         if (!WireType.isValidFieldNumber(number)) {
             diag.error(origin, "invalid field number " + number);
+            return null;
+        }
+        if (reserved.containsNumber(number)) {
+            diag.error(origin, "field number " + number + " is reserved");
             return null;
         }
         if (checkAssignability && !assignable(origin, ofType, caseType, fieldType)) {

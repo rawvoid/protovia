@@ -44,6 +44,7 @@ public final class SchemaParser {
 
     private final TypeEnv env;
     private final Diagnostics diag;
+    private final ReservedParser reserved;
     private final EnumParser enums;
     private final AdapterResolver adapters;
     private final FieldResolver fields;
@@ -53,7 +54,8 @@ public final class SchemaParser {
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.env = new TypeEnv(types, elements);
         this.diag = new Diagnostics(messager);
-        this.enums = new EnumParser(diag);
+        this.reserved = new ReservedParser(diag);
+        this.enums = new EnumParser(diag, reserved);
         TypeClassifier classifier = new TypeClassifier(env, diag, enums);
         this.adapters = new AdapterResolver(env, diag, classifier);
         this.fields = new FieldResolver(env, diag, classifier, adapters);
@@ -118,6 +120,7 @@ public final class SchemaParser {
             : meta.name().trim();
 
         MessageScope scope = new MessageScope(type, pkg);
+        scope.reserved = reserved.parse(type, ReservedParser.Scope.MESSAGE);
         adapters.enter(type);
         try {
             ScanResult scanned = scanner.scan(type);
@@ -246,7 +249,8 @@ public final class SchemaParser {
             access.setter(),
             member.name(),
             scope.pkg,
-            scope.taken);
+            scope.taken,
+            scope.reserved);
         if (oneof != null && scope.claimed.add(member.name())) {
             scope.oneofs.add(oneof);
             if (member.recordComponent()) {

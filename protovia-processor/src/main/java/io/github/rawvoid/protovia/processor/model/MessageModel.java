@@ -31,7 +31,7 @@ import java.util.List;
  * @author Rawvoid
  */
 @Getter
-@Builder(builderClassName = "Builder", toBuilder = true)
+@Builder(toBuilder = true)
 @AllArgsConstructor
 public final class MessageModel {
 
@@ -48,6 +48,8 @@ public final class MessageModel {
     @Singular
     public final List<RecordComponentModel> recordComponents;
     public final UnknownField unknown;
+    @Builder.Default
+    public final Reserved reserved = Reserved.EMPTY;
 
     /**
      * @return {@code package.name} or just {@code name} when the proto package is empty

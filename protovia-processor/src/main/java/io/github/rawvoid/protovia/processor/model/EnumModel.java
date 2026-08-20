@@ -30,7 +30,7 @@ import java.util.List;
  * @author Rawvoid
  */
 @Getter
-@Builder(builderClassName = "Builder", toBuilder = true)
+@Builder(toBuilder = true)
 @AllArgsConstructor
 public final class EnumModel {
 
@@ -42,6 +42,8 @@ public final class EnumModel {
      * Java-only sentinel name, or {@code null}.
      */
     public final String unrecognized;
+    @Builder.Default
+    public final Reserved reserved = Reserved.EMPTY;
 
     public record Constant(String name, int number) {
     }
