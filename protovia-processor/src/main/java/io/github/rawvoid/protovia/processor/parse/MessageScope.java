@@ -117,7 +117,9 @@ final class MessageScope {
         for (OneofCaseModel oneofCase : oneof.oneofCases) {
             ok &= claimName(oneof.origin, oneofCase.exportName(), diag);
             if (oneofCase.empty() && oneofCase.type != null) {
-                ok &= claimName(oneof.origin, oneofCase.type.getSimpleName().toString(), diag);
+                String nested = oneofCase.type.getSimpleName().toString();
+                ok &= ExportNames.require(diag, oneof.origin, nested);
+                ok &= claimName(oneof.origin, nested, diag);
             }
         }
         return ok;

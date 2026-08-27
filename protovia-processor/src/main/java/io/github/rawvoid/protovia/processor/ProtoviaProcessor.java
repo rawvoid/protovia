@@ -19,13 +19,17 @@ package io.github.rawvoid.protovia.processor;
 import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.processor.gen.CodecGenerator;
+import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.parse.SchemaParser;
+import io.github.rawvoid.protovia.processor.proto.ProtoFileWriter;
+import io.github.rawvoid.protovia.processor.proto.ProtoPrinter;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
@@ -37,8 +41,8 @@ import java.io.Writer;
 import java.util.Set;
 
 /**
- * Isolating annotation processor that writes {@code XxxProtoCodec} next to each
- * {@code @ProtoMessage} type.
+ * Isolating annotation processor that writes {@code XxxProtoCodec} and a
+ * {@code .proto} resource for each {@code @ProtoMessage} / {@code @ProtoEnum}.
  *
  * @author Rawvoid
  */
@@ -46,6 +50,7 @@ import java.util.Set;
     "io.github.rawvoid.protovia.annotation.ProtoMessage",
     "io.github.rawvoid.protovia.annotation.ProtoEnum"
 })
+@SupportedOptions(ProtoFileWriter.PROTO_OUT_OPTION)
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public final class ProtoviaProcessor extends AbstractProcessor {
 
@@ -61,9 +66,14 @@ public final class ProtoviaProcessor extends AbstractProcessor {
             processingEnv.getElementUtils(),
             processingEnv.getMessager());
 
+        ProtoFileWriter protoFiles = new ProtoFileWriter(processingEnv);
+
         for (Element element : roundEnv.getElementsAnnotatedWith(ProtoEnum.class)) {
             if (element instanceof TypeElement type) {
-                parser.parseEnum(type);
+                EnumModel model = parser.parseEnum(type);
+                if (model != null) {
+                    protoFiles.write(type, model.protoFullName(), ProtoPrinter.print(model));
+                }
             }
         }
 
@@ -76,6 +86,7 @@ public final class ProtoviaProcessor extends AbstractProcessor {
                 continue;
             }
             writeCodec(type, model);
+            protoFiles.write(type, model.protoFullName(), ProtoPrinter.print(model));
         }
         return false;
     }

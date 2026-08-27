@@ -24,7 +24,7 @@ import io.github.rawvoid.protovia.wire.WireType;
 import javax.lang.model.element.TypeElement;
 
 /**
- * Reads {@link ProtoReserved} on a message or enum type.
+ * Reads {@link ProtoReserved} on a message, enum, or mixin superclass.
  *
  * @author Rawvoid
  */
