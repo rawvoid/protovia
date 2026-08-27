@@ -301,11 +301,23 @@ private Event event;
 
 ## Entity rules
 
-**POJO**
+**POJO (mutable)**
 
-- Non-abstract class, non-private no-arg constructor
-- Each `@ProtoField` needs a JavaBean getter+setter, or a non-private field
+- Public no-arg constructor
+- Each `@ProtoField` needs a JavaBean getter+setter, or a non-final public field
 - Unannotated members are ignored
+- Preferred when both a JavaBean path and a builder / all-args constructor exist
+
+**Immutable class**
+
+- Public getters (or public fields) for encode
+- Decode uses one public construction path, chosen in this order:
+  1. `@ProtoCreator` constructor or static factory
+  2. `@ProtoBuilder` (non-standard `builder()` / setter names)
+  3. `builder()` + `build()` + a setter per proto member (Lombok `@Builder` / `@SuperBuilder`, handwritten)
+  4. Public all-args constructor or public static factory whose parameters match proto members
+- Generated codecs live in `*.internal`, so the constructor / factory / `builder()` must be **public**. Lombok `@Value` defaults to a private constructor — use `@Builder`, `@Value(staticConstructor = "of")`, or `@AllArgsConstructor(access = PUBLIC)`
+- `mergeFrom` returns a new instance
 
 **Record**
 
@@ -330,7 +342,7 @@ private Event event;
 - A concrete `@ProtoMessage` class may extend a non-message class or abstract class. Superclass `@ProtoField` / `@ProtoOneof` / `@ProtoUnknown` members are merged into the leaf codec as one flat proto3 message.
 - The superclass must **not** be `@ProtoMessage`. No codec is generated for it; this is not wire polymorphism.
 - Duplicate field numbers, proto export names, or Java property names across the hierarchy fail compilation. There is no override and no same-name coexistence.
-- Inherited members need a public getter+setter or a public field (the generated codec lives in `.internal`). Field access casts to the superclass, so that type must be public; a package-private mixin must expose public getters and setters.
+- Inherited members need a public getter (and a public setter when the leaf is a mutable JavaBean) or a public field (the generated codec lives in `.internal`). Field access casts to the superclass, so that type must be public; a package-private mixin must expose public getters (and setters if mutable). An immutable leaf must bind inherited properties on its constructor, factory, or builder.
 - Generic bases work when the leaf binds the type arguments (`class UserPage extends PageResult<User> {}`). Raw / wildcard superclasses fail.
 - Prefer numbers 1–15 on shared bases, 16+ on leaves. If you change only annotations on a superclass and the leaf codec does not rebuild, clean rebuild (Isolating APT).
 
@@ -365,7 +377,7 @@ Default safety limits: 64 MiB per message, nesting depth 100. Override with `Pro
 
 ## Not in this release
 
-`.proto` import (Java stays the schema), proto2 required/default, `Struct` / `Value`, Lombok-specific integration.
+`.proto` import (Java stays the schema), proto2 required/default, `Struct` / `Value`.
 
 ## Build
 

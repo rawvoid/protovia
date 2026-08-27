@@ -14,15 +14,24 @@
  * limitations under the License.
  */
 
-package io.github.rawvoid.protovia.processor.parse;
+package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.processor.model.AccessKind;
+import io.github.rawvoid.protovia.annotation.ProtoField;
+import io.github.rawvoid.protovia.annotation.ProtoMessage;
+import lombok.Value;
 
 /**
- * How generated code reads and writes one member.
+ * Lombok {@code @Value(staticConstructor = "of")} immutable message.
  *
- * @param setter {@code null} when the member is a field, getter-only, or record component
  * @author Rawvoid
  */
-record Access(AccessKind kind, String readExpr, String setter) {
+@Value(staticConstructor = "of")
+@ProtoMessage
+public class FactoryUser {
+
+    @ProtoField(number = 1)
+    String name;
+
+    @ProtoField(number = 2)
+    int age;
 }

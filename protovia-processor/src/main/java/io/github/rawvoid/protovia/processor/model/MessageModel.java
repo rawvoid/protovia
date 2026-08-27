@@ -50,6 +50,8 @@ public final class MessageModel {
     public final UnknownField unknown;
     @Builder.Default
     public final Reserved reserved = Reserved.EMPTY;
+    @Builder.Default
+    public final Instantiation instantiation = Instantiation.MUTABLE;
 
     /**
      * @return {@code package.name} or just {@code name} when the proto package is empty

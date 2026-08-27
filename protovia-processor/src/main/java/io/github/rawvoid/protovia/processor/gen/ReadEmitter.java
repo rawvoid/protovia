@@ -46,7 +46,7 @@ final class ReadEmitter {
             .addModifiers(Modifier.PUBLIC)
             .returns(msgType)
             .addParameter(PROTO_READER, "reader");
-        if (model.record) {
+        if (model.instantiation.usesLocals()) {
             readFrom.addStatement("return mergeFrom(reader, null)");
         } else {
             readFrom.addStatement("return mergeFrom(reader, new $T())", messageType(model));
@@ -56,8 +56,8 @@ final class ReadEmitter {
 
     private static MethodSpec mergeFrom(MessageModel model, TypeName msgType) {
         CodeBlock.Builder body = CodeBlock.builder();
-        if (model.record) {
-            readRecord(body, model);
+        if (model.instantiation.usesLocals()) {
+            readLocals(body, model);
         } else {
             readPojo(body, model);
         }
@@ -85,17 +85,72 @@ final class ReadEmitter {
         b.addStatement("return msg");
     }
 
-    private static void readRecord(CodeBlock.Builder b, MessageModel model) {
-        for (MessageModel.RecordComponentModel component : model.recordComponents) {
-            recordComponentInit(b, model, component);
+    private static void readLocals(CodeBlock.Builder b, MessageModel model) {
+        if (model.record) {
+            for (MessageModel.RecordComponentModel component : model.recordComponents) {
+                recordComponentInit(b, model, component);
+            }
+        } else {
+            for (FieldModel field : model.fields) {
+                fieldLocalInit(b, field);
+            }
+            if (model.unknown != null) {
+                unknownLocalInit(b, model);
+            }
         }
         initArrayBuilders(b, model);
         readLoop(b, model, true);
         finalizeArrayBuilders(b, model, null);
-        String args = model.recordComponents.stream()
-            .map(c -> Names.safeLocal(c.name()))
-            .collect(Collectors.joining(", "));
-        b.addStatement("return new $T($L)", messageType(model), args);
+        instantiate(b, model);
+    }
+
+    private static void instantiate(CodeBlock.Builder b, MessageModel model) {
+        TypeName msgType = messageType(model);
+        switch (model.instantiation) {
+            case Instantiation.Constructor(var slots) -> {
+                String args = slots.stream()
+                    .map(Instantiation.Slot::localName)
+                    .collect(Collectors.joining(", "));
+                b.addStatement("return new $T($L)", msgType, args);
+            }
+            case Instantiation.Factory(var method, var slots) -> {
+                String args = slots.stream()
+                    .map(Instantiation.Slot::localName)
+                    .collect(Collectors.joining(", "));
+                b.addStatement("return $T.$L($L)", msgType, method, args);
+            }
+            case Instantiation.Builder(var factory, var nested, var build, var bindings) -> {
+                if (factory != null && !factory.isEmpty()) {
+                    b.addStatement("var builder = $T.$L()", msgType, factory);
+                } else {
+                    b.addStatement("var builder = new $T.$L()", msgType, nested);
+                }
+                for (Instantiation.BuilderBinding binding : bindings) {
+                    b.addStatement("builder.$L($L)", binding.setterName(), binding.localName());
+                }
+                b.addStatement("return builder.$L()", build);
+            }
+            case Instantiation.Mutable() -> throw new IllegalStateException("locals path requires a constructor, factory, or builder");
+        }
+    }
+
+    private static void fieldLocalInit(CodeBlock.Builder b, FieldModel field) {
+        String local = field.localName;
+        String fromExisting = field.accessOn("existing");
+        if (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP) {
+            b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
+                javaType(field), local, fromExisting, newImpl(field, fromExisting), defaultValue(field.javaType));
+            return;
+        }
+        b.addStatement("$T $L = existing != null ? $L : $L",
+            javaType(field), local, fromExisting, defaultValue(field.javaType));
+    }
+
+    private static void unknownLocalInit(CodeBlock.Builder b, MessageModel model) {
+        MessageModel.UnknownField u = model.unknown;
+        String fromExisting = u.accessOn("existing");
+        b.addStatement("$T $L = existing != null && $L != null ? $L : $T.EMPTY",
+            UNKNOWN_FIELDS, u.localName(), fromExisting, fromExisting, UNKNOWN_FIELDS);
     }
 
     private static void initArrayBuilders(CodeBlock.Builder b, MessageModel model) {

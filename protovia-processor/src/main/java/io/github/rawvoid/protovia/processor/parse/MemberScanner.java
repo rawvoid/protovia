@@ -176,15 +176,20 @@ final class MemberScanner {
         Map<String, ExecutableElement> methods) {
         String setter = Names.setterName(property);
         ExecutableElement set = methods.get(setter);
-        if (set == null || set.getParameters().size() != 1 || !set.getModifiers().contains(Modifier.PUBLIC)
-            || !method.getModifiers().contains(Modifier.PUBLIC)) {
-            diag.error(method, "annotated getter '" + method.getSimpleName() + "' has no matching public setter " + setter);
+        if (!method.getModifiers().contains(Modifier.PUBLIC)) {
+            diag.error(method, "annotated getter '" + method.getSimpleName() + "' must be public");
             return null;
         }
+        if (set != null && set.getParameters().size() == 1 && set.getModifiers().contains(Modifier.PUBLIC)) {
+            return new Access(
+                AccessKind.GETTER_SETTER,
+                "value." + method.getSimpleName() + "()",
+                setter);
+        }
         return new Access(
-            AccessKind.GETTER_SETTER,
+            AccessKind.GETTER,
             "value." + method.getSimpleName() + "()",
-            setter);
+            null);
     }
 
     private Access resolvePojoAccess(
@@ -208,10 +213,16 @@ final class MemberScanner {
                 "value." + getter.getSimpleName() + "()",
                 setter.getSimpleName().toString());
         }
+        if (getterOk) {
+            return new Access(
+                AccessKind.GETTER,
+                "value." + getter.getSimpleName() + "()",
+                null);
+        }
         if (field.getModifiers().contains(Modifier.PUBLIC)) {
             return new Access(AccessKind.FIELD, "value." + name, null);
         }
-        diag.error(field, "field '" + name + "' needs a public JavaBean getter and setter, or must be public");
+        diag.error(field, "field '" + name + "' needs a public JavaBean getter, or must be public");
         return null;
     }
 

@@ -600,7 +600,7 @@ class InheritanceProcessorTest {
                 @ProtoMessage
                 public class User extends Base {}
                 """));
-        assertThat(compilation).hadErrorContaining("getter and setter");
+        assertThat(compilation).hadErrorContaining("needs a public JavaBean getter");
     }
 
     @Test

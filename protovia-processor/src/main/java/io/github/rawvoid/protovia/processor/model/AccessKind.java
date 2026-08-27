@@ -17,11 +17,13 @@
 package io.github.rawvoid.protovia.processor.model;
 
 /**
- * How generated code reads and writes a member.
+ * How generated code reads a member. Writes go through setters / field
+ * assignment only for mutable messages; immutable decode uses locals.
  *
  * @author Rawvoid
  */
 public enum AccessKind {
+    GETTER,
     GETTER_SETTER,
     FIELD,
     RECORD

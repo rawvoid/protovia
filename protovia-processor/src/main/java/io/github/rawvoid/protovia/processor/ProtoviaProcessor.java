@@ -38,6 +38,8 @@ import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -55,10 +57,20 @@ import java.util.Set;
 public final class ProtoviaProcessor extends AbstractProcessor {
 
     private final CodecGenerator generator = new CodecGenerator();
+    private final Map<String, TypeElement> deferredMessages = new LinkedHashMap<>();
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (roundEnv.processingOver()) {
+            if (!deferredMessages.isEmpty()) {
+                SchemaParser parser = new SchemaParser(
+                    processingEnv.getTypeUtils(),
+                    processingEnv.getElementUtils(),
+                    processingEnv.getMessager());
+                for (TypeElement type : deferredMessages.values()) {
+                    parser.parseMessage(type, false);
+                }
+            }
             return false;
         }
         SchemaParser parser = new SchemaParser(
@@ -77,18 +89,32 @@ public final class ProtoviaProcessor extends AbstractProcessor {
             }
         }
 
+        Map<String, TypeElement> messages = new LinkedHashMap<>(deferredMessages);
         for (Element element : roundEnv.getElementsAnnotatedWith(ProtoMessage.class)) {
-            if (!(element instanceof TypeElement type)) {
-                continue;
+            if (element instanceof TypeElement type) {
+                messages.put(type.getQualifiedName().toString(), type);
             }
-            MessageModel model = parser.parseMessage(type);
-            if (model == null) {
-                continue;
-            }
-            writeCodec(type, model);
-            protoFiles.write(type, model.protoFullName(), ProtoPrinter.print(model));
+        }
+        for (TypeElement type : messages.values()) {
+            handleMessage(parser, protoFiles, type);
         }
         return false;
+    }
+
+    private void handleMessage(SchemaParser parser, ProtoFileWriter protoFiles, TypeElement type) {
+        String fqcn = type.getQualifiedName().toString();
+        boolean retry = deferredMessages.containsKey(fqcn);
+        MessageModel model = parser.parseMessage(type, !retry);
+        if (parser.wasDeferred()) {
+            deferredMessages.put(fqcn, type);
+            return;
+        }
+        deferredMessages.remove(fqcn);
+        if (model == null) {
+            return;
+        }
+        writeCodec(type, model);
+        protoFiles.write(type, model.protoFullName(), ProtoPrinter.print(model));
     }
 
     private void writeCodec(TypeElement type, MessageModel model) {

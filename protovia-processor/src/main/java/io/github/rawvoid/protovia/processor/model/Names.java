@@ -154,6 +154,10 @@ public final class Names {
         return "set" + capitalize(property);
     }
 
+    public static String witherName(String property) {
+        return "with" + capitalize(property);
+    }
+
     /**
      * @param fieldNumber protobuf field number
      * @return {@code TAG_<number>} used in generated codecs

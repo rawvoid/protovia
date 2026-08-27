@@ -73,7 +73,7 @@ class ProtoviaProcessorTest {
                 "public class Bad {",
                 "  @ProtoField(number = 1) private int age;",
                 "}"));
-        assertThat(compilation).hadErrorContaining("getter and setter");
+        assertThat(compilation).hadErrorContaining("needs a public JavaBean getter");
     }
 
     @Test
@@ -91,7 +91,6 @@ class ProtoviaProcessorTest {
                 "  @ProtoField(number = 1) public int getAge() { return age; }",
                 "}"));
         assertThat(compilation).hadErrorContaining("already annotated");
-        assertThat(compilation).hadErrorContaining("getter and setter");
     }
 
     @Test
