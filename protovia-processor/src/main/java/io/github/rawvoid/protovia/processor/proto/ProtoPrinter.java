@@ -97,7 +97,7 @@ public final class ProtoPrinter {
                     if (c.empty()) {
                         continue;
                     }
-                    addImport(imports, self, c.selfMessage ? c.payload : payload(c));
+                    addImport(imports, self, c.payload);
                 }
             } else {
                 addImport(imports, self, field);
@@ -119,9 +119,9 @@ public final class ProtoPrinter {
             case SCALAR -> {
             }
             default -> {
-                String path = ProtoNames.importPath(field);
-                if (path != null && !path.equals(selfPath)) {
-                    imports.add(path);
+                ProtoNames.Named named = ProtoNames.named(field);
+                if (named != null && !named.importPath().equals(selfPath)) {
+                    imports.add(named.importPath());
                 }
             }
         }
@@ -149,16 +149,12 @@ public final class ProtoPrinter {
             if (c.empty()) {
                 typeName = c.type != null ? c.type.getSimpleName().toString() : c.typeName;
             } else {
-                typeName = typeRef(payload(c), currentPackage);
+                typeName = typeRef(c.payload, currentPackage);
             }
             out.append("    ").append(typeName).append(' ').append(c.exportName())
                 .append(" = ").append(c.number).append(";\n");
         }
         out.append("  }\n");
-    }
-
-    private static FieldModel payload(OneofCaseModel c) {
-        return c.payload;
     }
 
     private static void printField(StringBuilder out, String indent, FieldModel field, String currentPackage) {
@@ -189,11 +185,11 @@ public final class ProtoPrinter {
         if (field.kind == FieldKind.SCALAR) {
             return scalarName(field.protoType);
         }
-        String full = ProtoNames.typeFullName(field);
-        if (full != null) {
-            return ProtoNames.qualify(full, currentPackage);
+        ProtoNames.Named named = ProtoNames.named(field);
+        if (named == null) {
+            throw new IllegalStateException("missing proto type for " + field.kind + " field " + field.exportName());
         }
-        return scalarName(field.protoType);
+        return ProtoNames.qualify(named.fullName(), currentPackage);
     }
 
     private static String scalarName(ProtoType type) {

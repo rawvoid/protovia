@@ -31,7 +31,6 @@ import java.nio.file.Path;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Rawvoid
@@ -104,8 +103,6 @@ class ProtoExportTest {
               ACTIVE = 1;
             }
             """, proto(compilation, "status.proto"));
-        assertTrue(proto(compilation, "status.proto").contains("ACTIVE"));
-        assertTrue(!proto(compilation, "status.proto").contains("UNRECOGNIZED"));
     }
 
     @Test
@@ -142,7 +139,6 @@ class ProtoExportTest {
                 }
                 """));
         assertThat(compilation).succeeded();
-        String contact = proto(compilation, "contact.proto");
         assertEquals("""
             syntax = "proto3";
 
@@ -155,9 +151,7 @@ class ProtoExportTest {
                 Address address = 11;
               }
             }
-            """, contact);
-        assertTrue(!contact.contains("Email"));
-        assertTrue(!contact.contains("Home"));
+            """, proto(compilation, "contact.proto"));
     }
 
     @Test
@@ -239,7 +233,7 @@ class ProtoExportTest {
                   public Object event;
                 }
                 """));
-        assertThat(bad).hadErrorContaining("is a proto keyword");
+        assertThat(bad).hadErrorContaining("empty oneof case type 'string' is a proto keyword; rename the Java type");
     }
 
     @Test
@@ -316,6 +310,60 @@ class ProtoExportTest {
               string name = 16;
             }
             """, proto(compilation, "user.proto"));
+    }
+
+    @Test
+    void repeatedMessageImportsPeerFile() {
+        Compilation compilation = compile(
+            src("demo.Address", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record Address(@ProtoField(number = 1) String city) {}
+                """),
+            src("demo.Book", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                import java.util.List;
+                @ProtoMessage
+                public class Book {
+                  @ProtoField(number = 1) public List<Address> places;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            import "address.proto";
+
+            message Book {
+              repeated Address places = 1;
+            }
+            """, proto(compilation, "book.proto"));
+    }
+
+    @Test
+    void selfRecursiveMessageDoesNotImportItself() {
+        Compilation compilation = compile(
+            src("demo.Node", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public class Node {
+                  @ProtoField(number = 1) public Node next;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            message Node {
+              Node next = 1;
+            }
+            """, proto(compilation, "node.proto"));
     }
 
     @Test

@@ -19,7 +19,8 @@ package io.github.rawvoid.protovia.processor.proto;
 import java.util.Map;
 
 /**
- * Official well-known types. We {@code import} them and never generate the body.
+ * Codec class → official proto full name and import. Bodies are never generated.
+ * Java type → codec lives in {@code TypeClassifier.WELL_KNOWN_CODECS}.
  *
  * @author Rawvoid
  */
@@ -30,16 +31,12 @@ final class WellKnownProtos {
 
     private static final String WRAPPERS = "google/protobuf/wrappers.proto";
 
-    private static final Map<String, Type> BY_CLASS = Map.ofEntries(
+    private static final Map<String, Type> BY_CODEC = Map.ofEntries(
         entry("io.github.rawvoid.protovia.wkt.TimestampCodec", "google.protobuf.Timestamp",
             "google/protobuf/timestamp.proto"),
-        entry("java.time.Instant", "google.protobuf.Timestamp", "google/protobuf/timestamp.proto"),
         entry("io.github.rawvoid.protovia.wkt.DurationCodec", "google.protobuf.Duration",
             "google/protobuf/duration.proto"),
-        entry("java.time.Duration", "google.protobuf.Duration", "google/protobuf/duration.proto"),
         entry("io.github.rawvoid.protovia.wkt.AnyCodec", "google.protobuf.Any",
-            "google/protobuf/any.proto"),
-        entry("io.github.rawvoid.protovia.ProtoAny", "google.protobuf.Any",
             "google/protobuf/any.proto"),
         entry("io.github.rawvoid.protovia.wkt.DoubleValue", "google.protobuf.DoubleValue", WRAPPERS),
         entry("io.github.rawvoid.protovia.wkt.FloatValue", "google.protobuf.FloatValue", WRAPPERS),
@@ -54,15 +51,15 @@ final class WellKnownProtos {
     private WellKnownProtos() {
     }
 
-    static Type ofClass(String qualifiedName) {
-        return qualifiedName == null ? null : BY_CLASS.get(qualifiedName);
+    static Type ofCodec(String codecName) {
+        return codecName == null ? null : BY_CODEC.get(codecName);
     }
 
     static boolean isWellKnownFullName(String fullName) {
         return fullName != null && fullName.startsWith("google.protobuf.");
     }
 
-    private static Map.Entry<String, Type> entry(String javaClass, String fullName, String importPath) {
-        return Map.entry(javaClass, new Type(fullName, importPath));
+    private static Map.Entry<String, Type> entry(String codec, String fullName, String importPath) {
+        return Map.entry(codec, new Type(fullName, importPath));
     }
 }

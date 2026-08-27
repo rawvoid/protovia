@@ -29,6 +29,9 @@ import java.util.Locale;
  */
 final class ProtoNames {
 
+    record Named(String fullName, String importPath) {
+    }
+
     private ProtoNames() {
     }
 
@@ -63,38 +66,29 @@ final class ProtoNames {
     static String messageFullName(TypeElement type) {
         ProtoMessage meta = type.getAnnotation(ProtoMessage.class);
         if (meta == null) {
-            WellKnownProtos.Type wkt = WellKnownProtos.ofClass(type.getQualifiedName().toString());
-            return wkt != null ? wkt.fullName() : type.getSimpleName().toString();
+            return type.getSimpleName().toString();
         }
         String name = meta.name().isBlank() ? type.getSimpleName().toString() : meta.name().trim();
         String pkg = meta.packageName().isBlank() ? "" : meta.packageName().trim();
         return pkg.isEmpty() ? name : pkg + "." + name;
     }
 
-    static String typeFullName(FieldModel field) {
+    /**
+     * Enum, user message, or well-known codec. {@code null} for scalars.
+     */
+    static Named named(FieldModel field) {
         if (field.enumModel != null) {
-            return field.enumModel.protoFullName();
+            String full = field.enumModel.protoFullName();
+            return new Named(full, filePath(full));
         }
         if (field.messageType != null) {
-            return messageFullName(field.messageType);
+            String full = messageFullName(field.messageType);
+            return new Named(full, filePath(full));
         }
-        WellKnownProtos.Type wkt = WellKnownProtos.ofClass(field.codecName);
-        if (wkt == null && field.javaType != null) {
-            wkt = WellKnownProtos.ofClass(field.javaType.toString());
-        }
-        return wkt != null ? wkt.fullName() : null;
-    }
-
-    static String importPath(FieldModel field) {
-        WellKnownProtos.Type wkt = WellKnownProtos.ofClass(field.codecName);
-        if (wkt == null && field.messageType != null) {
-            wkt = WellKnownProtos.ofClass(field.messageType.getQualifiedName().toString());
-        }
+        WellKnownProtos.Type wkt = WellKnownProtos.ofCodec(field.codecName);
         if (wkt != null) {
-            return wkt.importPath();
+            return new Named(wkt.fullName(), wkt.importPath());
         }
-        String full = typeFullName(field);
-        return full == null ? null : filePath(full);
+        return null;
     }
-
 }
