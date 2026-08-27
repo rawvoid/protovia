@@ -25,7 +25,8 @@ import java.lang.annotation.Target;
 
 /**
  * Occupies retired protobuf field numbers and names so they cannot be reused.
- * Repeatable. Meaningful only on {@link ProtoMessage} and {@link ProtoEnum}.
+ * Repeatable. Apply to {@link ProtoMessage}, {@link ProtoEnum}, or a mixin
+ * superclass whose reserved set is unioned into the {@code @ProtoMessage} leaf.
  *
  * <pre>{@code
  * @ProtoMessage

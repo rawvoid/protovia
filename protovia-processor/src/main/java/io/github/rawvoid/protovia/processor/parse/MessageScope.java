@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.ProtoIdent;
 import io.github.rawvoid.protovia.processor.model.Reserved;
 import io.github.rawvoid.protovia.wire.WireType;
 
@@ -117,7 +118,18 @@ final class MessageScope {
         for (OneofCaseModel oneofCase : oneof.oneofCases) {
             ok &= claimName(oneof.origin, oneofCase.exportName(), diag);
             if (oneofCase.empty() && oneofCase.type != null) {
-                ok &= claimName(oneof.origin, oneofCase.type.getSimpleName().toString(), diag);
+                String nested = oneofCase.type.getSimpleName().toString();
+                if (!ProtoIdent.isExportName(nested)) {
+                    if (ProtoIdent.isKeyword(nested)) {
+                        diag.error(oneof.origin, "empty oneof case type '" + nested
+                            + "' is a proto keyword; rename the Java type");
+                    } else {
+                        diag.error(oneof.origin, "empty oneof case type '" + nested
+                            + "' is not a proto identifier");
+                    }
+                    ok = false;
+                }
+                ok &= claimName(oneof.origin, nested, diag);
             }
         }
         return ok;
