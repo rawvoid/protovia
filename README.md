@@ -1,6 +1,6 @@
 # Protovia
 
-Lightweight compile-time Protobuf for Java 21. **The Java entity is the schema** — no `.proto` files.
+Lightweight compile-time Protobuf for Java 21. **The Java entity is the schema** — you do not write `.proto` files. Compiling emits them.
 
 Annotate a POJO or record, compile, and get a generated zero-reflection `ProtoCodec` that speaks official proto3 wire format.
 
@@ -79,11 +79,36 @@ implementation("io.github.rawvoid:protovia-core:1.0-SNAPSHOT")
 annotationProcessor("io.github.rawvoid:protovia-processor:1.0-SNAPSHOT")
 ```
 
+To copy generated `.proto` files into a directory for buf / Go, pass `-Aprotovia.protoOut`:
+
+Maven:
+
+```xml
+<plugin>
+  <artifactId>maven-compiler-plugin</artifactId>
+  <configuration>
+    <compilerArgs>
+      <arg>-Aprotovia.protoOut=${project.basedir}/src/main/proto</arg>
+    </compilerArgs>
+  </configuration>
+</plugin>
+```
+
+Gradle:
+
+```kotlin
+tasks.compileJava {
+    options.compilerArgs.add("-Aprotovia.protoOut=${layout.projectDirectory.dir("src/main/proto")}")
+}
+```
+
+Without that option, the files still land on class output (and in the jar) as `example/v1/user.proto`.
+
 ## How it works
 
 1. You mark types with `@ProtoMessage` / `@ProtoEnum` and members with `@ProtoField(number = N)`.
-2. At compile time the processor writes `UserProtoCodec` in the **same package** (nested types become `Outer$InnerProtoCodec`).
-3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields.
+2. At compile time the processor writes `internal.UserProtoCodec` and a `.proto` resource (`example.v1.User` → `example/v1/user.proto`). Nested types become `Outer$InnerProtoCodec`.
+3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields. The `.proto` is for other languages and docs; the runtime codec does not read it.
 
 Generated codecs:
 
@@ -117,6 +142,12 @@ Generated codecs:
 | `Optional<T>`                                             | proto3 optional T                     |                                           |
 
 Map keys must be integral, `bool`, or `string`. Field numbers are **required** and must stay stable.
+
+**Export names.** Wire uses numbers only. `.proto` field names default to the Java member (or the oneof-case rule below). Override with `@ProtoField(name=…)`, `@ProtoOneof(name=…)`, or `@ProtoOneof.Case(name=…)`. There is no automatic snake_case. Names must be proto identifiers and cannot be keywords (`string`, `message`, …).
+
+**Reserved.** `@ProtoReserved` on a `@ProtoMessage` / `@ProtoEnum` (or a mixin superclass) occupies retired numbers and proto names so they cannot be reused. They are written into the generated `.proto` as `reserved`.
+
+**oneof export.** A wrapper record without `@ProtoMessage` flattens to its payload (`Email(String)` → `string email`). A case type that is itself `@ProtoMessage` exports as that message, even if it has a single string field. Empty `record Ping() {}` becomes a nested `message Ping {}` in the parent file.
 
 ## Custom adapters
 
