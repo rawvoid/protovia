@@ -17,6 +17,7 @@
 package io.github.rawvoid.protovia.processor.parse;
 
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.Instantiation;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
@@ -43,6 +44,11 @@ final class MessageScope {
     final Set<String> claimed = new HashSet<>();
     final Set<String> claimedJava = new HashSet<>();
     final List<FieldModel> oneofs = new ArrayList<>();
+    /**
+     * {@link #addField} / oneof bind order: Java source / mixin walk order, not
+     * field-number order. Used to match all-args constructors.
+     */
+    final List<FieldModel> bindOrder = new ArrayList<>();
     final List<MessageModel.RecordComponentModel> recordComponents = new ArrayList<>();
     final Set<String> annotatedViaField = new HashSet<>();
     MessageModel.UnknownField unknown;
@@ -74,7 +80,13 @@ final class MessageScope {
             return false;
         }
         byNumber.put(field.number, field);
+        bindOrder.add(field);
         return true;
+    }
+
+    void addOneof(FieldModel oneof) {
+        oneofs.add(oneof);
+        bindOrder.add(oneof);
     }
 
     /**
@@ -175,7 +187,14 @@ final class MessageScope {
         recordComponents.add(new MessageModel.RecordComponentModel(name, type, field));
     }
 
-    MessageModel toModel(String codecPackageName, String protoPackage, String protoMessageName, String typeName, String codecSimpleName, boolean record) {
+    MessageModel toModel(
+        String codecPackageName,
+        String protoPackage,
+        String protoMessageName,
+        String typeName,
+        String codecSimpleName,
+        boolean record,
+        Instantiation instantiation) {
         List<FieldModel> fields = new ArrayList<>(byNumber.values());
         fields.sort(Comparator.comparingInt(f -> f.number));
         fields.addAll(oneofs);
@@ -191,6 +210,7 @@ final class MessageScope {
             fields,
             recordComponents,
             unknown,
-            reserved);
+            reserved,
+            instantiation);
     }
 }

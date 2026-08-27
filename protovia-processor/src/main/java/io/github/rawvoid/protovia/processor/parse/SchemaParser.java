@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
 import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.Instantiation;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.Reserved;
@@ -27,7 +28,6 @@ import io.github.rawvoid.protovia.processor.model.Reserved;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeKind;
-import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.List;
@@ -50,6 +50,8 @@ public final class SchemaParser {
     private final OneofParser oneofs;
     private final MemberScanner scanner;
     private final InheritanceWalker inheritance;
+    private final ConstructionResolver construction;
+    private boolean deferred;
 
     public SchemaParser(Types types, Elements elements, Messager messager) {
         this.env = new TypeEnv(types, elements);
@@ -62,6 +64,7 @@ public final class SchemaParser {
         this.oneofs = new OneofParser(env, diag, fields, adapters);
         this.scanner = new MemberScanner(diag);
         this.inheritance = new InheritanceWalker(env, diag);
+        this.construction = new ConstructionResolver(env, diag);
     }
 
     /**
@@ -80,19 +83,35 @@ public final class SchemaParser {
     }
 
     /**
+     * @return {@code true} if construction resolution was deferred for Lombok
+     */
+    public boolean wasDeferred() {
+        return deferred;
+    }
+
+    /**
      * @param type {@code @ProtoMessage} class or record
-     * @return model, or {@code null} if the message is invalid
+     * @return model, or {@code null} if the message is invalid or deferred
      */
     public MessageModel parseMessage(TypeElement type) {
+        return parseMessage(type, false);
+    }
+
+    /**
+     * @param allowDefer when {@code true}, Lombok types missing a construction
+     *                   path are skipped this round instead of failing
+     */
+    public MessageModel parseMessage(TypeElement type, boolean allowDefer) {
+        deferred = false;
         diag.push();
         try {
-            return doParseMessage(type);
+            return doParseMessage(type, allowDefer);
         } finally {
             diag.popAndMerge();
         }
     }
 
-    private MessageModel doParseMessage(TypeElement type) {
+    private MessageModel doParseMessage(TypeElement type, boolean allowDefer) {
         if (type.getKind() != ElementKind.CLASS && type.getKind() != ElementKind.RECORD) {
             diag.error(type, "@ProtoMessage is only valid on classes and records");
             return null;
@@ -107,9 +126,6 @@ public final class SchemaParser {
         }
 
         boolean record = type.getKind() == ElementKind.RECORD;
-        if (!record) {
-            checkNoArgConstructor(type);
-        }
 
         String pkg = Names.packageName(type);
         String typeName = Names.typeName(type, pkg);
@@ -151,13 +167,22 @@ public final class SchemaParser {
             if (diag.failed()) {
                 return null;
             }
+            Instantiation instantiation = construction.resolve(type, scope, record, allowDefer);
+            if (construction.wasDeferred()) {
+                deferred = true;
+                return null;
+            }
+            if (instantiation == null) {
+                return null;
+            }
             return scope.toModel(
                 Names.codecPackageName(type),
                 protoPackage,
                 protoMessageName,
                 typeName,
                 Names.codecSimpleName(env.elements, type),
-                record);
+                record,
+                instantiation);
         } finally {
             adapters.exit();
         }
@@ -283,7 +308,7 @@ public final class SchemaParser {
             scope.reserved);
         if (oneof != null && scope.claimJava(oneof.origin, oneof.name, diag)
             && scope.claimOneof(oneof, diag)) {
-            scope.oneofs.add(oneof);
+            scope.addOneof(oneof);
             if (member.recordComponent()) {
                 scope.addComponent(member.name(), oneof.javaType, oneof);
             }
@@ -308,7 +333,7 @@ public final class SchemaParser {
             diag.error(member.origin(), "inherited field '" + member.name()
                 + "' on " + superType.element().getSimpleName()
                 + " is not accessible from " + Names.codecPackageName(scope.type)
-                + "; make the superclass public, or provide a public getter and setter");
+                + "; make the superclass public, or provide a public getter");
             return null;
         }
         return access;
@@ -359,14 +384,5 @@ public final class SchemaParser {
             return true;
         }
         return false;
-    }
-
-    private void checkNoArgConstructor(TypeElement type) {
-        for (ExecutableElement ctor : ElementFilter.constructorsIn(type.getEnclosedElements())) {
-            if (ctor.getParameters().isEmpty() && !ctor.getModifiers().contains(Modifier.PRIVATE)) {
-                return;
-            }
-        }
-        diag.error(type, "@ProtoMessage class " + type.getSimpleName() + " needs a non-private no-arg constructor");
     }
 }

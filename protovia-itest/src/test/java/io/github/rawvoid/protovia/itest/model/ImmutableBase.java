@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 
-package io.github.rawvoid.protovia.processor.parse;
+package io.github.rawvoid.protovia.itest.model;
 
-import io.github.rawvoid.protovia.processor.model.AccessKind;
+import io.github.rawvoid.protovia.annotation.ProtoField;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 
 /**
- * How generated code reads and writes one member.
+ * Mixin for {@code @SuperBuilder} flattening tests. Not a {@code @ProtoMessage}.
  *
- * @param setter {@code null} when the member is a field, getter-only, or record component
  * @author Rawvoid
  */
-record Access(AccessKind kind, String readExpr, String setter) {
+@Getter
+@SuperBuilder
+@EqualsAndHashCode
+public abstract class ImmutableBase {
+
+    @ProtoField(number = 1)
+    private final String id;
 }
