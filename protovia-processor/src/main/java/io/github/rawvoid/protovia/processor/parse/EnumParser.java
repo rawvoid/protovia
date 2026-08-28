@@ -21,6 +21,7 @@ import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
 import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.Names;
+import io.github.rawvoid.protovia.processor.model.ProtoIdent;
 import io.github.rawvoid.protovia.processor.model.Reserved;
 
 import javax.lang.model.element.ElementKind;
@@ -64,6 +65,12 @@ final class EnumParser {
             diag.error(type, "@ProtoEnum is only valid on enum types");
             return null;
         }
+        ProtoEnum meta = type.getAnnotation(ProtoEnum.class);
+        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String protoEnumName = meta == null || meta.name().isBlank()
+            ? type.getSimpleName().toString()
+            : meta.name().trim();
+
         Reserved reservedNumbers = reserved.parse(type, ReservedParser.Scope.ENUM);
         List<EnumModel.Constant> constants = new ArrayList<>();
         Set<Integer> numbers = new HashSet<>();
@@ -99,22 +106,18 @@ final class EnumParser {
                 hasZero = true;
             }
             String constantName = constant.getSimpleName().toString();
+            String protoConstantName = ProtoIdent.enumConstantName(protoEnumName, constantName);
             if (reservedNumbers.containsNumber(number)) {
                 diag.error(constant, "enum number " + number + " is reserved");
             }
-            if (reservedNumbers.containsName(constantName)) {
-                diag.error(constant, "proto name '" + constantName + "' is reserved");
+            if (reservedNumbers.containsName(protoConstantName)) {
+                diag.error(constant, "proto name '" + protoConstantName + "' is reserved");
             }
             constants.add(new EnumModel.Constant(constantName, number));
         }
         if (!hasZero) {
             diag.error(type, "proto3 enum " + type.getSimpleName() + " must have a constant with number 0");
         }
-        ProtoEnum meta = type.getAnnotation(ProtoEnum.class);
-        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
-        String protoEnumName = meta == null || meta.name().isBlank()
-            ? type.getSimpleName().toString()
-            : meta.name().trim();
         ExportNames.requirePackage(diag, type, protoPackage);
         ExportNames.require(diag, type, protoEnumName);
         if (diag.failed()) {

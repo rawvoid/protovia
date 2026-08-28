@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.processor.model;
 
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -94,6 +95,27 @@ public final class ProtoIdent {
             start = i + 1;
         }
         return true;
+    }
+
+    /**
+     * CamelCase / PascalCase / acronyms to {@code lower_snake_case}.
+     * {@code AncillaryBookingRQ} → {@code ancillary_booking_rq}.
+     */
+    public static String toSnakeCase(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        String split = name
+            .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+            .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2");
+        return split.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Protobuf enum constant: {@code CabinClass} + {@code BUSINESS} → {@code CABIN_CLASS_BUSINESS}.
+     */
+    public static String enumConstantName(String enumTypeName, String constantName) {
+        return toSnakeCase(enumTypeName).toUpperCase(Locale.ROOT) + "_" + constantName;
     }
 
     private static boolean isIdentStart(char c) {
