@@ -41,7 +41,7 @@ byte[] bytes = Protovia.toBytes(user);
 User back = Protovia.fromBytes(bytes, User.class);
 ```
 
-The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type onto the class output (and into the jar), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `FlightOfferId` → `flight_offer_id.proto`). Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go.
+The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type onto the class output (and into the jar), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go.
 
 ## Modules
 
@@ -373,7 +373,7 @@ ProtoAny packed = Protovia.pack(user);           // type.googleapis.com/<protoFu
 User back = Protovia.unpack(packed, User.class);
 ```
 
-`pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. `Integer` stays int32; use `Int32Value` when you need the wrapper message.
+`pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. Blank `packageName` defaults to the Java package (`demo.User` → `type.googleapis.com/demo.User`). `Integer` stays int32; use `Int32Value` when you need the wrapper message.
 
 Default safety limits: 64 MiB per message, nesting depth 100. Override with `Protovia.setMaxMessageSize` / `setMaxDepth`.
 

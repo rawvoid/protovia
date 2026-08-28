@@ -36,8 +36,9 @@ public interface ProtoCodec<T> {
 
     /**
      * Protobuf full name ({@code package.Message}) used by Any {@code type_url}.
-     * Generated codecs use {@code @ProtoMessage(packageName, name)}; well-known
-     * types return {@code google.protobuf.*}. Default is the Java simple name.
+     * Generated codecs use {@code @ProtoMessage(packageName, name)}, defaulting
+     * {@code packageName} to the Java package; well-known types return
+     * {@code google.protobuf.*}. Hand-written codecs default to the Java simple name.
      */
     default String protoFullName() {
         return type().getSimpleName();

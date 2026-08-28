@@ -78,11 +78,15 @@ class ProtoExportTest {
                 }
                 """));
         assertThat(compilation).succeeded();
+        assertThat(compilation).generatedSourceFile("demo.internal.UserProtoCodec")
+            .contentsAsUtf8String().contains("return \"demo.User\"");
         assertEquals("""
             syntax = "proto3";
 
-            import "address.proto";
-            import "status.proto";
+            package demo;
+
+            import "demo/address.proto";
+            import "demo/status.proto";
 
             message User {
               string name = 1;
@@ -94,15 +98,17 @@ class ProtoExportTest {
               optional int32 level = 8;
               repeated int32 unpacked = 10 [packed = false];
             }
-            """, proto(compilation, "user.proto"));
+            """, proto(compilation, "demo/user.proto"));
         assertEquals("""
             syntax = "proto3";
+
+            package demo;
 
             enum Status {
               STATUS_UNKNOWN = 0;
               STATUS_ACTIVE = 1;
             }
-            """, proto(compilation, "status.proto"));
+            """, proto(compilation, "demo/status.proto"));
     }
 
     @Test
@@ -142,27 +148,33 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
+            package demo;
+
             enum ErrorCategory {
               ERROR_CATEGORY_SYSTEM = 0;
               ERROR_CATEGORY_SEAT = 5;
             }
-            """, proto(compilation, "error_category.proto"));
+            """, proto(compilation, "demo/error_category.proto"));
         assertEquals("""
             syntax = "proto3";
+
+            package demo;
 
             enum AncillaryCategory {
               ANCILLARY_CATEGORY_BAGGAGE = 0;
               ANCILLARY_CATEGORY_SEAT = 1;
             }
-            """, proto(compilation, "ancillary_category.proto"));
+            """, proto(compilation, "demo/ancillary_category.proto"));
         assertEquals("""
             syntax = "proto3";
+
+            package demo;
 
             enum CabinClass {
               CABIN_CLASS_FIRST = 0;
               CABIN_CLASS_BUSINESS = 1;
             }
-            """, proto(compilation, "cabin_class.proto"));
+            """, proto(compilation, "demo/cabin_class.proto"));
     }
 
     @Test
@@ -196,16 +208,18 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
-            import "ancillary_booking_rq.proto";
-            import "flight_offer_id.proto";
+            package demo;
+
+            import "demo/ancillary_booking_rq.proto";
+            import "demo/flight_offer_id.proto";
 
             message Wrap {
               AncillaryBookingRQ rq = 1;
               FlightOfferId id = 2;
             }
-            """, proto(compilation, "wrap.proto"));
-        proto(compilation, "ancillary_booking_rq.proto");
-        proto(compilation, "flight_offer_id.proto");
+            """, proto(compilation, "demo/wrap.proto"));
+        proto(compilation, "demo/ancillary_booking_rq.proto");
+        proto(compilation, "demo/flight_offer_id.proto");
     }
 
     @Test
@@ -245,7 +259,9 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
-            import "address.proto";
+            package demo;
+
+            import "demo/address.proto";
 
             message Contact {
               string name = 1;
@@ -254,7 +270,7 @@ class ProtoExportTest {
                 Address address = 11;
               }
             }
-            """, proto(compilation, "contact.proto"));
+            """, proto(compilation, "demo/contact.proto"));
     }
 
     @Test
@@ -281,14 +297,16 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
-            import "email.proto";
+            package demo;
+
+            import "demo/email.proto";
 
             message Box {
               oneof data {
                 Email email = 10;
               }
             }
-            """, proto(compilation, "box.proto"));
+            """, proto(compilation, "demo/box.proto"));
     }
 
     @Test
@@ -312,6 +330,8 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
+            package demo;
+
             message Box {
               message Ping {
               }
@@ -319,7 +339,7 @@ class ProtoExportTest {
                 Ping ping = 20;
               }
             }
-            """, proto(ok, "box.proto"));
+            """, proto(ok, "demo/box.proto"));
 
         Compilation bad = compile(
             src("demo.string", """
@@ -408,11 +428,13 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
+            package demo;
+
             message User {
               string id = 1;
               string name = 16;
             }
-            """, proto(compilation, "user.proto"));
+            """, proto(compilation, "demo/user.proto"));
     }
 
     @Test
@@ -439,12 +461,14 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
-            import "address.proto";
+            package demo;
+
+            import "demo/address.proto";
 
             message Book {
               repeated Address places = 1;
             }
-            """, proto(compilation, "book.proto"));
+            """, proto(compilation, "demo/book.proto"));
     }
 
     @Test
@@ -463,10 +487,12 @@ class ProtoExportTest {
         assertEquals("""
             syntax = "proto3";
 
+            package demo;
+
             message Node {
               Node next = 1;
             }
-            """, proto(compilation, "node.proto"));
+            """, proto(compilation, "demo/node.proto"));
     }
 
     @Test
