@@ -28,7 +28,7 @@
 
     <artifactId>protovia-bench</artifactId>
     <name>protovia-bench</name>
-    <description>JMH comparison of Protovia against protobuf-java 4.35.1 generated messages</description>
+    <description>JMH comparison of Protovia against protobuf-java generated messages</description>
 
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>
