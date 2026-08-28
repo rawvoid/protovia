@@ -146,7 +146,7 @@ class ProtoExportTest {
               ERROR_CATEGORY_SYSTEM = 0;
               ERROR_CATEGORY_SEAT = 5;
             }
-            """, proto(compilation, "errorcategory.proto"));
+            """, proto(compilation, "error_category.proto"));
         assertEquals("""
             syntax = "proto3";
 
@@ -154,7 +154,7 @@ class ProtoExportTest {
               ANCILLARY_CATEGORY_BAGGAGE = 0;
               ANCILLARY_CATEGORY_SEAT = 1;
             }
-            """, proto(compilation, "ancillarycategory.proto"));
+            """, proto(compilation, "ancillary_category.proto"));
         assertEquals("""
             syntax = "proto3";
 
@@ -162,7 +162,50 @@ class ProtoExportTest {
               CABIN_CLASS_FIRST = 0;
               CABIN_CLASS_BUSINESS = 1;
             }
-            """, proto(compilation, "cabinclass.proto"));
+            """, proto(compilation, "cabin_class.proto"));
+    }
+
+    @Test
+    void protoFileNamesAreSnakeCase() {
+        Compilation compilation = compile(
+            src("demo.AncillaryBookingRQ", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record AncillaryBookingRQ(@ProtoField(number = 1) String id) {}
+                """),
+            src("demo.FlightOfferId", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record FlightOfferId(@ProtoField(number = 1) String token) {}
+                """),
+            src("demo.Wrap", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public class Wrap {
+                  @ProtoField(number = 1) public AncillaryBookingRQ rq;
+                  @ProtoField(number = 2) public FlightOfferId id;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            import "ancillary_booking_rq.proto";
+            import "flight_offer_id.proto";
+
+            message Wrap {
+              AncillaryBookingRQ rq = 1;
+              FlightOfferId id = 2;
+            }
+            """, proto(compilation, "wrap.proto"));
+        proto(compilation, "ancillary_booking_rq.proto");
+        proto(compilation, "flight_offer_id.proto");
     }
 
     @Test
