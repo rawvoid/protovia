@@ -58,7 +58,10 @@ class ProtoExportTest {
               bytes payload = 11;
             }
             """, resource("user.proto"));
-        assertFalse(resource("status.proto").contains("UNRECOGNIZED"));
+        String status = resource("status.proto");
+        assertFalse(status.contains("UNRECOGNIZED"));
+        assertTrue(status.contains("STATUS_UNKNOWN = 0;"));
+        assertTrue(status.contains("STATUS_ACTIVE = 1;"));
     }
 
     @Test

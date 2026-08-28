@@ -22,6 +22,7 @@ import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
+import io.github.rawvoid.protovia.processor.model.ProtoIdent;
 import io.github.rawvoid.protovia.processor.model.Reserved;
 
 import java.util.ArrayList;
@@ -66,8 +67,12 @@ public final class ProtoPrinter {
         header(out, model.protoPackage, Set.of());
         out.append("enum ").append(model.protoEnumName).append(" {\n");
         printReserved(out, "  ", model.reserved);
+        String enumTypeName = model.protoEnumName == null || model.protoEnumName.isEmpty()
+            ? model.type.getSimpleName().toString()
+            : model.protoEnumName;
         for (EnumModel.Constant constant : model.constants) {
-            out.append("  ").append(constant.name()).append(" = ").append(constant.number()).append(";\n");
+            String protoName = ProtoIdent.enumConstantName(enumTypeName, constant.name());
+            out.append("  ").append(protoName).append(" = ").append(constant.number()).append(";\n");
         }
         out.append("}\n");
         return out.toString();

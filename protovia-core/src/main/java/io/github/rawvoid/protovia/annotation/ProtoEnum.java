@@ -20,6 +20,8 @@ import java.lang.annotation.*;
 
 /**
  * Marks a Java enum as a Protobuf enum. Each constant must have {@link ProtoEnumValue}.
+ * Generated {@code .proto} constants are prefixed with the enum type name
+ * ({@code Status.ACTIVE} → {@code STATUS_ACTIVE}).
  *
  * @author Rawvoid
  */

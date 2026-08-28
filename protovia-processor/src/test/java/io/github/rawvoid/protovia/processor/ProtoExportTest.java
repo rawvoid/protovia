@@ -99,10 +99,70 @@ class ProtoExportTest {
             syntax = "proto3";
 
             enum Status {
-              UNKNOWN = 0;
-              ACTIVE = 1;
+              STATUS_UNKNOWN = 0;
+              STATUS_ACTIVE = 1;
             }
             """, proto(compilation, "status.proto"));
+    }
+
+    @Test
+    void prefixesEnumConstantsWithTypeName() {
+        Compilation compilation = compile(
+            src("demo.ErrorCategory", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum
+                public enum ErrorCategory {
+                  @ProtoEnumValue(0) SYSTEM,
+                  @ProtoEnumValue(5) SEAT
+                }
+                """),
+            src("demo.AncillaryCategory", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum
+                public enum AncillaryCategory {
+                  @ProtoEnumValue(0) BAGGAGE,
+                  @ProtoEnumValue(1) SEAT
+                }
+                """),
+            src("demo.Cabin", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum(name = "CabinClass")
+                public enum Cabin {
+                  @ProtoEnumValue(0) FIRST,
+                  @ProtoEnumValue(1) BUSINESS
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            enum ErrorCategory {
+              ERROR_CATEGORY_SYSTEM = 0;
+              ERROR_CATEGORY_SEAT = 5;
+            }
+            """, proto(compilation, "errorcategory.proto"));
+        assertEquals("""
+            syntax = "proto3";
+
+            enum AncillaryCategory {
+              ANCILLARY_CATEGORY_BAGGAGE = 0;
+              ANCILLARY_CATEGORY_SEAT = 1;
+            }
+            """, proto(compilation, "ancillarycategory.proto"));
+        assertEquals("""
+            syntax = "proto3";
+
+            enum CabinClass {
+              CABIN_CLASS_FIRST = 0;
+              CABIN_CLASS_BUSINESS = 1;
+            }
+            """, proto(compilation, "cabinclass.proto"));
     }
 
     @Test

@@ -313,13 +313,30 @@ class ReservedProcessorTest {
             import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
             import io.github.rawvoid.protovia.annotation.ProtoReserved;
             @ProtoEnum
+            @ProtoReserved(names = "STATUS_BANNED")
+            public enum Status {
+              @ProtoEnumValue(0) UNKNOWN,
+              @ProtoEnumValue(1) BANNED
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("proto name 'STATUS_BANNED' is reserved");
+    }
+
+    @Test
+    void reservedEnumJavaNameDoesNotBlockPrefixedConstant() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            import io.github.rawvoid.protovia.annotation.ProtoReserved;
+            @ProtoEnum
             @ProtoReserved(names = "BANNED")
             public enum Status {
               @ProtoEnumValue(0) UNKNOWN,
               @ProtoEnumValue(1) BANNED
             }
             """));
-        assertThat(compilation).hadErrorContaining("proto name 'BANNED' is reserved");
+        assertThat(compilation).succeeded();
     }
 
     @Test

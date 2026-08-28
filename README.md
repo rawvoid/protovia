@@ -143,7 +143,9 @@ Generated codecs:
 
 Map keys must be integral, `bool`, or `string`. Field numbers are **required** and must stay stable.
 
-**Export names.** Wire uses numbers only. `.proto` field names default to the Java member (or the oneof-case rule below). Override with `@ProtoField(name=…)`, `@ProtoOneof(name=…)`, or `@ProtoOneof.Case(name=…)`. There is no automatic snake_case. Names must be proto identifiers and cannot be keywords (`string`, `message`, …).
+**Export names.** Wire uses numbers only. `.proto` field names default to the Java member (or the oneof-case rule below). Override with `@ProtoField(name=…)`, `@ProtoOneof(name=…)`, or `@ProtoOneof.Case(name=…)`. There is no automatic snake_case for fields. Names must be proto identifiers and cannot be keywords (`string`, `message`, …).
+
+**Enum constants.** Java stays `Status.ACTIVE`. The generated `.proto` prefixes every constant with the enum type name (`STATUS_ACTIVE`) so values stay unique under protobuf’s C++ scoping rules. `@ProtoEnum(name=…)` is the prefix source. `@ProtoReserved(names=…)` on an enum refers to those prefixed proto names.
 
 **Reserved.** `@ProtoReserved` on a `@ProtoMessage` / `@ProtoEnum` (or a mixin superclass) occupies retired numbers and proto names so they cannot be reused. They are written into the generated `.proto` as `reserved`.
 
