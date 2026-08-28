@@ -44,7 +44,8 @@ import java.util.Set;
 
 /**
  * Isolating annotation processor that writes {@code XxxProtoCodec} and a
- * {@code .proto} resource for each {@code @ProtoMessage} / {@code @ProtoEnum}.
+ * {@code .proto} file under {@code SOURCE_OUTPUT/proto/} for each
+ * {@code @ProtoMessage} / {@code @ProtoEnum}.
  *
  * @author Rawvoid
  */

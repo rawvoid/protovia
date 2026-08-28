@@ -27,14 +27,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Writes a {@code .proto} to {@code CLASS_OUTPUT} and optionally mirrors it to
- * {@code -Aprotovia.protoOut}.
+ * Writes a {@code .proto} to {@code SOURCE_OUTPUT/proto/} and optionally mirrors
+ * it to {@code -Aprotovia.protoOut}.
  *
  * @author Rawvoid
  */
 public final class ProtoFileWriter {
 
     public static final String PROTO_OUT_OPTION = "protovia.protoOut";
+
+    private static final String SOURCE_PROTO_ROOT = "proto";
 
     private final ProcessingEnvironment env;
 
@@ -44,27 +46,28 @@ public final class ProtoFileWriter {
 
     public void write(TypeElement origin, String protoFullName, String text) {
         String relative = ProtoNames.filePath(protoFullName);
-        writeClassOutput(origin, relative, text);
+        writeSourceOutput(origin, relative, text);
         String protoOut = env.getOptions().get(PROTO_OUT_OPTION);
         if (protoOut != null && !protoOut.isBlank()) {
             mirror(origin, protoOut.trim(), relative, text);
         }
     }
 
-    private void writeClassOutput(TypeElement origin, String relative, String text) {
-        int slash = relative.lastIndexOf('/');
-        String pkg = slash < 0 ? "" : relative.substring(0, slash).replace('/', '.');
-        String fileName = slash < 0 ? relative : relative.substring(slash + 1);
+    private void writeSourceOutput(TypeElement origin, String relative, String text) {
+        String resource = SOURCE_PROTO_ROOT + "/" + relative;
+        int slash = resource.lastIndexOf('/');
+        String pkg = slash < 0 ? "" : resource.substring(0, slash).replace('/', '.');
+        String fileName = slash < 0 ? resource : resource.substring(slash + 1);
         try {
             FileObject file = env.getFiler().createResource(
-                StandardLocation.CLASS_OUTPUT, pkg, fileName, origin);
+                StandardLocation.SOURCE_OUTPUT, pkg, fileName, origin);
             try (Writer writer = file.openWriter()) {
                 writer.write(text);
             }
         } catch (IOException e) {
             env.getMessager().printMessage(
                 Diagnostic.Kind.ERROR,
-                "failed to write " + relative + ": " + e.getMessage(),
+                "failed to write " + resource + ": " + e.getMessage(),
                 origin);
         }
     }

@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static com.google.testing.compile.Compiler.javac;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Rawvoid
@@ -78,6 +79,7 @@ class ProtoExportTest {
                 }
                 """));
         assertThat(compilation).succeeded();
+        assertTrue(compilation.generatedFile(StandardLocation.CLASS_OUTPUT, "demo/user.proto").isEmpty());
         assertThat(compilation).generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String().contains("return \"demo.User\"");
         assertEquals("""
@@ -538,8 +540,9 @@ class ProtoExportTest {
     }
 
     private static String proto(Compilation compilation, String path) {
-        JavaFileObject file = compilation.generatedFile(StandardLocation.CLASS_OUTPUT, path)
-            .orElseThrow(() -> new AssertionError("missing " + path + ": " + compilation.generatedFiles()));
+        String sourcePath = "proto/" + path;
+        JavaFileObject file = compilation.generatedFile(StandardLocation.SOURCE_OUTPUT, sourcePath)
+            .orElseThrow(() -> new AssertionError("missing " + sourcePath + ": " + compilation.generatedFiles()));
         try {
             return file.getCharContent(true).toString();
         } catch (IOException e) {
