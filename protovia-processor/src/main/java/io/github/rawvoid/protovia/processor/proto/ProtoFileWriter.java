@@ -25,10 +25,13 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Writes a {@code .proto} to {@code SOURCE_OUTPUT/proto/} and optionally mirrors
- * it to {@code -Aprotovia.protoOut}.
+ * it to {@code -Aprotovia.protoOut}. Colliding snake_case paths in one
+ * compilation are reported as errors instead of overwriting.
  *
  * @author Rawvoid
  */
@@ -39,6 +42,7 @@ public final class ProtoFileWriter {
     private static final String SOURCE_PROTO_ROOT = "proto";
 
     private final ProcessingEnvironment env;
+    private final Map<String, TypeElement> written = new LinkedHashMap<>();
 
     public ProtoFileWriter(ProcessingEnvironment env) {
         this.env = env;
@@ -46,6 +50,18 @@ public final class ProtoFileWriter {
 
     public void write(TypeElement origin, String protoFullName, String text) {
         String relative = ProtoNames.filePath(protoFullName);
+        TypeElement previous = written.putIfAbsent(relative, origin);
+        if (previous != null && !previous.getQualifiedName().contentEquals(origin.getQualifiedName())) {
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "proto file '" + relative + "' collides with " + origin.getQualifiedName(),
+                previous);
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "proto file '" + relative + "' collides with " + previous.getQualifiedName(),
+                origin);
+            return;
+        }
         writeSourceOutput(origin, relative, text);
         String protoOut = env.getOptions().get(PROTO_OUT_OPTION);
         if (protoOut != null && !protoOut.isBlank()) {
