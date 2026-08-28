@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.processor.parse;
 
+import io.github.rawvoid.protovia.annotation.ProtoDeterministic;
 import io.github.rawvoid.protovia.annotation.ProtoEnum;
 import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
 import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
@@ -66,6 +67,9 @@ final class EnumParser {
         if (type.getKind() != ElementKind.ENUM) {
             diag.error(type, "@ProtoEnum is only valid on enum types");
             return null;
+        }
+        if (type.getAnnotation(ProtoDeterministic.class) != null) {
+            diag.error(type, DeterministicResolver.ONLY_MAPS);
         }
         ProtoEnum meta = type.getAnnotation(ProtoEnum.class);
         String protoPackage = Names.protoPackage(type, meta == null ? "" : meta.packageName());

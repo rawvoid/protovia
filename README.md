@@ -149,6 +149,25 @@ Map keys must be integral, `bool`, or `string`. Field numbers are **required** a
 
 **Reserved.** `@ProtoReserved` on a `@ProtoMessage` / `@ProtoEnum` (or a mixin superclass) occupies retired numbers and proto names so they cannot be reused. They are written into the generated `.proto` as `reserved`.
 
+**Deterministic maps.** Map fields are written in `Map` iteration order (`LinkedHashMap` = insertion order). Annotate with `@ProtoDeterministic` to sort entries by **wire key** so the same logical map yields the same bytes (signing, diffs). Resolution, first match wins: field / getter / record component → `@ProtoMessage` type → mixin superclasses (near to far) → the leaf type's `package-info` → off.
+
+```java
+@ProtoField(number = 1)
+@ProtoDeterministic
+Map<String, Integer> scores;          // this field only
+
+@ProtoMessage
+@ProtoDeterministic
+public class SignedEnvelope { ... }   // every map on this message
+
+@ProtoDeterministic                   // default for every @ProtoMessage in the package
+package example.v1;
+```
+
+A mixin superclass annotated `@ProtoDeterministic` applies to **every map** on each `@ProtoMessage` leaf that extends it, including maps the subclass declares. `@ProtoDeterministic(false)` on a field or on the leaf opts out. Nested messages are independent: annotating `User` does not sort maps inside `Address`. Non-map members and `@ProtoEnum` types cannot carry the annotation.
+
+Sort order is Java natural order for `string` / `bool` / signed integers, unsigned order for `uint32` / `fixed32` / `uint64` / `fixed64`. Adapted keys are sorted after `toWire`. This is not byte-identical to C++ `deterministic_serialization`. Unannotated maps keep the previous write path with no extra allocation. The generated `.proto` is unchanged (`map<k, v>`).
+
 **oneof export.** A wrapper record without `@ProtoMessage` flattens to its payload (`Email(String)` → `string email`). A case type that is itself `@ProtoMessage` exports as that message, even if it has a single string field. Empty `record Ping() {}` becomes a nested `message Ping {}` in the parent file.
 
 ## Custom adapters

@@ -17,6 +17,7 @@
 package io.github.rawvoid.protovia.processor.gen;
 
 import com.palantir.javapoet.*;
+import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
@@ -75,6 +76,39 @@ final class WireCodegen {
         }
         assignToWire(b, field, javaValue, wireName);
         return wireName;
+    }
+
+    /**
+     * Iterates map entries in write order: sorted by wire key when
+     * {@link FieldModel#deterministic} is set, otherwise {@code entrySet()}.
+     * Size and write must use the same order so {@code SizeCache} stays aligned.
+     */
+    static void forEachMapEntry(CodeBlock.Builder b, FieldModel field) {
+        if (field.deterministic) {
+            b.beginControlFlow("for ($T.Entry<$T, $T> e : $T.sortedEntries($L, $L))",
+                MAP, boxedType(field.mapKey), boxedType(field.mapValue),
+                PROTO_MAPS, field.localName, keyComparator(field));
+        } else {
+            b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
+                MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
+        }
+    }
+
+    static CodeBlock keyComparator(FieldModel field) {
+        CodeBlock wireOrder = wireKeyOrder(field.mapKey.protoType);
+        if (field.mapKey.adapterType == null) {
+            return wireOrder;
+        }
+        return CodeBlock.of("$T.comparing(k -> $L.toWire(k), $L)",
+            COMPARATOR, adapterInstance(field.mapKey), wireOrder);
+    }
+
+    static CodeBlock wireKeyOrder(ProtoType protoType) {
+        return switch (protoType) {
+            case UINT32, FIXED32 -> CodeBlock.of("$T::compareUnsigned", Integer.class);
+            case UINT64, FIXED64 -> CodeBlock.of("$T::compareUnsigned", Long.class);
+            default -> CodeBlock.of("$T.naturalOrder()", COMPARATOR);
+        };
     }
 
     static String oneofWireLocal(OneofCaseModel c) {

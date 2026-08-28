@@ -46,6 +46,7 @@ public final class SchemaParser {
     private final ReservedParser reserved;
     private final EnumParser enums;
     private final AdapterResolver adapters;
+    private final DeterministicResolver deterministic;
     private final FieldResolver fields;
     private final OneofParser oneofs;
     private final MemberScanner scanner;
@@ -60,7 +61,8 @@ public final class SchemaParser {
         this.enums = new EnumParser(diag, reserved);
         TypeClassifier classifier = new TypeClassifier(env, diag, enums);
         this.adapters = new AdapterResolver(env, diag, classifier);
-        this.fields = new FieldResolver(env, diag, classifier, adapters);
+        this.deterministic = new DeterministicResolver(env, diag);
+        this.fields = new FieldResolver(env, diag, classifier, adapters, deterministic);
         this.oneofs = new OneofParser(env, diag, fields, adapters);
         this.scanner = new MemberScanner(diag);
         this.inheritance = new InheritanceWalker(env, diag);
@@ -146,6 +148,7 @@ public final class SchemaParser {
         reservedUnion.addAll(reserved.parse(type, ReservedParser.Scope.MESSAGE));
         scope.reserved = reservedUnion.build();
         adapters.enter(type);
+        deterministic.enter(type);
         try {
             for (InheritanceWalker.SuperType superType : supers) {
                 ScanResult scanned = scanner.scan(superType.element());
@@ -185,6 +188,7 @@ public final class SchemaParser {
                 instantiation);
         } finally {
             adapters.exit();
+            deterministic.exit();
         }
     }
 
@@ -266,6 +270,7 @@ public final class SchemaParser {
         if (alreadyAnnotatedOnGetter(member, scope)) {
             return;
         }
+        deterministic.reject(member.origin());
         if (!scope.checkUnknownType(member.origin(), member.type(), env, diag)) {
             return;
         }
@@ -290,6 +295,7 @@ public final class SchemaParser {
         if (alreadyAnnotatedOnGetter(member, scope)) {
             return;
         }
+        deterministic.reject(member.origin());
         Access access = resolveAccess(member, scope, methods, superType);
         if (access == null) {
             return;

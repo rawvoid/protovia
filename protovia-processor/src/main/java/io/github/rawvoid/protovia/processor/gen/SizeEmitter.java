@@ -153,8 +153,7 @@ final class SizeEmitter {
 
     private static void computeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
-        b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
-            MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
+        forEachMapEntry(b, field);
         b.addStatement("size += $T.lengthDelimited($L, $L(e.getKey(), e.getValue(), cache))",
             CODED_SIZE, field.number, mapEntrySizeOf(field));
         b.endControlFlow();

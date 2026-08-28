@@ -171,8 +171,7 @@ final class WriteEmitter {
 
     private static void writeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
-        b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
-            MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
+        forEachMapEntry(b, field);
         b.addStatement("$L(writer, e.getKey(), e.getValue())", mapEntryWrite(field));
         b.endControlFlow();
         b.endControlFlow();

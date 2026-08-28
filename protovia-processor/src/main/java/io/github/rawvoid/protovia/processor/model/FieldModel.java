@@ -46,6 +46,11 @@ public final class FieldModel {
     public final ProtoType protoType;
     public final boolean optional;
     public final boolean packed;
+    /**
+     * Sort map entries by wire key on write. Ignored for non-map fields.
+     */
+    @Builder.Default
+    public final boolean deterministic = false;
     public final boolean primitive;
     public final boolean javaOptional;
     public final boolean byteArray;

@@ -40,12 +40,19 @@ final class FieldResolver {
     private final Diagnostics diag;
     private final TypeClassifier classifier;
     private final AdapterResolver adapters;
+    private final DeterministicResolver deterministic;
 
-    FieldResolver(TypeEnv env, Diagnostics diag, TypeClassifier classifier, AdapterResolver adapters) {
+    FieldResolver(
+        TypeEnv env,
+        Diagnostics diag,
+        TypeClassifier classifier,
+        AdapterResolver adapters,
+        DeterministicResolver deterministic) {
         this.env = env;
         this.diag = diag;
         this.classifier = classifier;
         this.adapters = adapters;
+        this.deterministic = deterministic;
     }
 
     FieldModel resolveField(
@@ -76,6 +83,9 @@ final class FieldResolver {
             }
             field = resolveMap(
                 origin, name, effective, ann, accessKind, readExpr, setter, fieldName, pkg, javaOptional, fieldAdapter);
+            if (field != null) {
+                field = field.toBuilder().deterministic(deterministic.resolve(origin)).build();
+            }
         } else if (env.isRepeatedContainer(effective)) {
             if (optional) {
                 diag.error(origin, "repeated field '" + name + "' cannot be optional");
@@ -88,6 +98,9 @@ final class FieldResolver {
                 origin, name, effective, ann.type(), optional, ann.packed(),
                 accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
                 fieldAdapter, ann.number(), AdapterSite.SINGULAR));
+        }
+        if (field != null && field.kind != FieldKind.MAP) {
+            deterministic.reject(origin);
         }
         return attachProtoName(origin, ann.name(), name, field);
     }
