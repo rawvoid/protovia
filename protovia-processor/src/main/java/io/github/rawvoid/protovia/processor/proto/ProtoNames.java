@@ -18,9 +18,9 @@ package io.github.rawvoid.protovia.processor.proto;
 
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.ProtoIdent;
 
 import javax.lang.model.element.TypeElement;
-import java.util.Locale;
 
 /**
  * Proto full names, import paths, and type references for {@code .proto} export.
@@ -38,7 +38,7 @@ final class ProtoNames {
     static String filePath(String fullName) {
         String simple = simpleName(fullName);
         String pkg = packageName(fullName);
-        String file = simple.toLowerCase(Locale.ROOT) + ".proto";
+        String file = ProtoIdent.toSnakeCase(simple) + ".proto";
         return pkg.isEmpty() ? file : pkg.replace('.', '/') + "/" + file;
     }
 

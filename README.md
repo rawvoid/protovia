@@ -41,7 +41,7 @@ byte[] bytes = Protovia.toBytes(user);
 User back = Protovia.fromBytes(bytes, User.class);
 ```
 
-The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type onto the class output (and into the jar), using the same names as protobuf imports (`example.v1.User` → `example/v1/user.proto`). Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go.
+The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type onto the class output (and into the jar), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `FlightOfferId` → `flight_offer_id.proto`). Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go.
 
 ## Modules
 
