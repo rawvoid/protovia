@@ -245,7 +245,7 @@ class ExportNameProcessorTest {
     }
 
     @Test
-    void camelCaseEnumConstantFails() {
+    void mixedCaseEnumConstantsNormalize() {
         Compilation compilation = compile(src("demo.Status", """
             package demo;
             import io.github.rawvoid.protovia.annotation.ProtoEnum;
@@ -253,24 +253,25 @@ class ExportNameProcessorTest {
             @ProtoEnum
             public enum Status {
               @ProtoEnumValue(0) Unknown,
-              @ProtoEnumValue(1) ACTIVE
+              @ProtoEnumValue(1) ActiveUser
             }
             """));
-        assertThat(compilation).hadErrorContaining("enum constant Unknown must be UPPER_SNAKE_CASE");
+        assertThat(compilation).succeeded();
     }
 
     @Test
-    void lowerCaseEnumConstantFails() {
+    void normalizedEnumConstantNamesCollide() {
         Compilation compilation = compile(src("demo.Status", """
             package demo;
             import io.github.rawvoid.protovia.annotation.ProtoEnum;
             import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
             @ProtoEnum
             public enum Status {
-              @ProtoEnumValue(0) unknown
+              @ProtoEnumValue(0) Unknown,
+              @ProtoEnumValue(1) UNKNOWN
             }
             """));
-        assertThat(compilation).hadErrorContaining("enum constant unknown must be UPPER_SNAKE_CASE");
+        assertThat(compilation).hadErrorContaining("proto name 'STATUS_UNKNOWN' collides with Unknown");
     }
 
     @Test

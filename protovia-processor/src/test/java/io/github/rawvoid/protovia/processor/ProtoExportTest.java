@@ -180,6 +180,32 @@ class ProtoExportTest {
     }
 
     @Test
+    void snakeCasesJavaEnumConstants() {
+        Compilation compilation = compile(
+            src("demo.Kind", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum
+                public enum Kind {
+                  @ProtoEnumValue(0) Unknown,
+                  @ProtoEnumValue(1) ActiveUser
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            package demo;
+
+            enum Kind {
+              KIND_UNKNOWN = 0;
+              KIND_ACTIVE_USER = 1;
+            }
+            """, proto(compilation, "demo/kind.proto"));
+    }
+
+    @Test
     void protoFileNamesAreSnakeCase() {
         Compilation compilation = compile(
             src("demo.AncillaryBookingRQ", """

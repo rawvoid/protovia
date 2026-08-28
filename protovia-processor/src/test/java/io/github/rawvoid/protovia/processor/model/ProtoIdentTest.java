@@ -19,8 +19,6 @@ package io.github.rawvoid.protovia.processor.model;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Rawvoid
@@ -46,21 +44,10 @@ class ProtoIdentTest {
         assertEquals("ERROR_CATEGORY_SEAT", ProtoIdent.enumConstantName("ErrorCategory", "SEAT"));
         assertEquals("ANCILLARY_CATEGORY_SEAT", ProtoIdent.enumConstantName("AncillaryCategory", "SEAT"));
         assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "UNKNOWN"));
+        assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "Unknown"));
+        assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "unknown"));
+        assertEquals("STATUS_ACTIVE_USER", ProtoIdent.enumConstantName("Status", "ActiveUser"));
+        assertEquals("STATUS_HTTP_OK", ProtoIdent.enumConstantName("Status", "HTTP_OK"));
         assertEquals("FOO_BAR_UNKNOWN", ProtoIdent.enumConstantName("FooBar", "UNKNOWN"));
-    }
-
-    @Test
-    void upperSnakeCaseAcceptsProtobufEnumStyle() {
-        assertTrue(ProtoIdent.isUpperSnakeCase("UNKNOWN"));
-        assertTrue(ProtoIdent.isUpperSnakeCase("HTTP_OK"));
-        assertTrue(ProtoIdent.isUpperSnakeCase("A"));
-        assertTrue(ProtoIdent.isUpperSnakeCase("A1"));
-        assertFalse(ProtoIdent.isUpperSnakeCase("Unknown"));
-        assertFalse(ProtoIdent.isUpperSnakeCase("unknown"));
-        assertFalse(ProtoIdent.isUpperSnakeCase("ActiveUser"));
-        assertFalse(ProtoIdent.isUpperSnakeCase("_FOO"));
-        assertFalse(ProtoIdent.isUpperSnakeCase("1ABC"));
-        assertFalse(ProtoIdent.isUpperSnakeCase(""));
-        assertFalse(ProtoIdent.isUpperSnakeCase(null));
     }
 }
