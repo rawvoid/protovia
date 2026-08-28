@@ -245,6 +245,52 @@ class ExportNameProcessorTest {
     }
 
     @Test
+    void mixedCaseEnumConstantsNormalize() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) Unknown,
+              @ProtoEnumValue(1) ActiveUser
+            }
+            """));
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
+    void normalizedEnumConstantNamesCollide() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) Unknown,
+              @ProtoEnumValue(1) UNKNOWN
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("proto name 'STATUS_UNKNOWN' collides with Unknown");
+    }
+
+    @Test
+    void unrecognizedSentinelNeedNotBeUpperSnake() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) UNKNOWN,
+              @ProtoUnrecognized Unrecognized
+            }
+            """));
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
     void enumPackageNameCompiles() {
         Compilation withPackage = compile(src("demo.Status", """
             package demo;

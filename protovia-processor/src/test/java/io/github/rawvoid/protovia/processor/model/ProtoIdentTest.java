@@ -44,6 +44,10 @@ class ProtoIdentTest {
         assertEquals("ERROR_CATEGORY_SEAT", ProtoIdent.enumConstantName("ErrorCategory", "SEAT"));
         assertEquals("ANCILLARY_CATEGORY_SEAT", ProtoIdent.enumConstantName("AncillaryCategory", "SEAT"));
         assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "UNKNOWN"));
+        assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "Unknown"));
+        assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "unknown"));
+        assertEquals("STATUS_ACTIVE_USER", ProtoIdent.enumConstantName("Status", "ActiveUser"));
+        assertEquals("STATUS_HTTP_OK", ProtoIdent.enumConstantName("Status", "HTTP_OK"));
         assertEquals("FOO_BAR_UNKNOWN", ProtoIdent.enumConstantName("FooBar", "UNKNOWN"));
     }
 }

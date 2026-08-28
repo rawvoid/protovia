@@ -113,9 +113,12 @@ public final class ProtoIdent {
 
     /**
      * Protobuf enum constant: {@code CabinClass} + {@code BUSINESS} → {@code CABIN_CLASS_BUSINESS}.
+     * The Java constant is itself snake-cased ({@code Unknown} / {@code ActiveUser} →
+     * {@code UNKNOWN} / {@code ACTIVE_USER}).
      */
     public static String enumConstantName(String enumTypeName, String constantName) {
-        return toSnakeCase(enumTypeName).toUpperCase(Locale.ROOT) + "_" + constantName;
+        return toSnakeCase(enumTypeName).toUpperCase(Locale.ROOT)
+            + "_" + toSnakeCase(constantName).toUpperCase(Locale.ROOT);
     }
 
     private static boolean isIdentStart(char c) {

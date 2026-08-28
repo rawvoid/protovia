@@ -29,8 +29,10 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.util.ElementFilter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -74,6 +76,7 @@ final class EnumParser {
         Reserved reservedNumbers = reserved.parse(type, ReservedParser.Scope.ENUM);
         List<EnumModel.Constant> constants = new ArrayList<>();
         Set<Integer> numbers = new HashSet<>();
+        Map<String, String> protoNames = new HashMap<>();
         boolean hasZero = false;
         String unrecognized = null;
         for (VariableElement constant : ElementFilter.fieldsIn(type.getEnclosedElements())) {
@@ -107,6 +110,10 @@ final class EnumParser {
             }
             String constantName = constant.getSimpleName().toString();
             String protoConstantName = ProtoIdent.enumConstantName(protoEnumName, constantName);
+            String previous = protoNames.putIfAbsent(protoConstantName, constantName);
+            if (previous != null) {
+                diag.error(constant, "proto name '" + protoConstantName + "' collides with " + previous);
+            }
             if (reservedNumbers.containsNumber(number)) {
                 diag.error(constant, "enum number " + number + " is reserved");
             }
