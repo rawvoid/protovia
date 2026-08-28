@@ -245,6 +245,51 @@ class ExportNameProcessorTest {
     }
 
     @Test
+    void camelCaseEnumConstantFails() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) Unknown,
+              @ProtoEnumValue(1) ACTIVE
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("enum constant Unknown must be UPPER_SNAKE_CASE");
+    }
+
+    @Test
+    void lowerCaseEnumConstantFails() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) unknown
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("enum constant unknown must be UPPER_SNAKE_CASE");
+    }
+
+    @Test
+    void unrecognizedSentinelNeedNotBeUpperSnake() {
+        Compilation compilation = compile(src("demo.Status", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoEnum;
+            import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+            import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
+            @ProtoEnum
+            public enum Status {
+              @ProtoEnumValue(0) UNKNOWN,
+              @ProtoUnrecognized Unrecognized
+            }
+            """));
+        assertThat(compilation).succeeded();
+    }
+
+    @Test
     void enumPackageNameCompiles() {
         Compilation withPackage = compile(src("demo.Status", """
             package demo;

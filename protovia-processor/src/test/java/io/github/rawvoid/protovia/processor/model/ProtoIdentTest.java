@@ -19,6 +19,8 @@ package io.github.rawvoid.protovia.processor.model;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Rawvoid
@@ -45,5 +47,20 @@ class ProtoIdentTest {
         assertEquals("ANCILLARY_CATEGORY_SEAT", ProtoIdent.enumConstantName("AncillaryCategory", "SEAT"));
         assertEquals("STATUS_UNKNOWN", ProtoIdent.enumConstantName("Status", "UNKNOWN"));
         assertEquals("FOO_BAR_UNKNOWN", ProtoIdent.enumConstantName("FooBar", "UNKNOWN"));
+    }
+
+    @Test
+    void upperSnakeCaseAcceptsProtobufEnumStyle() {
+        assertTrue(ProtoIdent.isUpperSnakeCase("UNKNOWN"));
+        assertTrue(ProtoIdent.isUpperSnakeCase("HTTP_OK"));
+        assertTrue(ProtoIdent.isUpperSnakeCase("A"));
+        assertTrue(ProtoIdent.isUpperSnakeCase("A1"));
+        assertFalse(ProtoIdent.isUpperSnakeCase("Unknown"));
+        assertFalse(ProtoIdent.isUpperSnakeCase("unknown"));
+        assertFalse(ProtoIdent.isUpperSnakeCase("ActiveUser"));
+        assertFalse(ProtoIdent.isUpperSnakeCase("_FOO"));
+        assertFalse(ProtoIdent.isUpperSnakeCase("1ABC"));
+        assertFalse(ProtoIdent.isUpperSnakeCase(""));
+        assertFalse(ProtoIdent.isUpperSnakeCase(null));
     }
 }

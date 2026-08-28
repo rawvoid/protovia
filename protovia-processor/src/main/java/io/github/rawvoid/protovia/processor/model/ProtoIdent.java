@@ -118,6 +118,26 @@ public final class ProtoIdent {
         return toSnakeCase(enumTypeName).toUpperCase(Locale.ROOT) + "_" + constantName;
     }
 
+    /**
+     * Java enum constant style used as the proto suffix: {@code [A-Z][A-Z0-9_]*}.
+     */
+    public static boolean isUpperSnakeCase(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                continue;
+            }
+            if (i > 0 && (c == '_' || (c >= '0' && c <= '9'))) {
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
     private static boolean isIdentStart(char c) {
         return c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
     }

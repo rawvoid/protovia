@@ -106,6 +106,9 @@ final class EnumParser {
                 hasZero = true;
             }
             String constantName = constant.getSimpleName().toString();
+            if (!ProtoIdent.isUpperSnakeCase(constantName)) {
+                diag.error(constant, "enum constant " + constantName + " must be UPPER_SNAKE_CASE");
+            }
             String protoConstantName = ProtoIdent.enumConstantName(protoEnumName, constantName);
             if (reservedNumbers.containsNumber(number)) {
                 diag.error(constant, "enum number " + number + " is reserved");
