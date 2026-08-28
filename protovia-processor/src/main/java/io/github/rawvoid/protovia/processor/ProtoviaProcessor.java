@@ -59,6 +59,7 @@ public final class ProtoviaProcessor extends AbstractProcessor {
 
     private final CodecGenerator generator = new CodecGenerator();
     private final Map<String, TypeElement> deferredMessages = new LinkedHashMap<>();
+    private ProtoFileWriter protoFiles;
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -79,7 +80,9 @@ public final class ProtoviaProcessor extends AbstractProcessor {
             processingEnv.getElementUtils(),
             processingEnv.getMessager());
 
-        ProtoFileWriter protoFiles = new ProtoFileWriter(processingEnv);
+        if (protoFiles == null) {
+            protoFiles = new ProtoFileWriter(processingEnv);
+        }
 
         for (Element element : roundEnv.getElementsAnnotatedWith(ProtoEnum.class)) {
             if (element instanceof TypeElement type) {

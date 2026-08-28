@@ -41,7 +41,7 @@ byte[] bytes = Protovia.toBytes(user);
 User back = Protovia.fromBytes(bytes, User.class);
 ```
 
-The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type under `SOURCE_OUTPUT/proto/` (`target/generated-sources/annotations/proto/…`), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go. Files are not written to class output, so they do not enter the jar.
+The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type under `SOURCE_OUTPUT/proto/` (`target/generated-sources/annotations/proto/…`), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). Two types that snake-case to the same path fail compilation (`FooBar` and `Foo_Bar` → `foo_bar.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go. Files are not written to class output, so they do not enter the jar.
 
 ## Modules
 

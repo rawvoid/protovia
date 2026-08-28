@@ -539,6 +539,54 @@ class ProtoExportTest {
                 : "missing");
     }
 
+    @Test
+    void snakeCaseFilePathCollisionFails(@TempDir Path protoOut) {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .withOptions("-Aprotovia.protoOut=" + protoOut)
+            .compile(
+                src("demo.FooBar", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoField;
+                    import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                    @ProtoMessage
+                    public record FooBar(@ProtoField(number = 1) String id) {}
+                    """),
+                src("demo.Foo_Bar", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoField;
+                    import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                    @ProtoMessage
+                    public record Foo_Bar(@ProtoField(number = 1) String id) {}
+                    """));
+        assertThat(compilation).hadErrorContaining("proto file 'demo/foo_bar.proto' collides with");
+        assertTrue(Files.exists(protoOut.resolve("demo/foo_bar.proto")));
+        String mirrored = read(protoOut.resolve("demo/foo_bar.proto"));
+        assertTrue(mirrored.contains("message FooBar") ^ mirrored.contains("message Foo_Bar"));
+    }
+
+    @Test
+    void snakeCaseFilePathCollisionAcrossPackagesDoesNotFail() {
+        Compilation compilation = compile(
+            src("demo.FooBar", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record FooBar(@ProtoField(number = 1) String id) {}
+                """),
+            src("other.FooBar", """
+                package other;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record FooBar(@ProtoField(number = 1) String id) {}
+                """));
+        assertThat(compilation).succeeded();
+        proto(compilation, "demo/foo_bar.proto");
+        proto(compilation, "other/foo_bar.proto");
+    }
+
     private static String proto(Compilation compilation, String path) {
         String sourcePath = "proto/" + path;
         JavaFileObject file = compilation.generatedFile(StandardLocation.SOURCE_OUTPUT, sourcePath)
