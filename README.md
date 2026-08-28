@@ -41,7 +41,7 @@ byte[] bytes = Protovia.toBytes(user);
 User back = Protovia.fromBytes(bytes, User.class);
 ```
 
-The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type onto the class output (and into the jar), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go.
+The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type under `SOURCE_OUTPUT/proto/` (`target/generated-sources/annotations/proto/…`), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go. Files are not written to class output, so they do not enter the jar.
 
 ## Modules
 
@@ -102,12 +102,12 @@ tasks.compileJava {
 }
 ```
 
-Without that option, the files still land on class output (and in the jar) as `example/v1/user.proto`.
+Without that option, the files still land in generated sources as `proto/example/v1/user.proto` (Maven: `target/generated-sources/annotations/proto/…`). They are not copied into the jar.
 
 ## How it works
 
 1. You mark types with `@ProtoMessage` / `@ProtoEnum` and members with `@ProtoField(number = N)`.
-2. At compile time the processor writes `internal.UserProtoCodec` and a `.proto` resource (`example.v1.User` → `example/v1/user.proto`). Nested types become `Outer$InnerProtoCodec`.
+2. At compile time the processor writes `internal.UserProtoCodec` and a `.proto` file under `SOURCE_OUTPUT/proto/` (`example.v1.User` → `proto/example/v1/user.proto`). Nested types become `Outer$InnerProtoCodec`.
 3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields. The `.proto` is for other languages and docs; the runtime codec does not read it.
 
 Generated codecs:

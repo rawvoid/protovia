@@ -20,8 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,9 +35,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ProtoExportTest {
 
     private static final String MODEL = "io/github/rawvoid/protovia/itest/model/";
+    private static final Path PROTO_ROOT =
+        Path.of("target/generated-test-sources/test-annotations/proto");
 
     @Test
-    void userProtoOnClasspath() {
+    void userProtoIsGenerated() {
         assertEquals("""
             syntax = "proto3";
 
@@ -134,16 +134,13 @@ class ProtoExportTest {
     @Test
     @EnabledIf("protocOnPath")
     void protocAcceptsUserProto() throws Exception {
-        Path dir = Files.createTempDirectory("protovia-proto");
-        for (String name : new String[] {"user.proto", "address.proto", "status.proto"}) {
-            Path dest = dir.resolve(MODEL + name);
-            Files.createDirectories(dest.getParent());
-            Files.writeString(dest, resource(MODEL + name));
-        }
-        Path desc = dir.resolve("user.pb");
+        Path desc = Files.createTempFile("protovia-user", ".pb");
         String userProto = MODEL + "user.proto";
         Process process = new ProcessBuilder(
-            "protoc", "-I", dir.toString(), "--descriptor_set_out=" + desc, userProto)
+            "protoc",
+            "-I", PROTO_ROOT.toString(),
+            "--descriptor_set_out=" + desc,
+            userProto)
             .redirectErrorStream(true)
             .start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -162,13 +159,11 @@ class ProtoExportTest {
     }
 
     private static String resource(String path) {
-        try (InputStream in = ProtoExportTest.class.getClassLoader().getResourceAsStream(path)) {
-            if (in == null) {
-                throw new AssertionError("missing classpath proto " + path);
-            }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        Path file = PROTO_ROOT.resolve(path);
+        try {
+            return Files.readString(file);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            throw new AssertionError("missing generated proto " + file.toAbsolutePath(), e);
         }
     }
 }
