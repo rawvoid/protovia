@@ -36,6 +36,7 @@ public @interface ProtoMessage {
 
     /**
      * Protobuf package for Any {@code type_url} and {@code .proto} export.
+     * Blank (the default) uses the Java package of the annotated type.
      * Full name is {@code packageName + "." + name} when package is non-empty.
      */
     String packageName() default "";

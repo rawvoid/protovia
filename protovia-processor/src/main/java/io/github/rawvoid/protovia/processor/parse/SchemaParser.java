@@ -130,7 +130,7 @@ public final class SchemaParser {
         String pkg = Names.packageName(type);
         String typeName = Names.typeName(type, pkg);
         ProtoMessage meta = type.getAnnotation(ProtoMessage.class);
-        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String protoPackage = Names.protoPackage(type, meta == null ? "" : meta.packageName());
         String protoMessageName = meta == null || meta.name().isBlank()
             ? type.getSimpleName().toString()
             : meta.name().trim();

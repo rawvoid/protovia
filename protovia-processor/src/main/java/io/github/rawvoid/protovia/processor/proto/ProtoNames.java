@@ -18,6 +18,7 @@ package io.github.rawvoid.protovia.processor.proto;
 
 import io.github.rawvoid.protovia.annotation.ProtoMessage;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.Names;
 import io.github.rawvoid.protovia.processor.model.ProtoIdent;
 
 import javax.lang.model.element.TypeElement;
@@ -69,7 +70,7 @@ final class ProtoNames {
             return type.getSimpleName().toString();
         }
         String name = meta.name().isBlank() ? type.getSimpleName().toString() : meta.name().trim();
-        String pkg = meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String pkg = Names.protoPackage(type, meta.packageName());
         return pkg.isEmpty() ? name : pkg + "." + name;
     }
 

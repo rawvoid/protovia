@@ -400,11 +400,11 @@ class OfficialInteropTest {
     void anyPacksUserAgainstDynamicMessage() throws Exception {
         User user = sample();
         ProtoAny packed = Protovia.pack(user);
-        assertEquals("type.googleapis.com/User", packed.typeUrl());
+        assertEquals("type.googleapis.com/io.github.rawvoid.protovia.itest.model.User", packed.typeUrl());
         assertEquals(user, Protovia.unpack(packed, User.class));
 
         com.google.protobuf.Any official = com.google.protobuf.Any.parseFrom(Protovia.toBytes(packed));
-        assertEquals("type.googleapis.com/User", official.getTypeUrl());
+        assertEquals("type.googleapis.com/io.github.rawvoid.protovia.itest.model.User", official.getTypeUrl());
         DynamicMessage parsed = DynamicMessage.parseFrom(userDescriptor, official.getValue().toByteArray());
         assertEquals("Ada", parsed.getField(userDescriptor.findFieldByName("name")));
 
@@ -484,15 +484,15 @@ class OfficialInteropTest {
             .addField(field("score", 3, DescriptorProtos.FieldDescriptorProto.Type.TYPE_SINT64))
             .addField(repeated("tags", 4, DescriptorProtos.FieldDescriptorProto.Type.TYPE_STRING))
             .addField(field("address", 5, DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
-                .setTypeName(".Address"))
+                .setTypeName(".io.github.rawvoid.protovia.itest.model.Address"))
             .addField(DescriptorProtos.FieldDescriptorProto.newBuilder()
                 .setName("scores")
                 .setNumber(6)
                 .setLabel(DescriptorProtos.FieldDescriptorProto.Label.LABEL_REPEATED)
                 .setType(DescriptorProtos.FieldDescriptorProto.Type.TYPE_MESSAGE)
-                .setTypeName(".User.ScoresEntry"))
+                .setTypeName(".io.github.rawvoid.protovia.itest.model.User.ScoresEntry"))
             .addField(field("status", 7, DescriptorProtos.FieldDescriptorProto.Type.TYPE_ENUM)
-                .setTypeName(".Status"))
+                .setTypeName(".io.github.rawvoid.protovia.itest.model.Status"))
             .addField(field("level", 8, DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT32)
                 .setProto3Optional(true))
             .addField(repeated("ranks", 9, DescriptorProtos.FieldDescriptorProto.Type.TYPE_INT32))
@@ -508,7 +508,7 @@ class OfficialInteropTest {
         DescriptorProtos.FileDescriptorProto file = DescriptorProtos.FileDescriptorProto.newBuilder()
             .setName("user.proto")
             .setSyntax("proto3")
-            .setPackage("")
+            .setPackage("io.github.rawvoid.protovia.itest.model")
             .addMessageType(address)
             .addMessageType(user)
             .addEnumType(status)

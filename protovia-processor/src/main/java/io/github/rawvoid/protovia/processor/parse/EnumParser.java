@@ -66,7 +66,7 @@ final class EnumParser {
             return null;
         }
         ProtoEnum meta = type.getAnnotation(ProtoEnum.class);
-        String protoPackage = meta == null || meta.packageName().isBlank() ? "" : meta.packageName().trim();
+        String protoPackage = Names.protoPackage(type, meta == null ? "" : meta.packageName());
         String protoEnumName = meta == null || meta.name().isBlank()
             ? type.getSimpleName().toString()
             : meta.name().trim();

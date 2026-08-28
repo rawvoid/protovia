@@ -50,6 +50,17 @@ public final class Names {
         return e instanceof PackageElement pkg ? pkg.getQualifiedName().toString() : "";
     }
 
+    /**
+     * Protobuf package for export and Any {@code type_url}. Blank {@code declared}
+     * falls back to the Java package; the unnamed Java package yields {@code ""}.
+     */
+    public static String protoPackage(TypeElement type, String declared) {
+        if (declared != null && !declared.isBlank()) {
+            return declared.trim();
+        }
+        return packageName(type);
+    }
+
     public static String codecPackageName(TypeElement type) {
         return codecPackageName(packageName(type));
     }

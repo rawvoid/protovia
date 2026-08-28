@@ -36,13 +36,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ProtoExportTest {
 
+    private static final String MODEL = "io/github/rawvoid/protovia/itest/model/";
+
     @Test
     void userProtoOnClasspath() {
         assertEquals("""
             syntax = "proto3";
 
-            import "address.proto";
-            import "status.proto";
+            package io.github.rawvoid.protovia.itest.model;
+
+            import "io/github/rawvoid/protovia/itest/model/address.proto";
+            import "io/github/rawvoid/protovia/itest/model/status.proto";
 
             message User {
               string name = 1;
@@ -57,8 +61,8 @@ class ProtoExportTest {
               repeated int32 unpacked = 10 [packed = false];
               bytes payload = 11;
             }
-            """, resource("user.proto"));
-        String status = resource("status.proto");
+            """, resource(MODEL + "user.proto"));
+        String status = resource(MODEL + "status.proto");
         assertFalse(status.contains("UNRECOGNIZED"));
         assertTrue(status.contains("STATUS_UNKNOWN = 0;"));
         assertTrue(status.contains("STATUS_ACTIVE = 1;"));
@@ -66,11 +70,13 @@ class ProtoExportTest {
 
     @Test
     void contactOneofIsPayloadTypeNotJavaWrapper() {
-        String contact = resource("contact.proto");
+        String contact = resource(MODEL + "contact.proto");
         assertEquals("""
             syntax = "proto3";
 
-            import "address.proto";
+            package io.github.rawvoid.protovia.itest.model;
+
+            import "io/github/rawvoid/protovia/itest/model/address.proto";
 
             message Contact {
               string name = 1;
@@ -104,7 +110,7 @@ class ProtoExportTest {
 
     @Test
     void datedAdaptersAreScalars() {
-        String dated = resource("dated.proto");
+        String dated = resource(MODEL + "dated.proto");
         assertTrue(dated.contains("int32 birthDate = 3;"));
         assertTrue(dated.contains("repeated int32 days = 4;"));
         assertTrue(dated.contains("repeated int32 unpacked = 5 [packed = false];"));
@@ -118,7 +124,7 @@ class ProtoExportTest {
 
     @Test
     void timedUsesTimestampAndDuration() {
-        String timed = resource("timed.proto");
+        String timed = resource(MODEL + "timed.proto");
         assertTrue(timed.contains("import \"google/protobuf/duration.proto\";"));
         assertTrue(timed.contains("import \"google/protobuf/timestamp.proto\";"));
         assertTrue(timed.contains("google.protobuf.Timestamp at = 1;"));
@@ -130,11 +136,14 @@ class ProtoExportTest {
     void protocAcceptsUserProto() throws Exception {
         Path dir = Files.createTempDirectory("protovia-proto");
         for (String name : new String[] {"user.proto", "address.proto", "status.proto"}) {
-            Files.writeString(dir.resolve(name), resource(name));
+            Path dest = dir.resolve(MODEL + name);
+            Files.createDirectories(dest.getParent());
+            Files.writeString(dest, resource(MODEL + name));
         }
         Path desc = dir.resolve("user.pb");
+        String userProto = MODEL + "user.proto";
         Process process = new ProcessBuilder(
-            "protoc", "-I", dir.toString(), "--descriptor_set_out=" + desc, "user.proto")
+            "protoc", "-I", dir.toString(), "--descriptor_set_out=" + desc, userProto)
             .redirectErrorStream(true)
             .start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);

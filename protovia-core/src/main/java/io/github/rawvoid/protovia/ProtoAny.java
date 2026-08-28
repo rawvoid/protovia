@@ -29,8 +29,7 @@ import java.util.Arrays;
  *
  * <p>{@code type_url} is {@code type.googleapis.com/<protoFullName>}. The proto
  * full name comes from {@code @ProtoMessage(packageName, name)}, not the Java
- * FQCN. A missing package yields a short name that will not match an official
- * type that lives under {@code package foo.bar}.
+ * FQCN. Blank {@code packageName} defaults to the Java package of the type.
  *
  * @author Rawvoid
  */

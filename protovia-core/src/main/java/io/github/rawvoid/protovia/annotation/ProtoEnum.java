@@ -37,6 +37,7 @@ public @interface ProtoEnum {
 
     /**
      * Protobuf package for {@code .proto} export.
+     * Blank (the default) uses the Java package of the annotated type.
      * Full name is {@code packageName + "." + name} when package is non-empty.
      */
     String packageName() default "";
