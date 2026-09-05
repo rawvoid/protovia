@@ -70,7 +70,7 @@
         <jmh.version>1.37</jmh.version>
         <compile-testing.version>0.23.0</compile-testing.version>
         <javapoet.version>0.19.0</javapoet.version>
-        <lombok.version>1.18.46</lombok.version>
+        <lombok.version>1.18.48</lombok.version>
     </properties>
 
     <dependencyManagement>
