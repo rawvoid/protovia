@@ -47,10 +47,8 @@ jobs:
     name: Publish Snapshot
     needs: test
     if: >-
-      (
-        (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'))
-        || github.event_name == 'pull_request'
-      )
+      github.event_name == 'push'
+      && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
       && endsWith(needs.test.outputs.version, '-SNAPSHOT')
     runs-on: ubuntu-latest
     timeout-minutes: 30
