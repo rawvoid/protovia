@@ -65,7 +65,7 @@ class RoundTripTest {
      */
     @Test
     void absentCollectionsDecodeAsEmpty() {
-        // Mutable target: the model's own fields start out null, so the read loop has to fill them.
+        // Mutable target: null the model's initialized collections so the post-loop fill has to restore them.
         User existing = new User();
         existing.setTags(null);
         existing.setScores(null);

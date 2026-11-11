@@ -348,9 +348,7 @@ final class ReadEmitter {
             return;
         }
         if (record) {
-            b.beginControlFlow("if ($L == null || $L.isEmpty())", field.localName, field.localName);
-            b.addStatement("$L = $L", field.localName, newImpl(field));
-            b.endControlFlow();
+            // The locals path starts every collection out as a fresh mutable instance, so there is nothing to ensure.
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
@@ -503,9 +501,7 @@ final class ReadEmitter {
 
     private static void ensureMap(CodeBlock.Builder b, FieldModel field, boolean record) {
         if (record) {
-            b.beginControlFlow("if ($L == null)", field.localName);
-            b.addStatement("$L = $L", field.localName, newImpl(field));
-            b.endControlFlow();
+            // Same as a repeated local: the map exists before the first entry is read.
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
