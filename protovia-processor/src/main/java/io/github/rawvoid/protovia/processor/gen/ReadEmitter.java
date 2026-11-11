@@ -79,6 +79,7 @@ final class ReadEmitter {
         }
         readLoop(b, model, false);
         finalizeArrayBuilders(b, model, "msg");
+        fillAbsentCollections(b, model);
         if (model.unknown != null) {
             unknownStore(b, model);
         }
@@ -137,13 +138,17 @@ final class ReadEmitter {
     private static void fieldLocalInit(CodeBlock.Builder b, FieldModel field) {
         String local = field.localName;
         String fromExisting = field.accessOn("existing");
-        if (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP) {
+        if (isCollection(field)) {
             b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
-                javaType(field), local, fromExisting, newImpl(field, fromExisting), defaultValue(field.javaType));
+                javaType(field), local, fromExisting, newImpl(field, fromExisting), newImpl(field));
             return;
         }
         b.addStatement("$T $L = existing != null ? $L : $L",
             javaType(field), local, fromExisting, defaultValue(field.javaType));
+    }
+
+    private static boolean isCollection(FieldModel field) {
+        return field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP;
     }
 
     private static void unknownLocalInit(CodeBlock.Builder b, MessageModel model) {
@@ -151,6 +156,21 @@ final class ReadEmitter {
         String fromExisting = u.accessOn("existing");
         b.addStatement("$T $L = existing != null && $L != null ? $L : $T.EMPTY",
             UNKNOWN_FIELDS, u.localName(), fromExisting, fromExisting, UNKNOWN_FIELDS);
+    }
+
+    /**
+     * A repeated / map field absent from the wire has no presence in proto3: it is the same as an empty one, and
+     * the official implementations hand out empty collections rather than null. A mutable target starts from the
+     * model's own (possibly null) fields, so fill them once the read loop is done.
+     */
+    private static void fillAbsentCollections(CodeBlock.Builder b, MessageModel model) {
+        for (FieldModel field : model.fields) {
+            if (isCollection(field)) {
+                b.beginControlFlow("if ($L == null)", field.accessOn("msg"));
+                assign(b, field, "msg", newImpl(field));
+                b.endControlFlow();
+            }
+        }
     }
 
     private static void initArrayBuilders(CodeBlock.Builder b, MessageModel model) {
@@ -378,9 +398,9 @@ final class ReadEmitter {
             return;
         }
         FieldModel field = component.field();
-        if (field != null && (field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP)) {
+        if (field != null && isCollection(field)) {
             b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
-                javaType(component.type()), local, fromExisting, newImpl(field, fromExisting), defaultValue(component.type()));
+                javaType(component.type()), local, fromExisting, newImpl(field, fromExisting), newImpl(field));
             return;
         }
         b.addStatement("$T $L = existing != null ? $L : $L",

@@ -59,6 +59,32 @@ class RoundTripTest {
         assertEquals(record, back);
     }
 
+    /**
+     * A repeated / map field absent from the wire has no presence in proto3: absent and empty are the same field,
+     * and the official implementations hand out empty collections rather than null.
+     */
+    @Test
+    void absentCollectionsDecodeAsEmpty() {
+        // Mutable target: the model's own fields start out null, so the read loop has to fill them.
+        User existing = new User();
+        existing.setTags(null);
+        existing.setScores(null);
+        User merged = UserProtoCodec.INSTANCE.mergeFrom(new ProtoReader(new byte[0]), existing);
+        assertTrue(merged.getTags().isEmpty());
+        assertTrue(merged.getScores().isEmpty());
+
+        // Immutable target: the field locals start out empty.
+        ImmutableUser immutable = Protovia.fromBytes(
+            Protovia.toBytes(new ImmutableUser("Ada", 36, null, null)), ImmutableUser.class);
+        assertTrue(immutable.getTags().isEmpty());
+
+        // Record: the canonical constructor is handed an empty collection.
+        UserRecord record = Protovia.fromBytes(
+            Protovia.toBytes(new UserRecord("Ada", 36, null, null, null, null, null)), UserRecord.class);
+        assertTrue(record.tags().isEmpty());
+        assertTrue(record.scores().isEmpty());
+    }
+
     @Test
     void anyAndWrapperRoundTrip() {
         Carrier carrier = new Carrier();

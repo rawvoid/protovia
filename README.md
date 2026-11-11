@@ -116,6 +116,7 @@ Generated codecs:
 - skip proto3 default values (`0`, `false`, `""`, empty bytes / lists / maps)
 - write proto3 `optional` (and `Optional<T>`) even when the value is default
 - read both packed and unpacked repeated scalars
+- decode a repeated / map field absent from the wire as an empty collection, never `null` (array-typed repeated fields stay `null`)
 - skip unknown fields
 
 ## Type mapping
