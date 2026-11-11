@@ -116,7 +116,16 @@ Generated codecs:
 - skip proto3 default values (`0`, `false`, `""`, empty bytes / lists / maps)
 - write proto3 `optional` (and `Optional<T>`) even when the value is default
 - read both packed and unpacked repeated scalars
+- decode a repeated / map field absent from the wire as an empty collection, never `null` (array-typed repeated fields stay `null`)
 - skip unknown fields
+
+**Decoded collections are mutable.** A repeated / map field is decoded into a mutable implementation
+chosen for the declared type — usually `ArrayList`, `LinkedHashSet` or `LinkedHashMap`, with the
+specialized primitive lists from `protovia-core` for repeated primitive scalars — and the entity owns it. This
+differs from `protobuf-java`, where `Message` getters return read-only collections and all mutation goes
+through a `Builder`. Protovia decodes into user-owned entities, so modifying a decoded collection in place
+is valid. If you need a frozen collection, copy or wrap it in the model itself, for example in a record
+compact constructor (`tags = List.copyOf(tags)`), a setter, or with `Collections.unmodifiableList(...)`.
 
 ## Type mapping
 

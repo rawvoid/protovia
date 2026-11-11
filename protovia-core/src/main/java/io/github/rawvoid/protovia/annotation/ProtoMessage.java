@@ -22,6 +22,13 @@ import java.lang.annotation.*;
  * Marks a Java class or record as a Protobuf message. The processor generates
  * {@code <SimpleName>ProtoCodec} in the same package.
  *
+ * <p>Decoded repeated and map fields are never {@code null}: a field absent from the
+ * wire decodes to an empty collection. That collection is mutable and owned by the
+ * entity, unlike {@code protobuf-java} {@code Message} getters, which expose read-only
+ * views. Copy or wrap the collection in the model (constructor, setter, or record
+ * compact constructor) when an immutable value is required. Array-typed repeated
+ * fields remain {@code null} when absent.
+ *
  * @author Rawvoid
  */
 @Documented
