@@ -93,7 +93,7 @@ class ImmutableProcessorTest {
             """));
         assertThat(compilation).succeeded();
         String codec = generated(compilation, "demo.internal.PointProtoCodec");
-        assertTrue(codec.contains("return new Point(y, x)"));
+        assertTrue(codec.contains("return new Point(f_y, f_x)"));
     }
 
     @Test
@@ -358,7 +358,7 @@ class ImmutableProcessorTest {
             """));
         assertThat(compilation).succeeded();
         assertTrue(generated(compilation, "demo.internal.RecordLikeProtoCodec")
-            .contains("return new RecordLike(zebra, middle, alpha)"));
+            .contains("return new RecordLike(f_zebra, f_middle, f_alpha)"));
     }
 
     @Test
@@ -379,7 +379,7 @@ class ImmutableProcessorTest {
             """));
         assertThat(compilation).succeeded();
         assertTrue(generated(compilation, "demo.internal.PairProtoCodec")
-            .contains("return new Pair(second, first)"));
+            .contains("return new Pair(f_second, f_first)"));
     }
 
     @Test
@@ -400,7 +400,7 @@ class ImmutableProcessorTest {
             """));
         assertThat(compilation).succeeded();
         assertTrue(generated(compilation, "demo.internal.HolderProtoCodec")
-            .contains("return new Holder(a, b)"));
+            .contains("return new Holder(f_a, f_b)"));
     }
 
     private static Compilation compile(JavaFileObject... files) {

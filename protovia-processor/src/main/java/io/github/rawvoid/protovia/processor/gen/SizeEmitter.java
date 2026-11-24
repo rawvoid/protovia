@@ -81,15 +81,7 @@ final class SizeEmitter {
         switch (field.kind) {
             case SCALAR -> computeScalar(b, field, field.localName, field.number, field.optional, field.javaOptional);
             case ENUM -> computeEnum(b, field, field.localName, field.number, field.optional);
-            case MESSAGE -> {
-                b.beginControlFlow("if ($L != null)", field.localName);
-                b.addStatement("int $LSlot = cache.reserve()", field.localName);
-                b.addStatement("int $LSize = $L.computeSize($L, cache)",
-                    field.localName, codecInstance(field), field.localName);
-                b.addStatement("cache.set($LSlot, $LSize)", field.localName, field.localName);
-                b.addStatement("size += $T.message($L, $LSize)", CODED_SIZE, field.number, field.localName);
-                b.endControlFlow();
-            }
+            case MESSAGE -> computeMessage(b, field);
             case REPEATED -> computeRepeated(b, field);
             case MAP -> computeMap(b, field);
             case ONEOF -> computeOneof(b, field);
@@ -109,17 +101,54 @@ final class SizeEmitter {
         b.endControlFlow();
     }
 
+    private static void computeMessage(CodeBlock.Builder b, FieldModel field) {
+        String slot = "_slot_" + field.number;
+        String sz = "_sz_" + field.number;
+        if (field.javaOptional) {
+            String msgVar = "_msg_" + field.number;
+            b.beginControlFlow("if ($L != null && $L.isPresent())", field.localName, field.localName);
+            b.addStatement("$T $L = $L.get()", optionalValueType(field), msgVar, field.localName);
+            b.addStatement("int $L = cache.reserve()", slot);
+            b.addStatement("int $L = $L.computeSize($L, cache)", sz, codecInstance(field), msgVar);
+            b.addStatement("cache.set($L, $L)", slot, sz);
+            b.addStatement("size += $T.message($L, $L)", CODED_SIZE, field.number, sz);
+            b.endControlFlow();
+        } else {
+            b.beginControlFlow("if ($L != null)", field.localName);
+            b.addStatement("int $L = cache.reserve()", slot);
+            b.addStatement("int $L = $L.computeSize($L, cache)", sz, codecInstance(field), field.localName);
+            b.addStatement("cache.set($L, $L)", slot, sz);
+            b.addStatement("size += $T.message($L, $L)", CODED_SIZE, field.number, sz);
+            b.endControlFlow();
+        }
+    }
+
     private static void computeEnum(CodeBlock.Builder b, FieldModel field, String var, int number, boolean optional) {
         String helper = enumNumberOf(field.enumModel);
+        if (field.javaOptional) {
+            String ev = "_ev_" + number;
+            b.beginControlFlow("if ($L != null && $L.isPresent())", var, var);
+            b.addStatement("$T $L = $L.get()", enumType(field.enumModel), ev, var);
+            if (field.enumModel.unrecognized != null) {
+                b.beginControlFlow("if ($L != $L)", ev, enumConstant(field.enumModel, field.enumModel.unrecognized));
+                b.addStatement("size += $T.enumValue($L, $L($L))", CODED_SIZE, number, helper, ev);
+                b.endControlFlow();
+            } else {
+                b.addStatement("size += $T.enumValue($L, $L($L))", CODED_SIZE, number, helper, ev);
+            }
+            b.endControlFlow();
+            return;
+        }
         if (optional) {
             b.beginControlFlow("if ($L)", enumPresent(field, var));
             b.addStatement("size += $T.enumValue($L, $L($L))", CODED_SIZE, number, helper, var);
             b.endControlFlow();
         } else {
+            String numVar = "_num_" + number;
             b.beginControlFlow("if ($L)", enumPresent(field, var));
-            b.addStatement("int $LNumber = $L($L)", var, helper, var);
-            b.beginControlFlow("if ($LNumber != 0)", var);
-            b.addStatement("size += $T.enumValue($L, $LNumber)", CODED_SIZE, number, var);
+            b.addStatement("int $L = $L($L)", numVar, helper, var);
+            b.beginControlFlow("if ($L != 0)", numVar);
+            b.addStatement("size += $T.enumValue($L, $L)", CODED_SIZE, number, numVar);
             b.endControlFlow();
             b.endControlFlow();
         }
@@ -128,9 +157,10 @@ final class SizeEmitter {
     private static void computeRepeated(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L)", presentRepeated(field));
         if (field.packed && field.packable()) {
-            b.addStatement("int $LPacked = $L($L)", field.localName, packedSizeOf(field), field.localName);
-            b.addStatement("cache.push($LPacked)", field.localName);
-            b.addStatement("size += $T.lengthDelimited($L, $LPacked)", CODED_SIZE, field.number, field.localName);
+            String packed = "_packed_" + field.number;
+            b.addStatement("int $L = $L($L)", packed, packedSizeOf(field), field.localName);
+            b.addStatement("cache.push($L)", packed);
+            b.addStatement("size += $T.lengthDelimited($L, $L)", CODED_SIZE, field.number, packed);
         } else {
             b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
             nullElementCheck(b, field.element, "item", field.name);
@@ -169,29 +199,36 @@ final class SizeEmitter {
         if (c.empty()) {
             b.addStatement("size += $T.lengthDelimited($L, 0)", CODED_SIZE, c.number);
         } else if (c.selfMessage) {
-            b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
-            b.addStatement("int $L_sz = $L.computeSize(_c, cache)", c.tagConstant, codecInstance(c.payload));
-            b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
-            b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
+            String slot = "_slot_" + c.number;
+            String sz = "_sz_" + c.number;
+            b.addStatement("int $L = cache.reserve()", slot);
+            b.addStatement("int $L = $L.computeSize(_c, cache)", sz, codecInstance(c.payload));
+            b.addStatement("cache.set($L, $L)", slot, sz);
+            b.addStatement("size += $T.message($L, $L)", CODED_SIZE, c.number, sz);
         } else if (c.payload.kind == FieldKind.MESSAGE) {
+            String slot = "_slot_" + c.number;
+            String sz = "_sz_" + c.number;
             b.addStatement("$T _p = $L", javaType(c.payload), value);
             b.beginControlFlow("if (_p != null)");
-            b.addStatement("int $L_slot = cache.reserve()", c.tagConstant);
-            b.addStatement("int $L_sz = $L.computeSize(_p, cache)", c.tagConstant, codecInstance(c.payload));
-            b.addStatement("cache.set($L_slot, $L_sz)", c.tagConstant, c.tagConstant);
-            b.addStatement("size += $T.message($L, $L_sz)", CODED_SIZE, c.number, c.tagConstant);
+            b.addStatement("int $L = cache.reserve()", slot);
+            b.addStatement("int $L = $L.computeSize(_p, cache)", sz, codecInstance(c.payload));
+            b.addStatement("cache.set($L, $L)", slot, sz);
+            b.addStatement("size += $T.message($L, $L)", CODED_SIZE, c.number, sz);
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
             b.beginControlFlow("if ($L)", enumPresent(c.payload, value));
             b.addStatement("size += $T.enumValue($L, $L($L))",
                 CODED_SIZE, c.number, enumNumberOf(c.payload.enumModel), value);
             b.endControlFlow();
-        } else if (c.payload.adapterType != null) {
-            String w = oneofWireLocal(c);
-            assignToWire(b, c.payload, value, w);
-            b.addStatement("size += $L", sizeCall(c.payload, c.number, w));
         } else {
-            b.addStatement("size += $L", sizeCall(c.payload, c.number, value));
+            String scalarValue = oneofScalarPayload(b, c, value);
+            if (c.payload.adapterType != null) {
+                String w = oneofWireLocal(c);
+                assignToWire(b, c.payload, scalarValue, w);
+                b.addStatement("size += $L", sizeCall(c.payload, c.number, w));
+            } else {
+                b.addStatement("size += $L", sizeCall(c.payload, c.number, scalarValue));
+            }
         }
     }
 }

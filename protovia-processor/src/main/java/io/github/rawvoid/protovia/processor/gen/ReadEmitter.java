@@ -189,10 +189,14 @@ final class ReadEmitter {
         }
     }
 
+    private static String arrayBuilderVar(FieldModel field) {
+        return "_builder_" + field.number;
+    }
+
     private static void initArrayBuilders(CodeBlock.Builder b, MessageModel model) {
         for (FieldModel field : model.fields) {
             if (field.array) {
-                b.addStatement("$T $LBuilder = null", WireCodegen.arrayBuilderType(field), field.localName);
+                b.addStatement("$T $L = null", WireCodegen.arrayBuilderType(field), arrayBuilderVar(field));
             }
         }
     }
@@ -202,11 +206,12 @@ final class ReadEmitter {
             if (!field.array) {
                 continue;
             }
-            b.beginControlFlow("if ($LBuilder != null)", field.localName);
+            String builderVar = arrayBuilderVar(field);
+            b.beginControlFlow("if ($L != null)", builderVar);
             if (assignTarget == null) {
-                b.addStatement("$L = $L", field.localName, toArray(field, field.localName + "Builder"));
+                b.addStatement("$L = $L", field.localName, toArray(field, builderVar));
             } else {
-                assign(b, field, assignTarget, toArray(field, field.localName + "Builder"));
+                assign(b, field, assignTarget, toArray(field, builderVar));
             }
             b.endControlFlow();
         }
@@ -357,8 +362,9 @@ final class ReadEmitter {
 
     private static void ensureRepeated(CodeBlock.Builder b, FieldModel field, boolean record) {
         if (field.array) {
-            b.beginControlFlow("if ($LBuilder == null)", field.localName);
-            b.addStatement("$LBuilder = new $T()", field.localName, WireCodegen.arrayBuilderType(field));
+            String builderVar = arrayBuilderVar(field);
+            b.beginControlFlow("if ($L == null)", builderVar);
+            b.addStatement("$L = new $T()", builderVar, WireCodegen.arrayBuilderType(field));
             seedArrayBuilder(b, field, record);
             b.endControlFlow();
             return;
@@ -448,13 +454,14 @@ final class ReadEmitter {
         String existing = record
             ? field.localName
             : field.accessOn("msg");
+        String builderVar = arrayBuilderVar(field);
         b.beginControlFlow("if ($L != null)", existing);
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), existing);
-        CodeBlock add = primitiveAdd(field, field.localName + "Builder", CodeBlock.of("item"));
+        CodeBlock add = primitiveAdd(field, builderVar, CodeBlock.of("item"));
         if (add != null) {
             b.addStatement("$L", add);
         } else {
-            b.addStatement("$LBuilder.add(item)", field.localName);
+            b.addStatement("$L.add(item)", builderVar);
         }
         b.endControlFlow();
         b.endControlFlow();
@@ -506,7 +513,7 @@ final class ReadEmitter {
 
     private static String repeatedVar(FieldModel field, boolean record) {
         if (field.array) {
-            return field.localName + "Builder";
+            return arrayBuilderVar(field);
         }
         if (record || field.accessKind != AccessKind.FIELD) {
             return field.localName;
