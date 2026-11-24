@@ -40,6 +40,8 @@ import io.github.rawvoid.protovia.itest.model.Status;
 import io.github.rawvoid.protovia.itest.model.User;
 import io.github.rawvoid.protovia.itest.model.WideSplitPojo;
 import io.github.rawvoid.protovia.itest.model.WideSplitRecord;
+import io.github.rawvoid.protovia.itest.model.internal.WideSplitPojoProtoCodec;
+import io.github.rawvoid.protovia.itest.model.internal.WideSplitRecordProtoCodec;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import io.github.rawvoid.protovia.wire.WireType;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -338,6 +341,8 @@ class CodecOptimizationTest {
 
     @Test
     void wideSplitPojoRoundTripAndUnknownEnumExclusion() {
+        assertTrue(hasDeclaredMethod(WideSplitPojoProtoCodec.class, "_readChunk_0"),
+            "WideSplitPojoProtoCodec must take the split read path");
         WideSplitPojo msg = new WideSplitPojo();
         msg.f1 = 101;
         msg.f2 = "hello";
@@ -358,6 +363,8 @@ class CodecOptimizationTest {
         msg.f58 = new int[]{7, 8};
         msg.f59 = Map.of("k", 42);
         msg.f60 = "tail";
+        msg.f75 = 75_000_000_000L;
+        msg.f85 = "chunk2-tail";
 
         byte[] encoded = Protovia.toBytes(msg);
         WideSplitPojo back = Protovia.fromBytes(encoded, WideSplitPojo.class);
@@ -378,6 +385,8 @@ class CodecOptimizationTest {
         assertArrayEquals(new int[]{7, 8}, back.f58);
         assertEquals(Map.of("k", 42), back.f59);
         assertEquals("tail", back.f60);
+        assertEquals(75_000_000_000L, back.f75);
+        assertEquals("chunk2-tail", back.f85);
 
         // Unknown fields + enum exclusion across split chunks.
         ProtoWriter wire = ProtoWriter.growing();
@@ -405,6 +414,8 @@ class CodecOptimizationTest {
 
     @Test
     void wideSplitRecordRoundTripMergeAndUnknownEnumExclusion() {
+        assertTrue(hasDeclaredMethod(WideSplitRecordProtoCodec.class, "_readChunk_0"),
+            "WideSplitRecordProtoCodec must take the split read path");
         // First decode from wire containing fields across all chunks + unknown enum + unknown field.
         ProtoWriter wire1 = ProtoWriter.growing();
         wire1.writeInt32(1, 10);
@@ -420,6 +431,8 @@ class CodecOptimizationTest {
         wire1.writeString(57, "tag1");
         wire1.writeInt32(58, 7);
         wire1.writeString(60, "end1");
+        wire1.writeInt64(75, 75_000_000_000L);
+        wire1.writeString(85, "rec-tail1");
         wire1.writeInt32(888, 12345);
 
         WideSplitRecord rec1 = Protovia.fromBytes(wire1.toByteArray(), WideSplitRecord.class);
@@ -436,6 +449,8 @@ class CodecOptimizationTest {
         assertEquals(List.of("tag1"), rec1.f57());
         assertArrayEquals(new int[]{7}, rec1.f58());
         assertEquals("end1", rec1.f60());
+        assertEquals(75_000_000_000L, rec1.f75());
+        assertEquals("rec-tail1", rec1.f85());
         assertFalse(rec1.unknown().isEmpty());
 
         // Round-trip rec1 bytes and verify exact equality of fields.
@@ -445,6 +460,8 @@ class CodecOptimizationTest {
         assertEquals(Status.UNRECOGNIZED, rt.f3());
         assertArrayEquals(rec1.f5(), rt.f5());
         assertEquals(rec1.f60(), rt.f60());
+        assertEquals(rec1.f75(), rt.f75());
+        assertEquals(rec1.f85(), rt.f85());
 
         // Merge second wire payload into rec1: arrays & lists append, f3 becomes ACTIVE and removes stale unknown 3.
         ProtoWriter wire2 = ProtoWriter.growing();
@@ -453,6 +470,7 @@ class CodecOptimizationTest {
         wire2.writeInt32(5, 200);
         wire2.writeInt32(58, 8);
         wire2.writeString(60, "end2");
+        wire2.writeString(85, "rec-tail2");
 
         WideSplitRecord merged = Protovia.mergeFrom(wire2.toByteArray(), rec1);
         assertEquals(10, merged.f1());
@@ -462,9 +480,15 @@ class CodecOptimizationTest {
         assertArrayEquals(new int[]{100, 200}, merged.f5());
         assertArrayEquals(new int[]{7, 8}, merged.f58());
         assertEquals("end2", merged.f60());
+        assertEquals(75_000_000_000L, merged.f75());
+        assertEquals("rec-tail2", merged.f85());
         List<Integer> mergedUnknownNums = readAllFieldNumbers(unknownBytes(merged.unknown()));
         assertFalse(mergedUnknownNums.contains(3));
         assertTrue(mergedUnknownNums.contains(888));
+    }
+
+    private static boolean hasDeclaredMethod(Class<?> type, String name) {
+        return Arrays.stream(type.getDeclaredMethods()).anyMatch(m -> m.getName().equals(name));
     }
 
     private static byte[] unknownBytes(UnknownFields unknown) {

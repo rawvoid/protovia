@@ -41,8 +41,8 @@ import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
  */
 final class WireCodegen {
 
-    static final int SPLIT_THRESHOLD = 48;
-    static final int CHUNK_SIZE = 32;
+    static final int SPLIT_THRESHOLD = 80;
+    static final int CHUNK_SIZE = 40;
 
     private WireCodegen() {
     }
@@ -87,7 +87,23 @@ final class WireCodegen {
     }
 
     private static int fieldUnits(FieldModel field) {
-        return field.kind == FieldKind.ONEOF ? Math.max(1, field.oneofCases.size()) : 1;
+        return switch (field.kind) {
+            case ONEOF -> {
+                int units = 0;
+                for (OneofCaseModel c : field.oneofCases) {
+                    units += (c.payload != null && c.payload.kind == FieldKind.ENUM) ? 2 : 1;
+                }
+                yield Math.max(1, units);
+            }
+            case REPEATED -> {
+                if (field.packable()) {
+                    yield field.array && field.element.kind == FieldKind.ENUM ? 4 : 3;
+                }
+                yield field.array || (field.element != null && field.element.kind == FieldKind.MESSAGE) ? 2 : 1;
+            }
+            case MAP -> field.deterministic ? 2 : 1;
+            case SCALAR, ENUM, MESSAGE -> 1;
+        };
     }
 
     static void loadField(CodeBlock.Builder b, FieldModel field) {

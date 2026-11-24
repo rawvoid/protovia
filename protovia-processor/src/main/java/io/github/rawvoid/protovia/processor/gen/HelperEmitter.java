@@ -304,7 +304,8 @@ final class HelperEmitter {
         }
         List<FieldModel> exclFields = unknownExclusionFields(model);
         TypeName intArray = com.palantir.javapoet.ArrayTypeName.of(TypeName.INT);
-        if (exclFields.size() <= CHUNK_SIZE) {
+        List<List<FieldModel>> chunks = chunkFields(exclFields);
+        if (chunks.size() <= 1) {
             CodeBlock.Builder body = CodeBlock.builder();
             body.addStatement("int _exclN = 0");
             emitUnknownExclusionChecks(body, exclFields, true);
@@ -318,7 +319,6 @@ final class HelperEmitter {
                 .build());
             return;
         }
-        List<List<FieldModel>> chunks = chunkFields(exclFields);
         CodeBlock.Builder main = CodeBlock.builder();
         main.addStatement("int _exclN = 0");
         for (int i = 0; i < chunks.size(); i++) {

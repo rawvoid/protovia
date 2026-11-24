@@ -95,6 +95,31 @@ public class WideSplitPojo {
     @ProtoField(number = 58) public int[] f58;
     @ProtoField(number = 59) public Map<String, Integer> f59;
     @ProtoField(number = 60) public String f60;
+    @ProtoField(number = 61) public int f61;
+    @ProtoField(number = 62) public int f62;
+    @ProtoField(number = 63) public int f63;
+    @ProtoField(number = 64) public int f64;
+    @ProtoField(number = 65) public int f65;
+    @ProtoField(number = 66) public int f66;
+    @ProtoField(number = 67) public int f67;
+    @ProtoField(number = 68) public int f68;
+    @ProtoField(number = 69) public int f69;
+    @ProtoField(number = 70) public int f70;
+    @ProtoField(number = 71) public long f71;
+    @ProtoField(number = 72) public long f72;
+    @ProtoField(number = 73) public long f73;
+    @ProtoField(number = 74) public long f74;
+    @ProtoField(number = 75) public long f75;
+    @ProtoField(number = 76) public boolean f76;
+    @ProtoField(number = 77) public boolean f77;
+    @ProtoField(number = 78) public boolean f78;
+    @ProtoField(number = 79) public boolean f79;
+    @ProtoField(number = 80) public boolean f80;
+    @ProtoField(number = 81) public String f81;
+    @ProtoField(number = 82) public String f82;
+    @ProtoField(number = 83) public String f83;
+    @ProtoField(number = 84) public String f84;
+    @ProtoField(number = 85) public String f85;
 
     @ProtoUnknown
     public UnknownFields unknown;

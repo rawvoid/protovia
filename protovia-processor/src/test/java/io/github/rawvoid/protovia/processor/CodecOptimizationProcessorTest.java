@@ -434,7 +434,7 @@ class CodecOptimizationProcessorTest {
                 case 0 -> "Status";
                 case 1 -> "List<Integer>";
                 case 2 -> "Map<String, Integer>";
-                default -> "String";
+                default -> i == 159 ? "Status" : "String";
             };
             pojo.append("  @ProtoField(number = ").append(i).append(") private ").append(type).append(" f").append(i).append(";\n");
             pojo.append("  public ").append(type).append(" getF").append(i).append("() { return f").append(i).append("; }\n");
@@ -498,7 +498,7 @@ class CodecOptimizationProcessorTest {
                 src("demo.WideBuilderMsg", builderMsg.toString()));
         assertThat(compilation).succeededWithoutWarnings();
 
-        // 40 enum fields -> _collectExcludedEnums splits into _collectExcludedEnums_0 / _1.
+        // 41 enum fields (> CHUNK_SIZE = 40) -> _collectExcludedEnums splits into _collectExcludedEnums_0 / _1.
         String accessorSource = generated(compilation, "demo.internal.WideAccessorPojoProtoCodec");
         assertTrue(accessorSource.contains("_collectExcludedEnums_0("));
         assertTrue(accessorSource.contains("_fillAbsent_0("));
@@ -506,6 +506,543 @@ class CodecOptimizationProcessorTest {
         assertAllMethodsUnderLimit(compilation, "demo/internal/WideAccessorPojoProtoCodec.class");
         assertAllMethodsUnderLimit(compilation, "demo/internal/WideBuilderMsgProtoCodec.class");
         assertAllMethodsUnderLimit(compilation, "demo/internal/WideBuilderMsgProtoCodec$_ReadState.class");
+    }
+
+    @Test
+    void mixed70FieldPojoAndRecordStayUnsplitBelowHugeMethodLimit() throws Exception {
+        // 70 fields with 5 packable repeated fields: 5 * 3 + 65 * 1 = 80 units (== SPLIT_THRESHOLD, stays unsplit).
+        StringBuilder pojo = new StringBuilder();
+        pojo.append("package demo;\n");
+        pojo.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        pojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        pojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        pojo.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        pojo.append("import java.util.List;\n");
+        pojo.append("import java.util.Map;\n");
+        pojo.append("import java.util.Optional;\n");
+        pojo.append("@ProtoMessage\n");
+        pojo.append("public class MediumPojo {\n");
+        for (int i = 1; i <= 70; i++) {
+            String type = switch (i) {
+                case 1, 2 -> "List<Integer>";
+                case 3 -> "List<Double>";
+                case 4, 5 -> "int[]";
+                default -> switch (i % 7) {
+                    case 0 -> "Map<String, Integer>";
+                    case 1 -> "String";
+                    case 2 -> "int";
+                    case 3 -> "long";
+                    case 4 -> "boolean";
+                    case 5 -> "Optional<String>";
+                    default -> (i % 2 == 0) ? "Status" : "List<String>";
+                };
+            };
+            pojo.append("  @ProtoField(number = ").append(i).append(") public ").append(type).append(" f").append(i).append(";\n");
+        }
+        pojo.append("  @ProtoUnknown public UnknownFields unknown;\n");
+        pojo.append("}\n");
+
+        StringBuilder rec = new StringBuilder();
+        rec.append("package demo;\n");
+        rec.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        rec.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        rec.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        rec.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        rec.append("import java.util.List;\n");
+        rec.append("import java.util.Map;\n");
+        rec.append("import java.util.Optional;\n");
+        rec.append("@ProtoMessage\n");
+        rec.append("public record MediumRecord(\n");
+        for (int i = 1; i <= 70; i++) {
+            String type = switch (i) {
+                case 1, 2 -> "List<Integer>";
+                case 3 -> "List<Double>";
+                case 4, 5 -> "int[]";
+                default -> switch (i % 7) {
+                    case 0 -> "Map<String, Integer>";
+                    case 1 -> "String";
+                    case 2 -> "int";
+                    case 3 -> "long";
+                    case 4 -> "boolean";
+                    case 5 -> "Optional<String>";
+                    default -> (i % 2 == 0) ? "Status" : "List<String>";
+                };
+            };
+            rec.append("  @ProtoField(number = ").append(i).append(") ").append(type).append(" f").append(i).append(",\n");
+        }
+        rec.append("  @ProtoUnknown UnknownFields unknown) {}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Status", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                    @ProtoEnum
+                    public enum Status {
+                      @ProtoEnumValue(0) UNKNOWN,
+                      @ProtoEnumValue(1) ACTIVE
+                    }
+                    """),
+                src("demo.MediumPojo", pojo.toString()),
+                src("demo.MediumRecord", rec.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        String pojoSrc = generated(compilation, "demo.internal.MediumPojoProtoCodec");
+        assertFalse(pojoSrc.contains("_readChunk_0("));
+        assertFalse(pojoSrc.contains("_computeSize_0("));
+        assertFalse(pojoSrc.contains("_writeTo_0("));
+        assertFalse(pojoSrc.contains("_ArrayState"));
+        assertTrue(pojoSrc.contains("_col_1"));
+
+        String recSrc = generated(compilation, "demo.internal.MediumRecordProtoCodec");
+        assertFalse(recSrc.contains("_readChunk_0("));
+        assertFalse(recSrc.contains("_computeSize_0("));
+        assertFalse(recSrc.contains("_writeTo_0("));
+        assertFalse(recSrc.contains("_ReadState"));
+
+        assertAllMethodsUnderLimit(compilation, "demo/internal/MediumPojoProtoCodec.class");
+        assertAllMethodsUnderLimit(compilation, "demo/internal/MediumRecordProtoCodec.class");
+    }
+
+    @Test
+    void fortyPackedDoubleListsSplitAutomaticallyBelowHugeMethodLimit() throws Exception {
+        // 40 packed List<Double> fields: 40 * 3 = 120 units > SPLIT_THRESHOLD (80).
+        StringBuilder pojo = new StringBuilder();
+        pojo.append("package demo;\n");
+        pojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        pojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        pojo.append("import java.util.List;\n");
+        pojo.append("@ProtoMessage\n");
+        pojo.append("public class AllPackedDoublesPojo {\n");
+        for (int i = 1; i <= 40; i++) {
+            pojo.append("  @ProtoField(number = ").append(i).append(") public List<Double> d").append(i).append(";\n");
+        }
+        pojo.append("}\n");
+
+        StringBuilder rec = new StringBuilder();
+        rec.append("package demo;\n");
+        rec.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        rec.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        rec.append("import java.util.List;\n");
+        rec.append("@ProtoMessage\n");
+        rec.append("public record AllPackedDoublesRecord(\n");
+        for (int i = 1; i <= 40; i++) {
+            rec.append("  @ProtoField(number = ").append(i).append(") List<Double> d").append(i)
+                .append(i < 40 ? ",\n" : ") {}\n");
+        }
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.AllPackedDoublesPojo", pojo.toString()),
+                src("demo.AllPackedDoublesRecord", rec.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        String pojoSrc = generated(compilation, "demo.internal.AllPackedDoublesPojoProtoCodec");
+        assertTrue(pojoSrc.contains("_readChunk_0("));
+        assertTrue(pojoSrc.contains("_computeSize_0("));
+        assertTrue(pojoSrc.contains("_writeTo_0("));
+
+        String recSrc = generated(compilation, "demo.internal.AllPackedDoublesRecordProtoCodec");
+        assertTrue(recSrc.contains("private static final class _ReadState"));
+        assertTrue(recSrc.contains("_readChunk_0("));
+        assertTrue(recSrc.contains("_computeSize_0("));
+        assertTrue(recSrc.contains("_writeTo_0("));
+
+        assertAllMethodsUnderLimit(compilation, "demo/internal/AllPackedDoublesPojoProtoCodec.class");
+        assertAllMethodsUnderLimit(compilation, "demo/internal/AllPackedDoublesRecordProtoCodec.class");
+        assertAllMethodsUnderLimit(compilation, "demo/internal/AllPackedDoublesRecordProtoCodec$_ReadState.class");
+    }
+
+    @Test
+    void multiCaseEnumOneofExclusionsChunkByUnitWeight() throws Exception {
+        // 21 enum oneofs (2 enum cases * 2 = 4 units each -> 84 units > CHUNK_SIZE 40, though exclFields.size() == 21 <= 40)
+        // + 40 scalar ints = 124 units > SPLIT_THRESHOLD 80.
+        StringBuilder sb = new StringBuilder();
+        sb.append("package demo;\n");
+        sb.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        sb.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        sb.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        sb.append("import io.github.rawvoid.protovia.annotation.ProtoOneof;\n");
+        sb.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        sb.append("@ProtoMessage\n");
+        sb.append("public class ManyEnumOneofs {\n");
+        for (int i = 1; i <= 21; i++) {
+            int n1 = i * 2 - 1;
+            int n2 = i * 2;
+            sb.append("  @ProtoOneof({\n");
+            sb.append("    @ProtoOneof.Case(number = ").append(n1).append(", name = \"c").append(i).append("_a\", of = CaseA.class),\n");
+            sb.append("    @ProtoOneof.Case(number = ").append(n2).append(", name = \"c").append(i).append("_b\", of = CaseB.class)\n");
+            sb.append("  })\n");
+            sb.append("  public EnumChoice c").append(i).append(";\n");
+        }
+        for (int i = 101; i <= 140; i++) {
+            sb.append("  @ProtoField(number = ").append(i).append(") public int s").append(i).append(";\n");
+        }
+        sb.append("  @ProtoUnknown public UnknownFields unknown;\n");
+        sb.append("}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Status", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                    @ProtoEnum
+                    public enum Status {
+                      @ProtoEnumValue(0) UNKNOWN,
+                      @ProtoEnumValue(1) ACTIVE
+                    }
+                    """),
+                src("demo.EnumChoice", """
+                    package demo;
+                    public sealed interface EnumChoice permits CaseA, CaseB {}
+                    """),
+                src("demo.CaseA", """
+                    package demo;
+                    public record CaseA(Status a) implements EnumChoice {}
+                    """),
+                src("demo.CaseB", """
+                    package demo;
+                    public record CaseB(Status b) implements EnumChoice {}
+                    """),
+                src("demo.ManyEnumOneofs", sb.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        String source = generated(compilation, "demo.internal.ManyEnumOneofsProtoCodec");
+        assertTrue(source.contains("_collectExcludedEnums_0("));
+        assertTrue(source.contains("_collectExcludedEnums_1("));
+        assertAllMethodsUnderLimit(compilation, "demo/internal/ManyEnumOneofsProtoCodec.class");
+    }
+
+    @Test
+    void adversarialNestedMessageListsAndNonPackableArraysSplitBelowHugeMethodLimit() throws Exception {
+        // 80 List<Addr> (2 units each = 160), 80 String[] (2 units each = 160), 80 Addr[] (2 units each = 160).
+        StringBuilder listPojo = new StringBuilder();
+        listPojo.append("package demo;\n");
+        listPojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        listPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        listPojo.append("import java.util.List;\n");
+        listPojo.append("@ProtoMessage\n");
+        listPojo.append("public class NestedList80Pojo {\n");
+        for (int i = 1; i <= 80; i++) {
+            listPojo.append("  @ProtoField(number = ").append(i).append(") public List<Addr> f").append(i).append(";\n");
+        }
+        listPojo.append("}\n");
+
+        StringBuilder strArrPojo = new StringBuilder();
+        strArrPojo.append("package demo;\n");
+        strArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        strArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        strArrPojo.append("@ProtoMessage\n");
+        strArrPojo.append("public class StringArray80Pojo {\n");
+        for (int i = 1; i <= 80; i++) {
+            strArrPojo.append("  @ProtoField(number = ").append(i).append(") public String[] f").append(i).append(";\n");
+        }
+        strArrPojo.append("}\n");
+
+        StringBuilder addrArrPojo = new StringBuilder();
+        addrArrPojo.append("package demo;\n");
+        addrArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        addrArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        addrArrPojo.append("@ProtoMessage\n");
+        addrArrPojo.append("public class AddrArray80Pojo {\n");
+        for (int i = 1; i <= 80; i++) {
+            addrArrPojo.append("  @ProtoField(number = ").append(i).append(") public Addr[] f").append(i).append(";\n");
+        }
+        addrArrPojo.append("}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Addr", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoField;
+                    import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                    @ProtoMessage
+                    public class Addr {
+                      @ProtoField(number = 1) public String city;
+                    }
+                    """),
+                src("demo.NestedList80Pojo", listPojo.toString()),
+                src("demo.StringArray80Pojo", strArrPojo.toString()),
+                src("demo.AddrArray80Pojo", addrArrPojo.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        for (String name : new String[]{"NestedList80Pojo", "StringArray80Pojo", "AddrArray80Pojo"}) {
+            String src = generated(compilation, "demo.internal." + name + "ProtoCodec");
+            assertTrue(src.contains("_computeSize_0("), name + " should split computeSize");
+            assertTrue(src.contains("_writeTo_0("), name + " should split writeTo");
+            assertTrue(src.contains("_readChunk_0("), name + " should split read");
+            assertAllMethodsUnderLimit(compilation, "demo/internal/" + name + "ProtoCodec.class");
+        }
+        assertAllMethodsUnderLimit(compilation, "demo/internal/StringArray80PojoProtoCodec$_ArrayState.class");
+        assertAllMethodsUnderLimit(compilation, "demo/internal/AddrArray80PojoProtoCodec$_ArrayState.class");
+    }
+
+    @Test
+    void adversarialDeterministicMapsSplitBelowHugeMethodLimit() throws Exception {
+        // 80 @ProtoDeterministic Map<String, Addr> (2 units each = 160 > SPLIT_THRESHOLD 80).
+        StringBuilder mapPojo = new StringBuilder();
+        mapPojo.append("package demo;\n");
+        mapPojo.append("import io.github.rawvoid.protovia.annotation.ProtoDeterministic;\n");
+        mapPojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        mapPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        mapPojo.append("import java.util.Map;\n");
+        mapPojo.append("@ProtoMessage\n");
+        mapPojo.append("public class DetMap80Pojo {\n");
+        for (int i = 1; i <= 80; i++) {
+            mapPojo.append("  @ProtoField(number = ").append(i)
+                .append(") @ProtoDeterministic public Map<String, Addr> m").append(i).append(";\n");
+        }
+        mapPojo.append("}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Addr", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoField;
+                    import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                    @ProtoMessage
+                    public class Addr {
+                      @ProtoField(number = 1) public String city;
+                    }
+                    """),
+                src("demo.DetMap80Pojo", mapPojo.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        String src = generated(compilation, "demo.internal.DetMap80PojoProtoCodec");
+        assertTrue(src.contains("_computeSize_0("));
+        assertTrue(src.contains("_writeTo_0("));
+        assertTrue(src.contains("_readChunk_0("));
+        assertAllMethodsUnderLimit(compilation, "demo/internal/DetMap80PojoProtoCodec.class");
+    }
+
+    @Test
+    void adversarialEnumOneofsAndEnumArraysSplitBelowHugeMethodLimit() throws Exception {
+        // 40 2-case enum @ProtoOneof + @ProtoUnknown (40 * 4 = 160 units > SPLIT_THRESHOLD 80).
+        StringBuilder oneofPojo = new StringBuilder();
+        oneofPojo.append("package demo;\n");
+        oneofPojo.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        oneofPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        oneofPojo.append("import io.github.rawvoid.protovia.annotation.ProtoOneof;\n");
+        oneofPojo.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        oneofPojo.append("@ProtoMessage\n");
+        oneofPojo.append("public class EnumOneof40Pojo {\n");
+        for (int i = 1; i <= 40; i++) {
+            int n1 = i * 2 - 1;
+            int n2 = i * 2;
+            oneofPojo.append("  @ProtoOneof({\n");
+            oneofPojo.append("    @ProtoOneof.Case(number = ").append(n1).append(", name = \"c").append(i).append("_a\", of = CaseA.class),\n");
+            oneofPojo.append("    @ProtoOneof.Case(number = ").append(n2).append(", name = \"c").append(i).append("_b\", of = CaseB.class)\n");
+            oneofPojo.append("  })\n");
+            oneofPojo.append("  public EnumChoice c").append(i).append(";\n");
+        }
+        oneofPojo.append("  @ProtoUnknown public UnknownFields unknown;\n");
+        oneofPojo.append("}\n");
+
+        // 26 Status[] with @ProtoUnrecognized + @ProtoUnknown on getter/setter POJO (26 * 4 = 104 units > 80).
+        StringBuilder enumArrPojo = new StringBuilder();
+        enumArrPojo.append("package demo;\n");
+        enumArrPojo.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        enumArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        enumArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        enumArrPojo.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        enumArrPojo.append("@ProtoMessage\n");
+        enumArrPojo.append("public class EnumArray26AccessorPojo {\n");
+        for (int i = 1; i <= 26; i++) {
+            enumArrPojo.append("  @ProtoField(number = ").append(i).append(") private Status[] s").append(i).append(";\n");
+            enumArrPojo.append("  public Status[] getS").append(i).append("() { return s").append(i).append("; }\n");
+            enumArrPojo.append("  public void setS").append(i).append("(Status[] v) { this.s").append(i).append(" = v; }\n");
+        }
+        enumArrPojo.append("  @ProtoUnknown private UnknownFields unknown;\n");
+        enumArrPojo.append("  public UnknownFields getUnknown() { return unknown; }\n");
+        enumArrPojo.append("  public void setUnknown(UnknownFields unknown) { this.unknown = unknown; }\n");
+        enumArrPojo.append("}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Status", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                    import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
+                    @ProtoEnum
+                    public enum Status {
+                      @ProtoEnumValue(0) UNKNOWN,
+                      @ProtoEnumValue(1) ACTIVE,
+                      @ProtoUnrecognized UNRECOGNIZED
+                    }
+                    """),
+                src("demo.EnumChoice", """
+                    package demo;
+                    public sealed interface EnumChoice permits CaseA, CaseB {}
+                    """),
+                src("demo.CaseA", """
+                    package demo;
+                    public record CaseA(Status a) implements EnumChoice {}
+                    """),
+                src("demo.CaseB", """
+                    package demo;
+                    public record CaseB(Status b) implements EnumChoice {}
+                    """),
+                src("demo.EnumOneof40Pojo", oneofPojo.toString()),
+                src("demo.EnumArray26AccessorPojo", enumArrPojo.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        String oneofSrc = generated(compilation, "demo.internal.EnumOneof40PojoProtoCodec");
+        assertTrue(oneofSrc.contains("_computeSize_0("));
+        assertTrue(oneofSrc.contains("_writeTo_0("));
+        assertTrue(oneofSrc.contains("_readChunk_0("));
+        assertTrue(oneofSrc.contains("_collectExcludedEnums_0("));
+        assertAllMethodsUnderLimit(compilation, "demo/internal/EnumOneof40PojoProtoCodec.class");
+
+        String enumArrSrc = generated(compilation, "demo.internal.EnumArray26AccessorPojoProtoCodec");
+        assertTrue(enumArrSrc.contains("_computeSize_0("));
+        assertTrue(enumArrSrc.contains("_writeTo_0("));
+        assertTrue(enumArrSrc.contains("_readChunk_0("));
+        assertAllMethodsUnderLimit(compilation, "demo/internal/EnumArray26AccessorPojoProtoCodec.class");
+        assertAllMethodsUnderLimit(compilation, "demo/internal/EnumArray26AccessorPojoProtoCodec$_ArrayState.class");
+    }
+
+    @Test
+    void heavyShapesAtExact80UnitBoundaryStayUnsplitBelowHugeMethodLimit() throws Exception {
+        // Exact SPLIT_THRESHOLD = 80 units unsplit for each heavy category:
+        // 40 List<Addr> (40 * 2 = 80), 40 Addr[] (40 * 2 = 80), 40 @ProtoDeterministic Map<String, Addr> (40 * 2 = 80),
+        // 20 2-case enum @ProtoOneof + @ProtoUnknown (20 * 4 = 80), 20 Status[] getter/setter + @ProtoUnknown (20 * 4 = 80).
+        StringBuilder list40 = new StringBuilder();
+        list40.append("package demo;\n");
+        list40.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        list40.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        list40.append("import java.util.List;\n");
+        list40.append("@ProtoMessage\npublic class List40Boundary {\n");
+        for (int i = 1; i <= 40; i++) {
+            list40.append("  @ProtoField(number = ").append(i).append(") public List<Addr> f").append(i).append(";\n");
+        }
+        list40.append("}\n");
+
+        StringBuilder arr40 = new StringBuilder();
+        arr40.append("package demo;\n");
+        arr40.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        arr40.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        arr40.append("@ProtoMessage\npublic class AddrArr40Boundary {\n");
+        for (int i = 1; i <= 40; i++) {
+            arr40.append("  @ProtoField(number = ").append(i).append(") public Addr[] f").append(i).append(";\n");
+        }
+        arr40.append("}\n");
+
+        StringBuilder map40 = new StringBuilder();
+        map40.append("package demo;\n");
+        map40.append("import io.github.rawvoid.protovia.annotation.ProtoDeterministic;\n");
+        map40.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        map40.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        map40.append("import java.util.Map;\n");
+        map40.append("@ProtoMessage\npublic class DetMap40Boundary {\n");
+        for (int i = 1; i <= 40; i++) {
+            map40.append("  @ProtoField(number = ").append(i)
+                .append(") @ProtoDeterministic public Map<String, Addr> m").append(i).append(";\n");
+        }
+        map40.append("}\n");
+
+        StringBuilder oneof20 = new StringBuilder();
+        oneof20.append("package demo;\n");
+        oneof20.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        oneof20.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        oneof20.append("import io.github.rawvoid.protovia.annotation.ProtoOneof;\n");
+        oneof20.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        oneof20.append("@ProtoMessage\npublic class EnumOneof20Boundary {\n");
+        for (int i = 1; i <= 20; i++) {
+            int n1 = i * 2 - 1;
+            int n2 = i * 2;
+            oneof20.append("  @ProtoOneof({\n");
+            oneof20.append("    @ProtoOneof.Case(number = ").append(n1).append(", name = \"c").append(i).append("_a\", of = CaseA.class),\n");
+            oneof20.append("    @ProtoOneof.Case(number = ").append(n2).append(", name = \"c").append(i).append("_b\", of = CaseB.class)\n");
+            oneof20.append("  })\n");
+            oneof20.append("  public EnumChoice c").append(i).append(";\n");
+        }
+        oneof20.append("  @ProtoUnknown public UnknownFields unknown;\n");
+        oneof20.append("}\n");
+
+        StringBuilder enumArr20 = new StringBuilder();
+        enumArr20.append("package demo;\n");
+        enumArr20.append("import io.github.rawvoid.protovia.UnknownFields;\n");
+        enumArr20.append("import io.github.rawvoid.protovia.annotation.ProtoField;\n");
+        enumArr20.append("import io.github.rawvoid.protovia.annotation.ProtoMessage;\n");
+        enumArr20.append("import io.github.rawvoid.protovia.annotation.ProtoUnknown;\n");
+        enumArr20.append("@ProtoMessage\npublic class EnumArr20Boundary {\n");
+        for (int i = 1; i <= 20; i++) {
+            enumArr20.append("  @ProtoField(number = ").append(i).append(") private Status[] s").append(i).append(";\n");
+            enumArr20.append("  public Status[] getS").append(i).append("() { return s").append(i).append("; }\n");
+            enumArr20.append("  public void setS").append(i).append("(Status[] v) { this.s").append(i).append(" = v; }\n");
+        }
+        enumArr20.append("  @ProtoUnknown private UnknownFields unknown;\n");
+        enumArr20.append("  public UnknownFields getUnknown() { return unknown; }\n");
+        enumArr20.append("  public void setUnknown(UnknownFields unknown) { this.unknown = unknown; }\n");
+        enumArr20.append("}\n");
+
+        Compilation compilation = javac()
+            .withOptions("--release", "21", "-Xlint:unchecked", "-Werror")
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                src("demo.Addr", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoField;
+                    import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                    @ProtoMessage
+                    public class Addr {
+                      @ProtoField(number = 1) public String city;
+                    }
+                    """),
+                src("demo.Status", """
+                    package demo;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                    import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                    import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
+                    @ProtoEnum
+                    public enum Status {
+                      @ProtoEnumValue(0) UNKNOWN,
+                      @ProtoEnumValue(1) ACTIVE,
+                      @ProtoUnrecognized UNRECOGNIZED
+                    }
+                    """),
+                src("demo.EnumChoice", """
+                    package demo;
+                    public sealed interface EnumChoice permits CaseA, CaseB {}
+                    """),
+                src("demo.CaseA", """
+                    package demo;
+                    public record CaseA(Status a) implements EnumChoice {}
+                    """),
+                src("demo.CaseB", """
+                    package demo;
+                    public record CaseB(Status b) implements EnumChoice {}
+                    """),
+                src("demo.List40Boundary", list40.toString()),
+                src("demo.AddrArr40Boundary", arr40.toString()),
+                src("demo.DetMap40Boundary", map40.toString()),
+                src("demo.EnumOneof20Boundary", oneof20.toString()),
+                src("demo.EnumArr20Boundary", enumArr20.toString()));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        for (String name : new String[]{
+            "List40Boundary", "AddrArr40Boundary", "DetMap40Boundary", "EnumOneof20Boundary", "EnumArr20Boundary"}) {
+            String src = generated(compilation, "demo.internal." + name + "ProtoCodec");
+            assertFalse(src.contains("_computeSize_0("), name + " should stay unsplit at exact 80 units");
+            assertFalse(src.contains("_writeTo_0("), name + " should stay unsplit at exact 80 units");
+            assertFalse(src.contains("_readChunk_0("), name + " should stay unsplit at exact 80 units");
+            assertAllMethodsUnderLimit(compilation, "demo/internal/" + name + "ProtoCodec.class");
+        }
     }
 
     private static void assertAllMethodsUnderLimit(Compilation compilation, String classPath) throws IOException {
