@@ -19,6 +19,7 @@ package io.github.rawvoid.protovia.processor.parse;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoField;
 import io.github.rawvoid.protovia.processor.model.AccessKind;
+import io.github.rawvoid.protovia.processor.model.CollectionKind;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.Names;
@@ -68,7 +69,7 @@ final class FieldResolver {
         boolean javaOptional = env.isOptional(type);
         TypeMirror effective = type;
         if (javaOptional) {
-            effective = env.typeArgument(type, 0, origin, "Optional", diag);
+            effective = env.typeArgument(type, env.optionalType, 0, origin, "Optional", diag);
             if (effective == null) {
                 return null;
             }
@@ -86,7 +87,7 @@ final class FieldResolver {
             if (field != null) {
                 field = field.toBuilder().deterministic(deterministic.resolve(origin)).build();
             }
-        } else if (env.isRepeatedContainer(effective)) {
+        } else if (env.isRepeatedContainer(effective) && !env.isByteArray(effective)) {
             if (optional) {
                 diag.error(origin, "repeated field '" + name + "' cannot be optional");
                 return null;
@@ -168,14 +169,8 @@ final class FieldResolver {
         TypeMirror elementType;
         if (array) {
             elementType = ((ArrayType) type).getComponentType();
-            if (elementType.getKind() == TypeKind.BYTE) {
-                return resolveSingular(new FieldRequest(
-                    origin, name, type, TypeClassifier.protoOrAuto(ann.type(), ProtoType.BYTES),
-                    ann.optional(), ann.packed(), accessKind, readExpr, setter, fieldName, pkg, javaOptional, type,
-                    fieldAdapter, ann.number(), AdapterSite.SINGULAR));
-            }
         } else {
-            elementType = env.typeArgument(type, 0, origin, "collection", diag);
+            elementType = env.typeArgument(type, env.collectionType, 0, origin, "collection", diag);
             if (elementType == null) {
                 return null;
             }
@@ -187,7 +182,17 @@ final class FieldResolver {
         if (element == null) {
             return null;
         }
-        TypeElement impl = array ? null : env.collectionImpl(type, element);
+        TypeElement impl = null;
+        CollectionKind collectionKind = CollectionKind.NONE;
+        boolean copyConstructor = false;
+        if (!array) {
+            impl = env.collectionImpl(type, element, origin, Names.codecPackageName(pkg), diag);
+            if (impl == null) {
+                return null;
+            }
+            collectionKind = env.collectionKind(type);
+            copyConstructor = env.hasPublicCopyConstructor(impl, type);
+        }
         boolean packed = ann.packed() && isPackable(element);
         var builder = FieldModel.builder()
             .number(ann.number())
@@ -206,6 +211,8 @@ final class FieldResolver {
             .javaType(type)
             .implTypeName(impl == null ? null : impl.getQualifiedName().toString())
             .implType(impl)
+            .collectionKind(collectionKind)
+            .implCopyConstructor(copyConstructor)
             .element(element)
             .origin(origin)
             .array(array);
@@ -227,8 +234,8 @@ final class FieldResolver {
         String pkg,
         boolean javaOptional,
         TypeElement fieldAdapter) {
-        TypeMirror keyType = env.typeArgument(type, 0, origin, "Map", diag);
-        TypeMirror valueType = env.typeArgument(type, 1, origin, "Map", diag);
+        TypeMirror keyType = env.typeArgument(type, env.mapType, 0, origin, "Map", diag);
+        TypeMirror valueType = env.typeArgument(type, env.mapType, 1, origin, "Map", diag);
         if (keyType == null || valueType == null) {
             return null;
         }
@@ -261,7 +268,10 @@ final class FieldResolver {
             diag.error(origin, "map key of field '" + name + "' must be an integral type, bool, or string");
             return null;
         }
-        TypeElement impl = env.mapImpl(type);
+        TypeElement impl = env.mapImpl(type, origin, Names.codecPackageName(pkg), diag);
+        if (impl == null) {
+            return null;
+        }
         return FieldModel.builder()
             .number(ann.number())
             .name(name)
@@ -276,6 +286,7 @@ final class FieldResolver {
             .javaType(type)
             .implTypeName(impl.getQualifiedName().toString())
             .implType(impl)
+            .implCopyConstructor(env.hasPublicCopyConstructor(impl, type))
             .mapKey(key)
             .mapValue(value)
             .origin(origin)

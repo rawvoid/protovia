@@ -658,6 +658,37 @@ class InheritanceProcessorTest {
         assertThat(compilation).hadErrorContaining("duplicate field number 10");
     }
 
+    @Test
+    void genericMixinOverloadedAccessorsPickSpecializedOverload() {
+        Compilation compilation = compile(
+            src("demo.Base", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                public class Base<T> {
+                  @ProtoField(number = 1) private T data;
+                  public T getData() { return data; }
+                  public T getData(int index) { return data; }
+                  public void setData(T data) { this.data = data; }
+                  public void setData(int index) {}
+                }
+                """),
+            src("demo.Leaf", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public class Leaf extends Base<String> {}
+                """));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.LeafProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.getData()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.LeafProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.setData(");
+    }
+
     private static JavaFileObject localDateAdapter() {
         return src("demo.LocalDateEpochDay", """
             package demo;

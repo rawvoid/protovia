@@ -16,20 +16,28 @@
 
 package io.github.rawvoid.protovia.processor.parse;
 
+import io.github.rawvoid.protovia.processor.model.CollectionKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import io.github.rawvoid.protovia.processor.model.Names;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.ExecutableType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Cached {@link TypeMirror}s and type-query helpers shared by the parse pipeline.
@@ -91,6 +99,11 @@ final class TypeEnv {
         return e instanceof TypeElement te ? te : null;
     }
 
+    boolean isByteArray(TypeMirror type) {
+        return type.getKind() == TypeKind.ARRAY
+            && ((ArrayType) type).getComponentType().getKind() == TypeKind.BYTE;
+    }
+
     boolean isRepeatedContainer(TypeMirror type) {
         if (type.getKind() == TypeKind.ARRAY) {
             return true;
@@ -101,6 +114,23 @@ final class TypeEnv {
             || types.isAssignable(erased, collectionType);
     }
 
+    CollectionKind collectionKind(TypeMirror type) {
+        if (type.getKind() == TypeKind.ARRAY) {
+            return CollectionKind.NONE;
+        }
+        TypeMirror erased = types.erasure(type);
+        if (types.isAssignable(erased, setType)) {
+            return CollectionKind.SET;
+        }
+        if (types.isAssignable(erased, listType)) {
+            return CollectionKind.LIST;
+        }
+        if (types.isAssignable(erased, collectionType)) {
+            return CollectionKind.COLLECTION;
+        }
+        return CollectionKind.NONE;
+    }
+
     boolean isMap(TypeMirror type) {
         return types.isAssignable(types.erasure(type), mapType);
     }
@@ -109,12 +139,19 @@ final class TypeEnv {
         return types.isAssignable(types.erasure(type), optionalType);
     }
 
-    TypeMirror typeArgument(TypeMirror type, int index, Element origin, String what, Diagnostics diag) {
-        if (!(type instanceof DeclaredType declared)) {
+    TypeMirror typeArgument(
+        TypeMirror type,
+        TypeMirror targetErasure,
+        int index,
+        Element origin,
+        String what,
+        Diagnostics diag) {
+        DeclaredType target = findSupertype(type, targetErasure);
+        if (target == null) {
             diag.error(origin, "raw " + what + " is not supported; use a parameterized type");
             return null;
         }
-        List<? extends TypeMirror> args = declared.getTypeArguments();
+        List<? extends TypeMirror> args = target.getTypeArguments();
         if (args.size() <= index) {
             diag.error(origin, "raw " + what + " is not supported; use a parameterized type");
             return null;
@@ -127,32 +164,165 @@ final class TypeEnv {
         return arg;
     }
 
-    TypeElement collectionImpl(TypeMirror type, FieldModel elementModel) {
-        TypeElement element = asTypeElement(type);
-        if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
-            && !element.getQualifiedName().contentEquals("java.util.List")
-            && !element.getQualifiedName().contentEquals("java.util.Set")
-            && !element.getQualifiedName().contentEquals("java.util.Collection")) {
-            return element;
+    private DeclaredType findSupertype(TypeMirror start, TypeMirror targetErasure) {
+        if (!(start instanceof DeclaredType)) {
+            return null;
         }
-        TypeMirror erased = types.erasure(type);
-        if (types.isAssignable(erased, setType)) {
-            return elements.getTypeElement("java.util.LinkedHashSet");
+        Deque<TypeMirror> queue = new ArrayDeque<>();
+        Set<TypeElement> visited = new HashSet<>();
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            TypeMirror current = queue.poll();
+            if (!(current instanceof DeclaredType declared)) {
+                continue;
+            }
+            if (types.isSameType(types.erasure(declared), targetErasure)) {
+                return declared;
+            }
+            TypeElement element = asTypeElement(declared);
+            if (element != null && !visited.add(element)) {
+                continue;
+            }
+            for (TypeMirror sup : types.directSupertypes(declared)) {
+                queue.add(sup);
+            }
         }
-        String primitive = elementModel.primitiveListClass();
-        if (primitive != null) {
-            return elements.getTypeElement(primitive);
-        }
-        return elements.getTypeElement("java.util.ArrayList");
+        return null;
     }
 
-    TypeElement mapImpl(TypeMirror type) {
+    TypeElement collectionImpl(
+        TypeMirror type,
+        FieldModel elementModel,
+        Element origin,
+        String codecPkg,
+        Diagnostics diag) {
         TypeElement element = asTypeElement(type);
-        if (element != null && !element.getModifiers().contains(Modifier.ABSTRACT)
-            && !element.getQualifiedName().contentEquals("java.util.Map")) {
+        if (element == null) {
+            diag.error(origin, "unsupported collection type " + type
+                + "; use List, Set, SortedSet, Collection, or a concrete mutable collection with a public no-arg constructor");
+            return null;
+        }
+        String qn = element.getQualifiedName().toString();
+        if (qn.equals("java.util.List") || qn.equals("java.util.Collection")) {
+            String primitive = elementModel.primitiveListClass();
+            return elements.getTypeElement(primitive != null ? primitive : "java.util.ArrayList");
+        }
+        if (qn.equals("java.util.Set")) {
+            return elements.getTypeElement("java.util.LinkedHashSet");
+        }
+        if (qn.equals("java.util.SortedSet") || qn.equals("java.util.NavigableSet")) {
+            return elements.getTypeElement("java.util.TreeSet");
+        }
+        if (element.getKind() == ElementKind.CLASS && !element.getModifiers().contains(Modifier.ABSTRACT)) {
+            if (!isAccessibleFromCodec(element, codecPkg)) {
+                diag.error(origin, "collection type " + element.getSimpleName()
+                    + " is not accessible from " + codecPkg);
+                return null;
+            }
+            if (!hasPublicNoArgConstructor(element)) {
+                diag.error(origin, "collection type " + element.getSimpleName()
+                    + " must have a public no-arg constructor");
+                return null;
+            }
             return element;
         }
-        return elements.getTypeElement("java.util.LinkedHashMap");
+        diag.error(origin, "unsupported collection type " + element.getSimpleName()
+            + "; use List, Set, SortedSet, Collection, or a concrete mutable collection with a public no-arg constructor");
+        return null;
+    }
+
+    TypeElement mapImpl(
+        TypeMirror type,
+        Element origin,
+        String codecPkg,
+        Diagnostics diag) {
+        TypeElement element = asTypeElement(type);
+        if (element == null) {
+            diag.error(origin, "unsupported map type " + type
+                + "; use Map, SortedMap, NavigableMap, ConcurrentMap, or a concrete mutable map with a public no-arg constructor");
+            return null;
+        }
+        String qn = element.getQualifiedName().toString();
+        if (qn.equals("java.util.Map")) {
+            return elements.getTypeElement("java.util.LinkedHashMap");
+        }
+        if (qn.equals("java.util.SortedMap") || qn.equals("java.util.NavigableMap")) {
+            return elements.getTypeElement("java.util.TreeMap");
+        }
+        if (qn.equals("java.util.concurrent.ConcurrentMap")) {
+            return elements.getTypeElement("java.util.concurrent.ConcurrentHashMap");
+        }
+        if (qn.equals("java.util.concurrent.ConcurrentNavigableMap")) {
+            return elements.getTypeElement("java.util.concurrent.ConcurrentSkipListMap");
+        }
+        if (element.getKind() == ElementKind.CLASS && !element.getModifiers().contains(Modifier.ABSTRACT)) {
+            if (!isAccessibleFromCodec(element, codecPkg)) {
+                diag.error(origin, "map type " + element.getSimpleName()
+                    + " is not accessible from " + codecPkg);
+                return null;
+            }
+            if (!hasPublicNoArgConstructor(element)) {
+                diag.error(origin, "map type " + element.getSimpleName()
+                    + " must have a public no-arg constructor");
+                return null;
+            }
+            return element;
+        }
+        diag.error(origin, "unsupported map type " + element.getSimpleName()
+            + "; use Map, SortedMap, NavigableMap, ConcurrentMap, or a concrete mutable map with a public no-arg constructor");
+        return null;
+    }
+
+    static boolean hasPublicNoArgConstructor(TypeElement type) {
+        boolean sawCtor = false;
+        for (ExecutableElement ctor : ElementFilter.constructorsIn(type.getEnclosedElements())) {
+            sawCtor = true;
+            if (ctor.getParameters().isEmpty() && ctor.getModifiers().contains(Modifier.PUBLIC)) {
+                return true;
+            }
+        }
+        return !sawCtor && type.getModifiers().contains(Modifier.PUBLIC);
+    }
+
+    boolean hasPublicCopyConstructor(TypeElement impl, TypeMirror declaredType) {
+        if (impl == null || !(declaredType instanceof DeclaredType declared)) {
+            return false;
+        }
+        boolean sameRaw = types.isSameType(types.erasure(declaredType), types.erasure(impl.asType()));
+        TypeMirror targetErasure = isMap(declaredType) ? mapType : collectionType;
+        for (ExecutableElement ctor : ElementFilter.constructorsIn(impl.getEnclosedElements())) {
+            if (!ctor.getModifiers().contains(Modifier.PUBLIC) || ctor.getParameters().size() != 1) {
+                continue;
+            }
+            if (sameRaw) {
+                TypeMirror paramType = ctor.getParameters().getFirst().asType();
+                try {
+                    if (types.asMemberOf(declared, ctor) instanceof ExecutableType exec
+                        && !exec.getParameterTypes().isEmpty()) {
+                        paramType = exec.getParameterTypes().getFirst();
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // fall back to declared parameter type
+                }
+                if (types.isAssignable(types.erasure(paramType), targetErasure)
+                    && types.isAssignable(declaredType, paramType)) {
+                    return true;
+                }
+            } else if (impl.getTypeParameters().isEmpty()) {
+                TypeMirror paramType = ctor.getParameters().getFirst().asType();
+                if (types.isAssignable(types.erasure(paramType), targetErasure)
+                    && types.isAssignable(declaredType, paramType)) {
+                    return true;
+                }
+            } else {
+                TypeMirror paramErased = types.erasure(ctor.getParameters().getFirst().asType());
+                if (types.isAssignable(paramErased, targetErasure)
+                    && types.isAssignable(types.erasure(declaredType), paramErased)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     String renderType(TypeMirror type, String pkg) {

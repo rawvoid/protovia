@@ -139,12 +139,28 @@ final class ReadEmitter {
         String local = field.localName;
         String fromExisting = field.accessOn("existing");
         if (isCollection(field)) {
-            b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
-                javaType(field), local, fromExisting, newImpl(field, fromExisting), newImpl(field));
+            initCollectionLocal(b, field, javaType(field), local, fromExisting);
             return;
         }
         b.addStatement("$T $L = existing != null ? $L : $L",
             javaType(field), local, fromExisting, defaultValue(field.javaType));
+    }
+
+    private static void initCollectionLocal(
+        CodeBlock.Builder b, FieldModel field, TypeName typeName, String local, String fromExisting) {
+        if (field.implCopyConstructor) {
+            b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
+                typeName, local, fromExisting, newImpl(field, fromExisting), newImpl(field));
+            return;
+        }
+        b.addStatement("$T $L = $L", typeName, local, newImpl(field));
+        b.beginControlFlow("if (existing != null && $L != null)", fromExisting);
+        if (field.kind == FieldKind.MAP) {
+            b.addStatement("$L.putAll($L)", local, fromExisting);
+        } else {
+            b.addStatement("$L.addAll($L)", local, fromExisting);
+        }
+        b.endControlFlow();
     }
 
     private static boolean isCollection(FieldModel field) {
@@ -397,8 +413,7 @@ final class ReadEmitter {
         }
         FieldModel field = component.field();
         if (field != null && isCollection(field)) {
-            b.addStatement("$T $L = existing != null && $L != null ? $L : $L",
-                javaType(component.type()), local, fromExisting, newImpl(field, fromExisting), newImpl(field));
+            initCollectionLocal(b, field, javaType(component.type()), local, fromExisting);
             return;
         }
         b.addStatement("$T $L = existing != null ? $L : $L",

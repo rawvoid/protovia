@@ -64,7 +64,7 @@ public final class SchemaParser {
         this.deterministic = new DeterministicResolver(env, diag);
         this.fields = new FieldResolver(env, diag, classifier, adapters, deterministic);
         this.oneofs = new OneofParser(env, diag, fields, adapters);
-        this.scanner = new MemberScanner(diag);
+        this.scanner = new MemberScanner(env, diag);
         this.inheritance = new InheritanceWalker(env, diag);
         this.construction = new ConstructionResolver(env, diag);
     }
@@ -130,6 +130,10 @@ public final class SchemaParser {
         boolean record = type.getKind() == ElementKind.RECORD;
 
         String pkg = Names.packageName(type);
+        if (pkg.isEmpty()) {
+            diag.error(type, "@ProtoMessage type " + type.getSimpleName() + " cannot be in the default (unnamed) package");
+            return null;
+        }
         String typeName = Names.typeName(type, pkg);
         ProtoMessage meta = type.getAnnotation(ProtoMessage.class);
         String protoPackage = Names.protoPackage(type, meta == null ? "" : meta.packageName());
@@ -199,7 +203,7 @@ public final class SchemaParser {
     private void dispatch(
         Member member,
         MessageScope scope,
-        Map<String, ExecutableElement> methods,
+        Map<String, List<ExecutableElement>> methods,
         InheritanceWalker.SuperType superType) {
         if (member.recordComponent() && !member.roles().any()) {
             scope.addComponent(member.name(), member.type(), null);
@@ -261,7 +265,7 @@ public final class SchemaParser {
     private void bindUnknown(
         Member member,
         MessageScope scope,
-        Map<String, ExecutableElement> methods,
+        Map<String, List<ExecutableElement>> methods,
         InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && member.name() == null) {
             diag.error(member.origin(), "@ProtoUnknown on a method must be a JavaBean getter");
@@ -287,7 +291,7 @@ public final class SchemaParser {
     private void bindOneof(
         Member member,
         MessageScope scope,
-        Map<String, ExecutableElement> methods,
+        Map<String, List<ExecutableElement>> methods,
         InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && badMethodGetter(member, "@ProtoOneof")) {
             return;
@@ -324,12 +328,13 @@ public final class SchemaParser {
     private Access resolveAccess(
         Member member,
         MessageScope scope,
-        Map<String, ExecutableElement> methods,
+        Map<String, List<ExecutableElement>> methods,
         InheritanceWalker.SuperType superType) {
         String inheritedOwner = superType == null
             ? null
             : env.renderType(superType.declared(), "");
-        Access access = scanner.resolveAccess(member, methods, inheritedOwner);
+        Access access = scanner.resolveAccess(
+            member, methods, superType == null ? null : superType.declared(), inheritedOwner);
         if (access == null) {
             return null;
         }
@@ -348,7 +353,7 @@ public final class SchemaParser {
     private void bindField(
         Member member,
         MessageScope scope,
-        Map<String, ExecutableElement> methods,
+        Map<String, List<ExecutableElement>> methods,
         InheritanceWalker.SuperType superType) {
         if (member.fromMethod() && badMethodGetter(member, "@ProtoField")) {
             return;
