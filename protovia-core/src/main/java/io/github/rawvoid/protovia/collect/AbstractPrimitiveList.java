@@ -27,11 +27,20 @@ import java.util.RandomAccess;
  */
 abstract class AbstractPrimitiveList<E> extends AbstractList<E> implements RandomAccess {
 
+    private static final int DEFAULT_CAPACITY = 10;
+    static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+
     int size;
 
     @Override
     public final int size() {
         return size;
+    }
+
+    @Override
+    public final void clear() {
+        size = 0;
+        modCount++;
     }
 
     final void checkElementIndex(int index) {
@@ -46,7 +55,29 @@ abstract class AbstractPrimitiveList<E> extends AbstractList<E> implements Rando
         }
     }
 
+    final void checkRange(int fromIndex, int toIndex) {
+        if (fromIndex < 0 || toIndex > size || fromIndex > toIndex) {
+            throw new IndexOutOfBoundsException(
+                "fromIndex=" + fromIndex + " toIndex=" + toIndex + " size=" + size);
+        }
+    }
+
+    static int checkedCapacity(int currentSize, int additional) {
+        int target = currentSize + additional;
+        if (target < 0) {
+            throw new OutOfMemoryError("list capacity overflow");
+        }
+        return target;
+    }
+
     static int grow(int current, int minCapacity) {
-        return Math.max(current * 2, minCapacity);
+        if (minCapacity < 0) {
+            throw new OutOfMemoryError("list capacity overflow");
+        }
+        if (current <= 0) {
+            return Math.max(DEFAULT_CAPACITY, minCapacity);
+        }
+        int grown = current > (MAX_ARRAY_SIZE >>> 1) ? MAX_ARRAY_SIZE : current << 1;
+        return Math.max(grown, minCapacity);
     }
 }

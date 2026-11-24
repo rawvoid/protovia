@@ -305,6 +305,9 @@ final class WireCodegen {
         if (field.implType != null && field.implType.getQualifiedName().toString().contains("Set")) {
             return CodeBlock.of("$T.ensureMutableSet($L, $L)", PROTO_LISTS, container, ctor);
         }
+        if (PrimitiveListSpec.of(field) != null && !field.array) {
+            return CodeBlock.of("$T.ensureMutablePrimitiveList($L, $L)", PROTO_LISTS, container, ctor);
+        }
         return CodeBlock.of("$T.ensureMutableList($L, $L)", PROTO_LISTS, container, ctor);
     }
 

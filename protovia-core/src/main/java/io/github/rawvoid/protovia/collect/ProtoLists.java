@@ -16,7 +16,26 @@
 
 package io.github.rawvoid.protovia.collect;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Supplier;
 
 /**
@@ -31,51 +50,111 @@ public final class ProtoLists {
 
     /**
      * Returns {@code list} when it can be appended in place; otherwise a mutable copy from {@code empty}.
-     * {@code List.of} / empty lists become a fresh instance so merge does not throw.
+     * Immutable or unmodifiable lists (such as {@code List.of} or {@code Collections.emptyList})
+     * become a fresh instance so merge does not throw.
      */
-    public static <E> List<E> ensureMutableList(List<E> list, Supplier<List<E>> empty) {
-        if (list == null || list.isEmpty()) {
+    public static <E, C extends List<E>> C ensureMutableList(C list, Supplier<? extends C> empty) {
+        if (list == null) {
             return empty.get();
         }
         if (isMutableList(list)) {
             return list;
         }
-        List<E> copy = empty.get();
+        C copy = empty.get();
+        if (!list.isEmpty()) {
+            copy.addAll(list);
+        }
+        return copy;
+    }
+
+    /**
+     * Returns {@code list} when it can be appended in place, upgrading an empty non-primitive list
+     * (such as a POJO field initialized to {@code new ArrayList<>()}) to the primitive list supplied
+     * by {@code empty} without boxing or throwaway allocations.
+     */
+    public static <E, C extends List<E>> C ensureMutablePrimitiveList(C list, Supplier<? extends C> empty) {
+        if (list == null || (list.isEmpty() && !(list instanceof AbstractPrimitiveList<?>))) {
+            return empty.get();
+        }
+        if (isMutableList(list)) {
+            return list;
+        }
+        C copy = empty.get();
         copy.addAll(list);
         return copy;
     }
 
-    public static <E> Set<E> ensureMutableSet(Set<E> set, Supplier<Set<E>> empty) {
-        if (set == null || set.isEmpty()) {
+    public static <E, C extends Set<E>> C ensureMutableSet(C set, Supplier<? extends C> empty) {
+        if (set == null) {
             return empty.get();
         }
-        if (set instanceof HashSet || set instanceof LinkedHashSet) {
+        if (isMutableSet(set)) {
             return set;
         }
-        Set<E> copy = empty.get();
-        copy.addAll(set);
+        C copy = empty.get();
+        if (!set.isEmpty()) {
+            copy.addAll(set);
+        }
         return copy;
     }
 
-    public static <K, V> Map<K, V> ensureMutableMap(Map<K, V> map, Supplier<Map<K, V>> empty) {
-        if (map == null || map.isEmpty()) {
+    public static <E, C extends Collection<E>> C ensureMutableCollection(C collection, Supplier<? extends C> empty) {
+        if (collection == null) {
             return empty.get();
         }
-        if (map instanceof HashMap || map instanceof LinkedHashMap) {
+        if (isMutableCollection(collection)) {
+            return collection;
+        }
+        C copy = empty.get();
+        if (!collection.isEmpty()) {
+            copy.addAll(collection);
+        }
+        return copy;
+    }
+
+    public static <K, V, M extends Map<K, V>> M ensureMutableMap(M map, Supplier<? extends M> empty) {
+        if (map == null) {
+            return empty.get();
+        }
+        if (isMutableMap(map)) {
             return map;
         }
-        Map<K, V> copy = empty.get();
-        copy.putAll(map);
+        M copy = empty.get();
+        if (!map.isEmpty()) {
+            copy.putAll(map);
+        }
         return copy;
     }
 
     public static boolean isMutableList(List<?> list) {
         return list instanceof ArrayList
-            || list instanceof IntArrayList
-            || list instanceof LongArrayList
-            || list instanceof FloatArrayList
-            || list instanceof DoubleArrayList
-            || list instanceof BooleanArrayList;
+            || list instanceof AbstractPrimitiveList
+            || list instanceof LinkedList
+            || list instanceof Vector
+            || list instanceof CopyOnWriteArrayList;
+    }
+
+    public static boolean isMutableSet(Set<?> set) {
+        return set instanceof HashSet
+            || set instanceof TreeSet
+            || set instanceof CopyOnWriteArraySet
+            || set instanceof ConcurrentSkipListSet
+            || set instanceof EnumSet;
+    }
+
+    public static boolean isMutableCollection(Collection<?> collection) {
+        return (collection instanceof List<?> list && isMutableList(list))
+            || (collection instanceof Set<?> set && isMutableSet(set))
+            || collection instanceof ArrayDeque;
+    }
+
+    public static boolean isMutableMap(Map<?, ?> map) {
+        return map instanceof HashMap
+            || map instanceof TreeMap
+            || map instanceof ConcurrentHashMap
+            || map instanceof ConcurrentSkipListMap
+            || map instanceof EnumMap
+            || map instanceof IdentityHashMap;
     }
 
     public static void addInt(List<Integer> list, int value) {
@@ -119,32 +198,47 @@ public final class ProtoLists {
     }
 
     public static void ensureIntCapacity(List<Integer> list, int additional) {
+        if (additional <= 0) {
+            return;
+        }
         if (list instanceof IntArrayList ints) {
-            ints.ensureCapacity(ints.size() + additional);
+            ints.ensureCapacity(AbstractPrimitiveList.checkedCapacity(ints.size(), additional));
         }
     }
 
     public static void ensureLongCapacity(List<Long> list, int additional) {
+        if (additional <= 0) {
+            return;
+        }
         if (list instanceof LongArrayList longs) {
-            longs.ensureCapacity(longs.size() + additional);
+            longs.ensureCapacity(AbstractPrimitiveList.checkedCapacity(longs.size(), additional));
         }
     }
 
     public static void ensureFloatCapacity(List<Float> list, int additional) {
+        if (additional <= 0) {
+            return;
+        }
         if (list instanceof FloatArrayList floats) {
-            floats.ensureCapacity(floats.size() + additional);
+            floats.ensureCapacity(AbstractPrimitiveList.checkedCapacity(floats.size(), additional));
         }
     }
 
     public static void ensureDoubleCapacity(List<Double> list, int additional) {
+        if (additional <= 0) {
+            return;
+        }
         if (list instanceof DoubleArrayList doubles) {
-            doubles.ensureCapacity(doubles.size() + additional);
+            doubles.ensureCapacity(AbstractPrimitiveList.checkedCapacity(doubles.size(), additional));
         }
     }
 
     public static void ensureBooleanCapacity(List<Boolean> list, int additional) {
+        if (additional <= 0) {
+            return;
+        }
         if (list instanceof BooleanArrayList booleans) {
-            booleans.ensureCapacity(booleans.size() + additional);
+            booleans.ensureCapacity(AbstractPrimitiveList.checkedCapacity(booleans.size(), additional));
         }
     }
 }
