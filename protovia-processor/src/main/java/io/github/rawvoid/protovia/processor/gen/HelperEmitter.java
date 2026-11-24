@@ -163,13 +163,14 @@ final class HelperEmitter {
     }
 
     private static void collectMapHelpers(MessageModel model, List<MethodSpec> methods) {
+        boolean captureUnknown = model.unknown != null;
         for (FieldModel field : model.fields) {
             if (field.kind != FieldKind.MAP) {
                 continue;
             }
             methods.add(mapEntrySize(field));
             methods.add(mapEntryWriteMethod(field));
-            methods.add(mapEntryReadMethod(field));
+            methods.add(mapEntryReadMethod(field, captureUnknown));
         }
     }
 
@@ -215,11 +216,13 @@ final class HelperEmitter {
             .build();
     }
 
-    private static MethodSpec mapEntryReadMethod(FieldModel field) {
+    private static MethodSpec mapEntryReadMethod(FieldModel field, boolean captureUnknown) {
         FieldModel key = field.mapKey;
         FieldModel value = field.mapValue;
         boolean keyAdapted = key.adapterType != null;
         boolean valueAdapted = value.adapterType != null;
+        boolean valueEnum = value.kind == FieldKind.ENUM;
+        boolean captureEnumUnknown = valueEnum && captureUnknown;
         String kLoop = keyAdapted ? "kWire" : "k";
         String vLoop = valueAdapted ? "vWire" : "v";
         CodeBlock.Builder body = CodeBlock.builder();
@@ -235,6 +238,12 @@ final class HelperEmitter {
         } else {
             body.addStatement("$T v = $L", boxedType(value), mapMissingDefault(value));
         }
+        if (valueEnum) {
+            body.addStatement("boolean _unknownEnum = false");
+        }
+        if (captureEnumUnknown) {
+            body.addStatement("int _entryStart = reader.position()");
+        }
         body.addStatement("int oldLimit = reader.pushLengthDelimited()");
         body.addStatement("int tag");
         body.beginControlFlow("while ((tag = reader.readTag()) != 0)");
@@ -249,6 +258,15 @@ final class HelperEmitter {
         body.endControlFlow();
         body.endControlFlow();
         body.addStatement("reader.popLimit(oldLimit)");
+        if (valueEnum) {
+            body.beginControlFlow("if (_unknownEnum)");
+            if (captureEnumUnknown) {
+                body.addStatement("_ub.mergeRange(reader, $L, _entryStart, reader.position())",
+                    Names.tagConstant(field.number));
+            }
+            body.addStatement("return");
+            body.endControlFlow();
+        }
         if (value.kind == FieldKind.MESSAGE) {
             body.beginControlFlow("if (v == null)");
             body.addStatement("v = $L", mapMissingDefault(value));
@@ -265,12 +283,14 @@ final class HelperEmitter {
         } else {
             body.addStatement("target.put(k, v)");
         }
-        return MethodSpec.methodBuilder(mapEntryRead(field))
+        MethodSpec.Builder method = MethodSpec.methodBuilder(mapEntryRead(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)
             .addParameter(PROTO_READER, "reader")
-            .addParameter(javaType(field), "target")
-            .addCode(body.build())
-            .build();
+            .addParameter(javaType(field), "target");
+        if (captureEnumUnknown) {
+            method.addParameter(UNKNOWN_FIELDS_BUILDER, "_ub");
+        }
+        return method.addCode(body.build()).build();
     }
 }

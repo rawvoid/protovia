@@ -22,6 +22,7 @@ import com.palantir.javapoet.TypeName;
 import io.github.rawvoid.protovia.processor.model.*;
 
 import javax.lang.model.element.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -102,6 +103,9 @@ final class ReadEmitter {
         initArrayBuilders(b, model);
         readLoop(b, model, true);
         finalizeArrayBuilders(b, model, null);
+        if (model.unknown != null) {
+            b.addStatement("$T $L = _ub.build()", UNKNOWN_FIELDS, model.unknown.localName());
+        }
         instantiate(b, model);
     }
 
@@ -168,10 +172,8 @@ final class ReadEmitter {
     }
 
     private static void unknownLocalInit(CodeBlock.Builder b, MessageModel model) {
-        MessageModel.UnknownField u = model.unknown;
-        String fromExisting = u.accessOn("existing");
-        b.addStatement("$T $L = existing != null && $L != null ? $L : $T.EMPTY",
-            UNKNOWN_FIELDS, u.localName(), fromExisting, fromExisting, UNKNOWN_FIELDS);
+        b.addStatement("$T _ub = $T.newBuilder(existing != null ? $L : null)",
+            UNKNOWN_FIELDS_BUILDER, UNKNOWN_FIELDS, model.unknown.accessOn("existing"));
     }
 
     /**
@@ -255,7 +257,11 @@ final class ReadEmitter {
             case MAP -> {
                 b.beginControlFlow("case $L ->", tag);
                 ensureMap(b, field, record);
-                b.addStatement("$L(reader, $L)", mapEntryRead(field), mapVar(field, record));
+                if (field.mapValue.kind == FieldKind.ENUM && model.unknown != null) {
+                    b.addStatement("$L(reader, $L, _ub)", mapEntryRead(field), mapVar(field, record));
+                } else {
+                    b.addStatement("$L(reader, $L)", mapEntryRead(field), mapVar(field, record));
+                }
                 b.endControlFlow();
             }
             case ONEOF -> readOneof(b, field, record, model);
@@ -271,17 +277,24 @@ final class ReadEmitter {
             mergeUnknownVarint(b, model, tag);
             store(b, field, record, wrapOptional(field, "_e"));
             b.nextControlFlow("else if (_e != null)");
+            removeUnknownField(b, model, field.number);
             store(b, field, record, wrapOptional(field, "_e"));
             b.endControlFlow();
         } else {
-            mergeUnknownVarintIfNull(b, model, tag, "_e");
             b.beginControlFlow("if (_e != null)");
+            removeUnknownField(b, model, field.number);
             store(b, field, record, wrapOptional(field, "_e"));
+            b.nextControlFlow("else");
+            mergeUnknownVarint(b, model, tag);
+            store(b, field, record, field.javaOptional
+                ? CodeBlock.of("$T.empty()", OPTIONAL)
+                : CodeBlock.of("null"));
             b.endControlFlow();
         }
     }
 
     private static void readOneof(CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model) {
+        List<Integer> enumCaseNumbers = oneofEnumNumbers(field);
         for (OneofCaseModel c : field.oneofCases) {
             b.beginControlFlow("case $L ->", c.tagConstant);
             if (c.empty()) {
@@ -290,14 +303,16 @@ final class ReadEmitter {
                 b.addStatement("reader.skipField()");
                 b.endControlFlow();
                 b.addStatement("reader.popLimit(_old)");
+                removeUnknownFields(b, model, enumCaseNumbers);
                 store(b, field, record, CodeBlock.of("new $T()", oneofCaseType(c)));
             } else if (c.selfMessage) {
-                store(b, field, record, CodeBlock.of("reader.readMessage($L)", codecInstance(c.payload)));
+                readOneofSelfMessage(b, field, record, c);
+                removeUnknownFields(b, model, enumCaseNumbers);
             } else if (c.payload.kind == FieldKind.MESSAGE) {
-                store(b, field, record,
-                    CodeBlock.of("new $T(reader.readMessage($L))", oneofCaseType(c), codecInstance(c.payload)));
+                readOneofWrappedMessage(b, field, record, c);
+                removeUnknownFields(b, model, enumCaseNumbers);
             } else if (c.payload.kind == FieldKind.ENUM) {
-                readOneofEnum(b, field, record, model, c);
+                readOneofEnum(b, field, record, model, c, enumCaseNumbers);
             } else {
                 CodeBlock read = readCall(c.payload);
                 if (c.payload.adapterType != null) {
@@ -308,14 +323,53 @@ final class ReadEmitter {
                 } else {
                     store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
                 }
+                removeUnknownFields(b, model, enumCaseNumbers);
             }
             b.endControlFlow();
         }
     }
 
+    private static void readOneofSelfMessage(CodeBlock.Builder b, FieldModel field, boolean record, OneofCaseModel c) {
+        TypeName caseType = oneofCaseType(c);
+        CodeBlock codec = codecInstance(c.payload);
+        if (record) {
+            store(b, field, true, CodeBlock.of(
+                "reader.readMessage($L, $L instanceof $T _prev ? _prev : null)",
+                codec, field.localName, caseType));
+            return;
+        }
+        b.addStatement("Object _cur = $L", field.accessOn("msg"));
+        store(b, field, false, CodeBlock.of(
+            "reader.readMessage($L, _cur instanceof $T _prev ? _prev : null)",
+            codec, caseType));
+    }
+
+    private static void readOneofWrappedMessage(CodeBlock.Builder b, FieldModel field, boolean record, OneofCaseModel c) {
+        TypeName caseType = oneofCaseType(c);
+        CodeBlock codec = codecInstance(c.payload);
+        if (record) {
+            store(b, field, true, CodeBlock.of(
+                "new $T(reader.readMessage($L, $L instanceof $T _prev ? _prev.$L : null))",
+                caseType, codec, field.localName, caseType, c.accessor));
+            return;
+        }
+        b.addStatement("Object _cur = $L", field.accessOn("msg"));
+        store(b, field, false, CodeBlock.of(
+            "new $T(reader.readMessage($L, _cur instanceof $T _prev ? _prev.$L : null))",
+            caseType, codec, caseType, c.accessor));
+    }
+
     private static void readOneofEnum(
-        CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model, OneofCaseModel c) {
+        CodeBlock.Builder b,
+        FieldModel field,
+        boolean record,
+        MessageModel model,
+        OneofCaseModel c,
+        List<Integer> enumCaseNumbers) {
         EnumModel enums = c.payload.enumModel;
+        List<Integer> otherEnumCaseNumbers = enumCaseNumbers.stream()
+            .filter(n -> n != c.number)
+            .toList();
         b.addStatement("int _n = reader.readEnum()");
         b.addStatement("$T _e = $L(_n)", enumType(enums), enumFrom(enums));
         CodeBlock constructed = c.accessor == null
@@ -323,15 +377,21 @@ final class ReadEmitter {
             : CodeBlock.of("new $T(_e)", oneofCaseType(c));
         if (enums.unrecognized != null) {
             b.beginControlFlow("if (_e == $L)", enumConstant(enums, enums.unrecognized));
+            removeUnknownFields(b, model, otherEnumCaseNumbers);
             mergeUnknownVarint(b, model, c.tagConstant);
             store(b, field, record, constructed);
             b.nextControlFlow("else if (_e != null)");
+            removeUnknownFields(b, model, enumCaseNumbers);
             store(b, field, record, constructed);
             b.endControlFlow();
         } else {
-            mergeUnknownVarintIfNull(b, model, c.tagConstant, "_e");
             b.beginControlFlow("if (_e != null)");
+            removeUnknownFields(b, model, enumCaseNumbers);
             store(b, field, record, constructed);
+            b.nextControlFlow("else");
+            removeUnknownFields(b, model, otherEnumCaseNumbers);
+            mergeUnknownVarint(b, model, c.tagConstant);
+            store(b, field, record, CodeBlock.of("null"));
             b.endControlFlow();
         }
     }
@@ -384,16 +444,13 @@ final class ReadEmitter {
     }
 
     private static void unknownInit(CodeBlock.Builder b, MessageModel model) {
-        MessageModel.UnknownField u = model.unknown;
-        String current = u.accessOn("msg");
-        b.addStatement("$T $L = $L != null ? $L : $T.EMPTY",
-            UNKNOWN_FIELDS, u.localName(), current, current, UNKNOWN_FIELDS);
+        b.addStatement("$T _ub = $T.newBuilder($L)",
+            UNKNOWN_FIELDS_BUILDER, UNKNOWN_FIELDS, model.unknown.accessOn("msg"));
     }
 
     private static void unknownDefault(CodeBlock.Builder b, MessageModel model) {
         if (model.unknown != null) {
-            b.addStatement("default -> $L = $T.merge($L, reader)",
-                model.unknown.localName(), UNKNOWN_FIELDS, model.unknown.localName());
+            b.addStatement("default -> _ub.merge(reader)");
         } else {
             b.addStatement("default -> reader.skipField()");
         }
@@ -402,9 +459,9 @@ final class ReadEmitter {
     private static void unknownStore(CodeBlock.Builder b, MessageModel model) {
         MessageModel.UnknownField u = model.unknown;
         if (u.accessKind() == AccessKind.FIELD) {
-            b.addStatement("$L = $L", u.accessOn("msg"), u.localName());
+            b.addStatement("$L = _ub.build()", u.accessOn("msg"));
         } else {
-            b.addStatement("msg.$L($L)", u.setterName(), u.localName());
+            b.addStatement("msg.$L(_ub.build())", u.setterName());
         }
     }
 
@@ -413,8 +470,8 @@ final class ReadEmitter {
         String local = Names.safeLocal(component.name());
         String fromExisting = "existing." + component.name() + "()";
         if (model.unknown != null && component.name().equals(model.unknown.name())) {
-            b.addStatement("$T $L = existing != null && $L != null ? $L : $T.EMPTY",
-                UNKNOWN_FIELDS, local, fromExisting, fromExisting, UNKNOWN_FIELDS);
+            b.addStatement("$T _ub = $T.newBuilder(existing != null ? $L : null)",
+                UNKNOWN_FIELDS_BUILDER, UNKNOWN_FIELDS, fromExisting);
             return;
         }
         FieldModel field = component.field();
@@ -484,12 +541,17 @@ final class ReadEmitter {
                 b.beginControlFlow("if (_item == $L)", enumConstant(enums, enums.unrecognized));
                 mergeUnknownVarint(b, model, tag);
                 b.nextControlFlow("else if (_item != null)");
+                repeatedAddValue(b, field, record, CodeBlock.of("_item"));
+                b.endControlFlow();
             } else {
-                mergeUnknownVarintIfNull(b, model, tag, "_item");
                 b.beginControlFlow("if (_item != null)");
+                repeatedAddValue(b, field, record, CodeBlock.of("_item"));
+                if (model.unknown != null) {
+                    b.nextControlFlow("else");
+                    b.addStatement("_ub.mergeVarint($L, _n)", tag);
+                }
+                b.endControlFlow();
             }
-            repeatedAddValue(b, field, record, CodeBlock.of("_item"));
-            b.endControlFlow();
             return;
         }
         CodeBlock addend = field.element.kind == FieldKind.MESSAGE
@@ -562,20 +624,38 @@ final class ReadEmitter {
         }
     }
 
+    private static List<Integer> oneofEnumNumbers(FieldModel field) {
+        List<Integer> numbers = new ArrayList<>();
+        for (OneofCaseModel c : field.oneofCases) {
+            if (c.payload != null && c.payload.kind == FieldKind.ENUM) {
+                numbers.add(c.number);
+            }
+        }
+        return numbers;
+    }
+
     private static void mergeUnknownVarint(CodeBlock.Builder b, MessageModel model, String tag) {
         if (model.unknown != null) {
-            b.addStatement("$L = $T.mergeVarint($L, $L, _n)",
-                model.unknown.localName(), UNKNOWN_FIELDS, model.unknown.localName(), tag);
+            b.addStatement("_ub.mergeVarint($L, _n)", tag);
         }
     }
 
-    private static void mergeUnknownVarintIfNull(CodeBlock.Builder b, MessageModel model, String tag, String enumVar) {
+    private static void removeUnknownField(CodeBlock.Builder b, MessageModel model, int fieldNumber) {
         if (model.unknown != null) {
-            b.beginControlFlow("if ($L == null)", enumVar);
-            b.addStatement("$L = $T.mergeVarint($L, $L, _n)",
-                model.unknown.localName(), UNKNOWN_FIELDS, model.unknown.localName(), tag);
-            b.endControlFlow();
+            b.addStatement("_ub.removeField($L)", fieldNumber);
         }
+    }
+
+    private static void removeUnknownFields(CodeBlock.Builder b, MessageModel model, List<Integer> fieldNumbers) {
+        if (model.unknown == null || fieldNumbers.isEmpty()) {
+            return;
+        }
+        if (fieldNumbers.size() == 1) {
+            b.addStatement("_ub.removeField($L)", fieldNumbers.getFirst());
+            return;
+        }
+        String args = fieldNumbers.stream().map(String::valueOf).collect(Collectors.joining(", "));
+        b.addStatement("_ub.removeFields($L)", args);
     }
 
 }

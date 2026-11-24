@@ -18,11 +18,15 @@ package io.github.rawvoid.protovia.processor.gen;
 
 import com.palantir.javapoet.*;
 import io.github.rawvoid.protovia.ProtoType;
+import io.github.rawvoid.protovia.processor.model.EnumModel;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
+import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 import io.github.rawvoid.protovia.wire.WireType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiConsumer;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
@@ -267,9 +271,9 @@ final class WireCodegen {
         return wrapOptional(field, CodeBlock.of("$L", expr));
     }
 
-    static CodeBlock mapReadExpr(FieldModel part) {
+    static CodeBlock mapReadExpr(FieldModel part, String var) {
         if (part.kind == FieldKind.MESSAGE) {
-            return CodeBlock.of("reader.readMessage($L)", codecInstance(part));
+            return CodeBlock.of("reader.readMessage($L, $L)", codecInstance(part), var);
         }
         if (part.kind == FieldKind.ENUM) {
             return CodeBlock.of("$L(reader.readEnum())", enumFrom(part.enumModel));
@@ -486,9 +490,117 @@ final class WireCodegen {
                 b.beginControlFlow("if ($LE != null)", var);
             }
             b.addStatement("$L = $LE", var, var);
+            b.addStatement("_unknownEnum = false");
+            b.nextControlFlow("else");
+            b.addStatement("_unknownEnum = true");
             b.endControlFlow();
             return;
         }
-        b.addStatement("$L = $L", var, mapReadExpr(part));
+        b.addStatement("$L = $L", var, mapReadExpr(part, var));
+    }
+
+    static void emitUnknown(CodeBlock.Builder b, MessageModel model, boolean computeSize) {
+        if (model.unknown == null) {
+            return;
+        }
+        String uLocal = model.unknown.localName();
+        b.addStatement("$T $L = $L", UNKNOWN_FIELDS, uLocal, model.unknown.readExpr());
+        int maxExcluded = countUnknownEnumExclusions(model);
+        if (maxExcluded == 0) {
+            b.beginControlFlow("if ($L != null)", uLocal);
+            if (computeSize) {
+                b.addStatement("size += $L.serializedSize()", uLocal);
+            } else {
+                b.addStatement("$L.writeTo(writer)", uLocal);
+            }
+            b.endControlFlow();
+            return;
+        }
+        b.beginControlFlow("if ($L != null && !$L.isEmpty())", uLocal, uLocal);
+        b.addStatement("int[] _excl = new int[$L]", maxExcluded);
+        b.addStatement("int _exclN = 0");
+        for (FieldModel field : model.fields) {
+            if (field.kind == FieldKind.ENUM) {
+                emitSingularEnumExclusion(b, field);
+            } else if (field.kind == FieldKind.ONEOF) {
+                emitOneofEnumExclusion(b, field);
+            }
+        }
+        if (computeSize) {
+            b.addStatement("size += $L.serializedSizeExcluding(_excl, _exclN)", uLocal);
+        } else {
+            b.addStatement("$L.writeToExcluding(writer, _excl, _exclN)", uLocal);
+        }
+        b.endControlFlow();
+    }
+
+    private static int countUnknownEnumExclusions(MessageModel model) {
+        int count = 0;
+        for (FieldModel field : model.fields) {
+            if (field.kind == FieldKind.ENUM) {
+                count++;
+            } else if (field.kind == FieldKind.ONEOF) {
+                for (OneofCaseModel c : field.oneofCases) {
+                    if (c.payload != null && c.payload.kind == FieldKind.ENUM) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static void emitSingularEnumExclusion(CodeBlock.Builder b, FieldModel field) {
+        if (field.javaOptional) {
+            if (field.enumModel.unrecognized != null) {
+                b.beginControlFlow("if ($L != null && $L.isPresent() && $L.get() != $L)",
+                    field.localName, field.localName, field.localName,
+                    enumConstant(field.enumModel, field.enumModel.unrecognized));
+            } else {
+                b.beginControlFlow("if ($L != null && $L.isPresent())", field.localName, field.localName);
+            }
+        } else if (field.enumModel.unrecognized != null) {
+            b.beginControlFlow("if ($L != null && $L != $L)",
+                field.localName, field.localName, enumConstant(field.enumModel, field.enumModel.unrecognized));
+        } else {
+            b.beginControlFlow("if ($L != null)", field.localName);
+        }
+        b.addStatement("_excl[_exclN++] = $L", field.number);
+        b.endControlFlow();
+    }
+
+    private static void emitOneofEnumExclusion(CodeBlock.Builder b, FieldModel field) {
+        List<OneofCaseModel> enumCases = new ArrayList<>();
+        for (OneofCaseModel c : field.oneofCases) {
+            if (c.payload != null && c.payload.kind == FieldKind.ENUM) {
+                enumCases.add(c);
+            }
+        }
+        if (enumCases.isEmpty()) {
+            return;
+        }
+        CodeBlock.Builder cond = CodeBlock.builder();
+        cond.add("$L != null", field.localName);
+        for (OneofCaseModel c : enumCases) {
+            EnumModel enums = c.payload.enumModel;
+            if (c.accessor != null) {
+                String uc = "_uc_" + c.number;
+                if (enums.unrecognized != null) {
+                    cond.add(" && !($L instanceof $T $L && ($L.$L == null || $L.$L == $L))",
+                        field.localName, oneofCaseType(c), uc, uc, c.accessor, uc, c.accessor,
+                        enumConstant(enums, enums.unrecognized));
+                } else {
+                    cond.add(" && !($L instanceof $T $L && $L.$L == null)",
+                        field.localName, oneofCaseType(c), uc, uc, c.accessor);
+                }
+            } else if (enums.unrecognized != null) {
+                cond.add(" && $L != $L", field.localName, enumConstant(enums, enums.unrecognized));
+            }
+        }
+        b.beginControlFlow("if ($L)", cond.build());
+        for (OneofCaseModel c : enumCases) {
+            b.addStatement("_excl[_exclN++] = $L", c.number);
+        }
+        b.endControlFlow();
     }
 }
