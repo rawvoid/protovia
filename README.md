@@ -61,12 +61,12 @@ Maven:
 <dependency>
   <groupId>io.github.rawvoid</groupId>
   <artifactId>protovia-core</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.3.0</version>
 </dependency>
 <dependency>
   <groupId>io.github.rawvoid</groupId>
   <artifactId>protovia-processor</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.3.0</version>
   <scope>provided</scope>
 </dependency>
 ```
@@ -76,8 +76,8 @@ The processor is discovered via `META-INF/services` once it is on the compiler c
 Gradle:
 
 ```kotlin
-implementation("io.github.rawvoid:protovia-core:1.3.0-SNAPSHOT")
-annotationProcessor("io.github.rawvoid:protovia-processor:1.3.0-SNAPSHOT")
+implementation("io.github.rawvoid:protovia-core:1.3.0")
+annotationProcessor("io.github.rawvoid:protovia-processor:1.3.0")
 ```
 
 To mirror generated `.proto` files into a directory for `buf` or other languages, pass `-Aprotovia.protoOut`:
