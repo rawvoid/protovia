@@ -41,6 +41,7 @@ public final class ProtoReader {
         MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     private final byte[] buffer;
+    private final int start;
     private final int end;
     private final int maxMessageSize;
     private final int maxDepth;
@@ -73,6 +74,7 @@ public final class ProtoReader {
             throw new ProtoException("message exceeds max size " + maxMessageSize);
         }
         this.buffer = data;
+        this.start = offset;
         this.pos = offset;
         this.end = offset + length;
         this.currentLimit = this.end;
@@ -142,6 +144,9 @@ public final class ProtoReader {
      */
     public byte[] captureField() {
         int tag = lastTag;
+        if (WireType.fieldNumber(tag) == 0) {
+            throw ProtoException.invalidTag(tag);
+        }
         int payloadStart = pos;
         skipField(tag);
         int payloadLen = pos - payloadStart;
@@ -152,6 +157,49 @@ public final class ProtoReader {
             System.arraycopy(buffer, payloadStart, out, tagSize, payloadLen);
         }
         return out;
+    }
+
+    /**
+     * Writes the field at {@link #lastTag()} (tag varint + payload) into {@code out} and advances past it.
+     *
+     * @param out destination writer
+     */
+    public void captureFieldTo(ProtoWriter out) {
+        Objects.requireNonNull(out, "out");
+        int tag = lastTag;
+        if (WireType.fieldNumber(tag) == 0) {
+            throw ProtoException.invalidTag(tag);
+        }
+        int payloadStart = pos;
+        skipField(tag);
+        writeRangeTo(tag, payloadStart, pos, out);
+    }
+
+    /**
+     * Writes {@code tag} followed by the raw payload bytes {@code [payloadStart, payloadEnd)}
+     * from this reader's backing buffer into {@code out}.
+     *
+     * @param tag          wire tag (must have non-zero field number and a valid start wire type)
+     * @param payloadStart inclusive start index obtained from {@link #position()}
+     * @param payloadEnd   exclusive end index obtained from {@link #position()}
+     * @param out          destination writer
+     */
+    public void writeRangeTo(int tag, int payloadStart, int payloadEnd, ProtoWriter out) {
+        Objects.requireNonNull(out, "out");
+        int wireType = WireType.getWireType(tag);
+        if (WireType.fieldNumber(tag) == 0
+            || wireType == WireType.END_GROUP
+            || wireType > WireType.I32) {
+            throw ProtoException.invalidTag(tag);
+        }
+        if (payloadStart < start || payloadEnd < payloadStart || payloadEnd > end) {
+            throw new ProtoException("invalid range [" + payloadStart + ", " + payloadEnd + ")");
+        }
+        out.writeUInt32NoTag(tag);
+        int payloadLen = payloadEnd - payloadStart;
+        if (payloadLen > 0) {
+            out.writeRawBytes(buffer, payloadStart, payloadLen);
+        }
     }
 
     public int readInt32() {
@@ -270,6 +318,10 @@ public final class ProtoReader {
             throw new ProtoException("nested message was not fully consumed");
         }
         currentLimit = oldLimit;
+    }
+
+    public int position() {
+        return pos;
     }
 
     public int remaining() {
