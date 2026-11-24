@@ -75,10 +75,81 @@ class Utf8Test {
 
     @Test
     void decodeRejectsInvalidSequences() {
-        assertThrows(ProtoException.class, () -> Utf8.decode(new byte[]{(byte) 0xC3, 0x28}, 0, 2));
-        assertThrows(ProtoException.class, () -> Utf8.decode(new byte[]{(byte) 0x80}, 0, 1));
-        assertThrows(ProtoException.class, () -> Utf8.decode(new byte[]{(byte) 0xE0, (byte) 0x80, (byte) 0x80}, 0, 3));
-        assertThrows(ProtoException.class, () -> Utf8.decode(new byte[]{(byte) 0xED, (byte) 0xA0, (byte) 0x80}, 0, 3));
+        byte[][] invalid = {
+            // Invalid continuation
+            {(byte) 0xC3, 0x28},
+            // Stray continuation bytes
+            {(byte) 0x80},
+            {(byte) 0xBF},
+            {0x61, (byte) 0x80, 0x62},
+            // Overlong encodings (2, 3, 4 bytes)
+            {(byte) 0xC0, (byte) 0x80},
+            {(byte) 0xC1, (byte) 0xBF},
+            {(byte) 0xE0, (byte) 0x80, (byte) 0x80},
+            {(byte) 0xE0, (byte) 0x9F, (byte) 0xBF},
+            {(byte) 0xF0, (byte) 0x80, (byte) 0x80, (byte) 0x80},
+            {(byte) 0xF0, (byte) 0x8F, (byte) 0xBF, (byte) 0xBF},
+            // UTF-16 surrogates (U+D800..U+DFFF)
+            {(byte) 0xED, (byte) 0xA0, (byte) 0x80},
+            {(byte) 0xED, (byte) 0xB0, (byte) 0x80},
+            {(byte) 0xED, (byte) 0xBF, (byte) 0xBF},
+            // Out-of-range (> U+10FFFF)
+            {(byte) 0xF4, (byte) 0x90, (byte) 0x80, (byte) 0x80},
+            {(byte) 0xF5, (byte) 0x80, (byte) 0x80, (byte) 0x80},
+            {(byte) 0xFF},
+            // Truncated sequences
+            {(byte) 0xC2},
+            {(byte) 0xE2},
+            {(byte) 0xE2, (byte) 0x82},
+            {(byte) 0xF0},
+            {(byte) 0xF0, (byte) 0x9F},
+            {(byte) 0xF0, (byte) 0x9F, (byte) 0x98},
+            // Valid literal U+FFFD mixed with invalid byte
+            {(byte) 0xEF, (byte) 0xBF, (byte) 0xBD, (byte) 0x80},
+            {(byte) 0x80, (byte) 0xEF, (byte) 0xBF, (byte) 0xBD}
+        };
+        for (byte[] seq : invalid) {
+            assertThrows(ProtoException.class, () -> Utf8.decode(seq, 0, seq.length));
+        }
+    }
+
+    @Test
+    void decodePreservesValidReplacementCharacter() {
+        byte[] literalFffd = {(byte) 0xEF, (byte) 0xBF, (byte) 0xBD};
+        assertEquals("\uFFFD", Utf8.decode(literalFffd, 0, literalFffd.length));
+
+        // Sub-slice with non-zero offset
+        byte[] padded = {0x78, (byte) 0xEF, (byte) 0xBF, (byte) 0xBD, 0x79};
+        assertEquals("\uFFFD", Utf8.decode(padded, 1, 3));
+
+        // Mixed ASCII + literal U+FFFD + multibyte
+        String mixed = "abc\uFFFDxyz\uFFFD世界\uFFFD𝄞";
+        byte[] utf8 = mixed.getBytes(StandardCharsets.UTF_8);
+        assertEquals(mixed, Utf8.decode(utf8, 0, utf8.length));
+    }
+
+    @Test
+    void decodeRejectsInvalidSliceBounds() {
+        byte[] buf = new byte[4];
+        assertThrows(ProtoException.class, () -> Utf8.decode(buf, -1, 1));
+        assertThrows(ProtoException.class, () -> Utf8.decode(buf, 0, -1));
+        assertThrows(ProtoException.class, () -> Utf8.decode(buf, 3, 2));
+        assertThrows(ProtoException.class, () -> Utf8.decode(buf, Integer.MAX_VALUE, Integer.MAX_VALUE));
+    }
+
+    @Test
+    void unpairedSurrogateEncodesAsAsciiQuestionMark() {
+        assertEquals(1, Utf8.encodedLength("\uD800"));
+        assertEquals(1, Utf8.encodedLength("\uDFFF"));
+        assertEquals(3, Utf8.encodedLength("a\uD800b"));
+
+        byte[] out1 = new byte[1];
+        assertEquals(1, Utf8.encode("\uD800", out1, 0, out1.length));
+        assertArrayEquals(new byte[]{0x3F}, out1);
+
+        byte[] out3 = new byte[3];
+        assertEquals(3, Utf8.encode("a\uDFFFb", out3, 0, out3.length));
+        assertArrayEquals(new byte[]{'a', 0x3F, 'b'}, out3);
     }
 
     @Test
@@ -92,6 +163,6 @@ class Utf8Test {
 
         ProtoReader r = new ProtoReader(actual);
         assertEquals(WireType.tag(1, WireType.LEN), r.readTag());
-        assertEquals(new String(s.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8), r.readString());
+        assertEquals("x?y", r.readString());
     }
 }

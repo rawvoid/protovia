@@ -19,6 +19,8 @@ package io.github.rawvoid.protovia.wire;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -47,6 +49,98 @@ class SizeCacheTest {
         assertFalse(SizeCache.NOOP.hasNext());
         SizeCache.NOOP.push(4);
         assertEquals(9, SizeCache.NOOP.take(() -> 9));
+        assertThrows(IllegalStateException.class, SizeCache.NOOP::take);
+
+        assertFalse(SizeCache.NOOP.hasNextObject());
+        SizeCache.NOOP.pushObject("ignored");
+        assertFalse(SizeCache.NOOP.hasNextObject());
+        assertThrows(IllegalStateException.class, SizeCache.NOOP::takeObject);
+        SizeCache.NOOP.reset();
+    }
+
+    @Test
+    void lazyAllocationDefersBackingArraysUntilUsed() throws Exception {
+        Field slotsField = SizeCache.class.getDeclaredField("slots");
+        slotsField.setAccessible(true);
+        Field objectsField = SizeCache.class.getDeclaredField("objects");
+        objectsField.setAccessible(true);
+
+        SizeCache unused = new SizeCache();
+        assertNull(slotsField.get(unused));
+        assertNull(objectsField.get(unused));
+        assertFalse(unused.hasNext());
+        assertFalse(unused.hasNextObject());
+        assertThrows(IllegalStateException.class, unused::take);
+        assertThrows(IllegalStateException.class, unused::takeObject);
+        unused.reset();
+        assertNull(slotsField.get(unused));
+        assertNull(objectsField.get(unused));
+
+        SizeCache sizesOnly = new SizeCache();
+        sizesOnly.push(42);
+        assertNotNull(slotsField.get(sizesOnly));
+        assertNull(objectsField.get(sizesOnly));
+        assertEquals(42, sizesOnly.take());
+
+        SizeCache objectsOnly = new SizeCache();
+        objectsOnly.pushObject("hello");
+        assertNull(slotsField.get(objectsOnly));
+        assertNotNull(objectsField.get(objectsOnly));
+        assertEquals("hello", objectsOnly.takeObject());
+    }
+
+    @Test
+    void objectCacheFifoGrowthResetAndProtoWriterForwarding() throws Exception {
+        SizeCache cache = new SizeCache();
+        for (int i = 0; i < 20; i++) {
+            cache.push(i * 10);
+            cache.pushObject("obj-" + i);
+        }
+        cache.pushObject(null);
+
+        ProtoWriter writer = new ProtoWriter(0, cache);
+        for (int i = 0; i < 20; i++) {
+            assertTrue(writer.hasCachedSize());
+            assertEquals(i * 10, writer.takeSize());
+            assertTrue(writer.hasCachedObject());
+            String value = writer.takeObject();
+            assertEquals("obj-" + i, value);
+        }
+        assertTrue(writer.hasCachedObject());
+        assertNull(writer.takeObject());
+        assertFalse(writer.hasCachedSize());
+        assertFalse(writer.hasCachedObject());
+        assertThrows(IllegalStateException.class, writer::takeObject);
+
+        // Push unread objects, then reset and verify references are cleared and cache is reusable
+        cache.push(7);
+        cache.pushObject("stale-1");
+        cache.pushObject("stale-2");
+        cache.reset();
+        assertFalse(cache.hasNext());
+        assertFalse(cache.hasNextObject());
+        assertThrows(IllegalStateException.class, cache::take);
+        assertThrows(IllegalStateException.class, cache::takeObject);
+
+        Field objectsField = SizeCache.class.getDeclaredField("objects");
+        objectsField.setAccessible(true);
+        Object[] backing = (Object[]) objectsField.get(cache);
+        for (Object slot : backing) {
+            assertNull(slot);
+        }
+
+        // Reuse after reset
+        cache.push(99);
+        cache.pushObject("fresh");
+        assertTrue(cache.hasNext());
+        assertTrue(cache.hasNextObject());
+        assertEquals(99, cache.take());
+        assertEquals("fresh", cache.takeObject());
+
+        // ProtoWriter with SizeCache.NOOP
+        ProtoWriter noopWriter = new ProtoWriter(0);
+        assertFalse(noopWriter.hasCachedObject());
+        assertThrows(IllegalStateException.class, noopWriter::takeObject);
     }
 
     @Test

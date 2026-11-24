@@ -19,7 +19,10 @@ package io.github.rawvoid.protovia.wire;
 import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.function.IntSupplier;
 
 /**
@@ -29,6 +32,13 @@ import java.util.function.IntSupplier;
  * @author Rawvoid
  */
 public final class ProtoWriter {
+
+    private static final byte[] EMPTY = new byte[0];
+    private static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+    private static final VarHandle INT_LE =
+        MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle LONG_LE =
+        MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     private final boolean exact;
     private final SizeCache sizes;
@@ -58,7 +68,7 @@ public final class ProtoWriter {
         if (size < 0) {
             throw new ProtoException("negative computed size: " + size);
         }
-        this.buffer = size == 0 ? new byte[0] : new byte[size];
+        this.buffer = size == 0 ? EMPTY : new byte[size];
         this.exact = exact;
         this.sizes = sizes;
     }
@@ -73,6 +83,15 @@ public final class ProtoWriter {
 
     public int takeSize(IntSupplier fallback) {
         return sizes.take(fallback);
+    }
+
+    public boolean hasCachedObject() {
+        return sizes.hasNextObject();
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T takeObject() {
+        return (T) sizes.takeObject();
     }
 
     public int position() {
@@ -94,6 +113,9 @@ public final class ProtoWriter {
     }
 
     public byte[] toByteArray() {
+        if (pos == 0) {
+            return EMPTY;
+        }
         if (pos == buffer.length) {
             return buffer;
         }
@@ -138,7 +160,7 @@ public final class ProtoWriter {
 
     public void writeBool(int fieldNumber, boolean value) {
         writeTag(fieldNumber, WireType.VARINT);
-        writeUInt32NoTag(value ? 1 : 0);
+        writeRawByte(value ? 1 : 0);
     }
 
     public void writeEnum(int fieldNumber, int number) {
@@ -182,25 +204,49 @@ public final class ProtoWriter {
      */
     public void writeStringNoTag(String value) {
         int oldPos = pos;
-        int maxUtf8 = value.length() * Utf8.MAX_BYTES_PER_CHAR;
-        if (!exact) {
-            require(CodedSize.uint32(maxUtf8) + maxUtf8);
-        }
         try {
-            int maxLengthVarIntSize = CodedSize.uint32(maxUtf8);
-            int minLengthVarIntSize = CodedSize.uint32(value.length());
-            if (minLengthVarIntSize == maxLengthVarIntSize) {
-                pos = oldPos + minLengthVarIntSize;
-                int newPos = Utf8.encode(value, buffer, pos, buffer.length - pos);
-                pos = oldPos;
-                int length = newPos - oldPos - minLengthVarIntSize;
-                writeUInt32NoTag(length);
-                pos = newPos;
-            } else {
-                int length = Utf8.encodedLength(value);
-                writeUInt32NoTag(length);
-                pos = Utf8.encode(value, buffer, pos, buffer.length - pos);
+            int utf16Len = value.length();
+            if (utf16Len <= Integer.MAX_VALUE / Utf8.MAX_BYTES_PER_CHAR) {
+                int maxUtf8 = utf16Len * Utf8.MAX_BYTES_PER_CHAR;
+                int maxLengthVarIntSize = CodedSize.uint32(maxUtf8);
+                int minLengthVarIntSize = CodedSize.uint32(utf16Len);
+                if (minLengthVarIntSize == maxLengthVarIntSize) {
+                    if (!exact) {
+                        int needed;
+                        if (maxUtf8 <= Integer.MAX_VALUE - maxLengthVarIntSize) {
+                            needed = maxLengthVarIntSize + maxUtf8;
+                        } else {
+                            int actual = Utf8.encodedLength(value);
+                            if (actual > Integer.MAX_VALUE - maxLengthVarIntSize) {
+                                throw new ProtoException("string too large to encode: " + actual);
+                            }
+                            needed = maxLengthVarIntSize + actual;
+                        }
+                        require(needed);
+                    }
+                    int startPos = oldPos + minLengthVarIntSize;
+                    int newPos = Utf8.encode(value, buffer, startPos, buffer.length - startPos);
+                    int length = newPos - startPos;
+                    int p = oldPos;
+                    while ((length & ~0x7F) != 0) {
+                        buffer[p++] = (byte) (length | 0x80);
+                        length >>>= 7;
+                    }
+                    buffer[p] = (byte) length;
+                    pos = newPos;
+                    return;
+                }
             }
+            int length = Utf8.encodedLength(value);
+            int varIntSize = CodedSize.uint32(length);
+            if (!exact) {
+                if (length > Integer.MAX_VALUE - varIntSize) {
+                    throw new ProtoException("string too large to encode: " + length);
+                }
+                require(varIntSize + length);
+            }
+            writeUInt32NoTag(length);
+            pos = Utf8.encode(value, buffer, pos, buffer.length - pos);
         } catch (IndexOutOfBoundsException e) {
             throw new ProtoException("write overflow encoding string at " + oldPos + " of " + buffer.length, e);
         }
@@ -225,6 +271,9 @@ public final class ProtoWriter {
     }
 
     public void writeBytesNoTag(byte[] value, int offset, int length) {
+        if (length < 0) {
+            throw new ProtoException("negative length: " + length);
+        }
         writeUInt32NoTag(length);
         writeRawBytes(value, offset, length);
     }
@@ -232,13 +281,17 @@ public final class ProtoWriter {
     public void writeBytesNoTag(ByteBuffer value) {
         int length = value.remaining();
         writeUInt32NoTag(length);
+        if (length == 0) {
+            return;
+        }
         if (value.hasArray()) {
             writeRawBytes(value.array(), value.arrayOffset() + value.position(), length);
         } else {
-            byte[] copy = new byte[length];
-            ByteBuffer duplicate = value.duplicate();
-            duplicate.get(copy);
-            writeRawBytes(copy, 0, length);
+            if (length > buffer.length - pos) {
+                require(length);
+            }
+            value.get(value.position(), buffer, pos, length);
+            pos += length;
         }
     }
 
@@ -248,8 +301,8 @@ public final class ProtoWriter {
     }
 
     public <T> void writeMessageNoTag(ProtoCodec<T> codec, T value) {
-        int size = codec.cachesNestedSizes()
-            ? takeSize(() -> codec.computeSize(value))
+        int size = codec.cachesNestedSizes() && hasCachedSize()
+            ? takeSize()
             : codec.computeSize(value);
         writeUInt32NoTag(size);
         codec.writeTo(this, value);
@@ -265,7 +318,7 @@ public final class ProtoWriter {
 
     public void writeUInt32NoTag(int value) {
         int position = pos;
-        if (!exact && position + 5 > buffer.length) {
+        if (!exact && 5 > buffer.length - position) {
             require(5);
             position = pos;
         }
@@ -286,7 +339,7 @@ public final class ProtoWriter {
 
     public void writeUInt64NoTag(long value) {
         int position = pos;
-        if (!exact && position + 10 > buffer.length) {
+        if (!exact && 10 > buffer.length - position) {
             require(10);
             position = pos;
         }
@@ -319,31 +372,21 @@ public final class ProtoWriter {
 
     public void writeFixed32NoTag(int value) {
         int position = pos;
-        if (position + 4 > buffer.length) {
+        if (4 > buffer.length - position) {
             require(4);
             position = pos;
         }
-        buffer[position] = (byte) value;
-        buffer[position + 1] = (byte) (value >>> 8);
-        buffer[position + 2] = (byte) (value >>> 16);
-        buffer[position + 3] = (byte) (value >>> 24);
+        INT_LE.set(buffer, position, value);
         pos = position + 4;
     }
 
     public void writeFixed64NoTag(long value) {
         int position = pos;
-        if (position + 8 > buffer.length) {
+        if (8 > buffer.length - position) {
             require(8);
             position = pos;
         }
-        buffer[position] = (byte) value;
-        buffer[position + 1] = (byte) (value >>> 8);
-        buffer[position + 2] = (byte) (value >>> 16);
-        buffer[position + 3] = (byte) (value >>> 24);
-        buffer[position + 4] = (byte) (value >>> 32);
-        buffer[position + 5] = (byte) (value >>> 40);
-        buffer[position + 6] = (byte) (value >>> 48);
-        buffer[position + 7] = (byte) (value >>> 56);
+        LONG_LE.set(buffer, position, value);
         pos = position + 8;
     }
 
@@ -363,10 +406,13 @@ public final class ProtoWriter {
     }
 
     public void writeRawBytes(byte[] value, int offset, int length) {
+        if (length < 0) {
+            throw new ProtoException("negative length: " + length);
+        }
         if (length == 0) {
             return;
         }
-        if (pos + length > buffer.length) {
+        if (length > buffer.length - pos) {
             require(length);
         }
         System.arraycopy(value, offset, buffer, pos, length);
@@ -374,14 +420,23 @@ public final class ProtoWriter {
     }
 
     private void require(int n) {
-        if (pos + n <= buffer.length) {
+        if (n < 0) {
+            throw new ProtoException("negative write size: " + n);
+        }
+        if (n <= buffer.length - pos) {
             return;
         }
         if (exact) {
             throw new ProtoException(
                 "write overflow: need " + n + " bytes at " + pos + " of " + buffer.length);
         }
-        int next = Math.max(buffer.length * 2, pos + n);
+        if (n > Integer.MAX_VALUE - pos) {
+            throw new ProtoException(
+                "write buffer overflow: need " + n + " bytes at " + pos);
+        }
+        int minCapacity = pos + n;
+        int doubled = buffer.length > (MAX_ARRAY_SIZE >>> 1) ? MAX_ARRAY_SIZE : buffer.length << 1;
+        int next = Math.max(doubled, minCapacity);
         byte[] grown = new byte[next];
         System.arraycopy(buffer, 0, grown, 0, pos);
         buffer = grown;

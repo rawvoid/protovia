@@ -19,7 +19,10 @@ package io.github.rawvoid.protovia.wire;
 import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Objects;
 
 /**
@@ -32,6 +35,10 @@ public final class ProtoReader {
     public static final int DEFAULT_MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
     public static final int DEFAULT_MAX_DEPTH = 100;
     private static final byte[] EMPTY_BYTES = new byte[0];
+    private static final VarHandle INT_LE =
+        MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+    private static final VarHandle LONG_LE =
+        MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
 
     private final byte[] buffer;
     private final int end;
@@ -406,8 +413,13 @@ public final class ProtoReader {
                 ^ (~0L << 42)
                 ^ (~0L << 49)
                 ^ (~0L << 56);
-        } else if ((x ^= (long) buf[tempPos++] << 63) >= 0L) {
-            x ^= (~0L << 7)
+        } else {
+            byte b9 = buf[tempPos++];
+            if (b9 < 0) {
+                throw ProtoException.malformedVarint();
+            }
+            x ^= ((long) b9 << 63)
+                ^ ((~0L << 7)
                 ^ (~0L << 14)
                 ^ (~0L << 21)
                 ^ (~0L << 28)
@@ -415,9 +427,7 @@ public final class ProtoReader {
                 ^ (~0L << 42)
                 ^ (~0L << 49)
                 ^ (~0L << 56)
-                ^ (~0L << 63);
-        } else {
-            throw ProtoException.malformedVarint();
+                ^ (~0L << 63));
         }
         pos = tempPos;
         return x;
@@ -428,12 +438,8 @@ public final class ProtoReader {
         if (currentLimit - tempPos < 4) {
             throw ProtoException.truncated(4);
         }
-        byte[] buf = buffer;
         pos = tempPos + 4;
-        return (buf[tempPos] & 0xFF)
-            | ((buf[tempPos + 1] & 0xFF) << 8)
-            | ((buf[tempPos + 2] & 0xFF) << 16)
-            | ((buf[tempPos + 3] & 0xFF) << 24);
+        return (int) INT_LE.get(buffer, tempPos);
     }
 
     public long readRawLittleEndian64() {
@@ -441,16 +447,8 @@ public final class ProtoReader {
         if (currentLimit - tempPos < 8) {
             throw ProtoException.truncated(8);
         }
-        byte[] buf = buffer;
         pos = tempPos + 8;
-        return (buf[tempPos] & 0xFFL)
-            | ((buf[tempPos + 1] & 0xFFL) << 8)
-            | ((buf[tempPos + 2] & 0xFFL) << 16)
-            | ((buf[tempPos + 3] & 0xFFL) << 24)
-            | ((buf[tempPos + 4] & 0xFFL) << 32)
-            | ((buf[tempPos + 5] & 0xFFL) << 40)
-            | ((buf[tempPos + 6] & 0xFFL) << 48)
-            | ((buf[tempPos + 7] & 0xFFL) << 56);
+        return (long) LONG_LE.get(buffer, tempPos);
     }
 
     private void skipRawVarint() {
@@ -511,7 +509,7 @@ public final class ProtoReader {
     }
 
     private void require(int n) {
-        if (n < 0 || pos + n > currentLimit) {
+        if (n < 0 || n > currentLimit - pos) {
             throw ProtoException.truncated(n);
         }
     }
