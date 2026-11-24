@@ -960,7 +960,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BagProtoCodec")
             .contentsAsUtf8String()
-            .contains("reader.readMessage(AddressProtoCodec.INSTANCE)");
+            .contains("reader.readMessage(AddressProtoCodec.INSTANCE, _cur instanceof Address _prev ? _prev : null)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BagProtoCodec")
             .contentsAsUtf8String()
@@ -995,7 +995,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
-            .contains("reader.readMessage(CityProtoCodec.INSTANCE)");
+            .contains("reader.readMessage(CityProtoCodec.INSTANCE, _cur instanceof City _prev ? _prev : null)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PlaceProtoCodec")
             .contentsAsUtf8String()
@@ -1326,7 +1326,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.EnvProtoCodec")
             .contentsAsUtf8String()
-            .contains("UnknownFields.merge");
+            .contains("UnknownFields.newBuilder");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.EnvProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.merge(reader)");
     }
 
     @Test
@@ -3531,6 +3535,343 @@ class ProtoviaProcessorTest {
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("oneof case count payload cannot be null");
+    }
+
+    @Test
+    void unknownBuilderAndEnumExclusionCodegen() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.OpenEnum",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                    "@ProtoEnum public enum OpenEnum {",
+                    "  @ProtoEnumValue(0) ZERO,",
+                    "  @ProtoEnumValue(1) ONE,",
+                    "  @ProtoUnrecognized UNRECOGNIZED",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ClosedEnum",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum ClosedEnum {",
+                    "  @ProtoEnumValue(0) ZERO,",
+                    "  @ProtoEnumValue(1) ONE",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.OpenWrap",
+                    "package demo;",
+                    "public record OpenWrap(OpenEnum value) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ClosedWrap",
+                    "package demo;",
+                    "public record ClosedWrap(ClosedEnum value) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.EmptyBranch",
+                    "package demo;",
+                    "public record EmptyBranch() {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.PlainUnknown",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.List;",
+                    "@ProtoMessage public class PlainUnknown {",
+                    "  @ProtoField(number = 1) public String name;",
+                    "  @ProtoField(number = 2) public List<OpenEnum> flags;",
+                    "  @ProtoUnknown public UnknownFields extra;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.RichRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "@ProtoMessage public record RichRecord(",
+                    "  @ProtoUnknown UnknownFields extra,",
+                    "  @ProtoField(number = 1) OpenEnum status,",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = OpenWrap.class),",
+                    "    @ProtoOneof.Case(number = 11, of = ClosedWrap.class),",
+                    "    @ProtoOneof.Case(number = 12, of = OpenEnum.class),",
+                    "    @ProtoOneof.Case(number = 13, of = ClosedEnum.class),",
+                    "    @ProtoOneof.Case(number = 14, of = EmptyBranch.class),",
+                    "    @ProtoOneof.Case(number = 15, of = String.class, name = \"label\")",
+                    "  }) Object choice) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ImmutableWithUnknown",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoCreator;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "@ProtoMessage public class ImmutableWithUnknown {",
+                    "  @ProtoField(number = 1) private final OpenEnum status;",
+                    "  @ProtoUnknown private final UnknownFields extra;",
+                    "  private ImmutableWithUnknown(OpenEnum status, UnknownFields extra) {",
+                    "    this.status = status; this.extra = extra;",
+                    "  }",
+                    "  public OpenEnum getStatus() { return status; }",
+                    "  public UnknownFields getExtra() { return extra; }",
+                    "  @ProtoCreator public static ImmutableWithUnknown of(OpenEnum status, UnknownFields extra) {",
+                    "    return new ImmutableWithUnknown(status, extra);",
+                    "  }",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.PlainUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("serializedSizeExcluding");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.PlainUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("writeToExcluding");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("UnknownFields.newBuilder(existing != null ? existing.extra() : null)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("UnknownFields f_extra = _ub.build()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeField(1)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeFields(10, 11, 12, 13)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeFields(11, 12, 13)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeFields(10, 12, 13)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeFields(10, 11, 13)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.removeFields(10, 11, 12)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("f_choice = null;");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("serializedSizeExcluding(_excl, _exclN)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.RichRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("writeToExcluding(writer, _excl, _exclN)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ImmutableWithUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .contains("UnknownFields f_extra = _ub.build()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ImmutableWithUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .contains("return ImmutableWithUnknown.of(f_status, f_extra)");
+    }
+
+    @Test
+    void closedEnumUnknownBranchClearsFieldAndSingleEnumOneofSkipsSelfRemoval() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.ClosedEnum",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum ClosedEnum {",
+                    "  @ProtoEnumValue(0) ZERO,",
+                    "  @ProtoEnumValue(1) ONE",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ClosedWrap",
+                    "package demo;",
+                    "public record ClosedWrap(ClosedEnum value) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ClosedHolder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage public class ClosedHolder {",
+                    "  @ProtoField(number = 1) public ClosedEnum plain = ClosedEnum.ZERO;",
+                    "  @ProtoField(number = 2) public Optional<ClosedEnum> opt = Optional.empty();",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = ClosedWrap.class),",
+                    "    @ProtoOneof.Case(number = 11, of = String.class, name = \"label\")",
+                    "  }) public Object choice;",
+                    "  @ProtoUnknown public UnknownFields extra;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ClosedHolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.plain = null;");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ClosedHolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.opt = Optional.empty();");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ClosedHolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.choice = null;");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.ClosedHolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("_ub.removeFields(");
+    }
+
+    @Test
+    void oneofRecordMergeAndMapUnknownEnumCodegen() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.City",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record City(@ProtoField(number = 1) String name) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CityWrap",
+                    "package demo;",
+                    "public record CityWrap(City city) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.SingleCaseRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage public record SingleCaseRecord(",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 1, of = City.class) }) City direct,",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 2, of = CityWrap.class, name = \"wrappedCity\") }) CityWrap wrapped) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.State",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                    "@ProtoEnum public enum State {",
+                    "  @ProtoEnumValue(0) ZERO,",
+                    "  @ProtoEnumValue(1) ON,",
+                    "  @ProtoUnrecognized UNRECOGNIZED",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.MapHolderWithUnknown",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.Map;",
+                    "@ProtoMessage public class MapHolderWithUnknown {",
+                    "  @ProtoField(number = 1) public Map<String, State> states;",
+                    "  @ProtoField(number = 2) public Map<String, City> cities;",
+                    "  @ProtoUnknown public UnknownFields extra;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.MapHolderBare",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Map;",
+                    "@ProtoMessage public class MapHolderBare {",
+                    "  @ProtoField(number = 1) public Map<String, State> states;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.SingleCaseRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("reader.readMessage(CityProtoCodec.INSTANCE, f_direct instanceof City _prev ? _prev : null)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.SingleCaseRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("new CityWrap(reader.readMessage(CityProtoCodec.INSTANCE, f_wrapped instanceof CityWrap _prev ? _prev.city() : null))");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.MapHolderWithUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .contains("readEntry_1(reader, msg.states, _ub)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.MapHolderWithUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.mergeRange(reader, TAG_1, _entryStart, reader.position())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.MapHolderWithUnknownProtoCodec")
+            .contentsAsUtf8String()
+            .contains("v = reader.readMessage(CityProtoCodec.INSTANCE, v)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.MapHolderBareProtoCodec")
+            .contentsAsUtf8String()
+            .contains("readEntry_1(reader, msg.states)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.MapHolderBareProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("mergeRange");
+    }
+
+    @Test
+    void collidingNamesWithUnknownBuilderAndExclusionsCompile() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.State",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                    "@ProtoEnum public enum State {",
+                    "  @ProtoEnumValue(0) ZERO,",
+                    "  @ProtoEnumValue(1) ON,",
+                    "  @ProtoUnrecognized UNRECOGNIZED",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.StateWrap",
+                    "package demo;",
+                    "public record StateWrap(State value) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingUnknowns",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.Map;",
+                    "@ProtoMessage public class CollidingUnknowns {",
+                    "  @ProtoField(number = 1) public State _excl;",
+                    "  @ProtoField(number = 2) public int _exclN;",
+                    "  @ProtoField(number = 3) public String _prev;",
+                    "  @ProtoField(number = 4) public String _unknownEnum;",
+                    "  @ProtoField(number = 5) public int _entryStart;",
+                    "  @ProtoField(number = 6) public String _uc_10;",
+                    "  @ProtoField(number = 7) public Map<String, State> _map;",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 10, of = StateWrap.class) }) public Object _oneof;",
+                    "  @ProtoUnknown public UnknownFields _ub;",
+                    "}"));
+        assertThat(compilation).succeeded();
     }
 
     private static java.util.List<javax.tools.JavaFileObject> withFieldOneof(

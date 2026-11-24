@@ -59,12 +59,7 @@ final class SizeEmitter {
         for (FieldModel field : model.fields) {
             computeField(body, field);
         }
-        if (model.unknown != null) {
-            body.addStatement("$T $L = $L", UNKNOWN_FIELDS, model.unknown.localName(), model.unknown.readExpr());
-            body.beginControlFlow("if ($L != null)", model.unknown.localName());
-            body.addStatement("size += $L.serializedSize()", model.unknown.localName());
-            body.endControlFlow();
-        }
+        emitUnknown(body, model, true);
         body.addStatement("return size");
         return MethodSpec.methodBuilder("computeSize")
             .addAnnotation(Override.class)

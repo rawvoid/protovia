@@ -301,7 +301,11 @@ class InheritanceProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("UnknownFields.merge");
+            .contains("UnknownFields.newBuilder");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.UserProtoCodec")
+            .contentsAsUtf8String()
+            .contains("_ub.merge(reader)");
     }
 
     @Test

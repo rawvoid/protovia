@@ -33,6 +33,7 @@ final class GenTypes {
 
     static final ClassName PROTO_EXCEPTION = ClassName.get("io.github.rawvoid.protovia", "ProtoException");
     static final ClassName UNKNOWN_FIELDS = ClassName.get("io.github.rawvoid.protovia", "UnknownFields");
+    static final ClassName UNKNOWN_FIELDS_BUILDER = UNKNOWN_FIELDS.nestedClass("Builder");
     static final ClassName PROTO_CODEC = ClassName.get("io.github.rawvoid.protovia.codec", "ProtoCodec");
     static final ClassName CODED_SIZE = ClassName.get("io.github.rawvoid.protovia.wire", "CodedSize");
     static final ClassName PROTO_READER = ClassName.get("io.github.rawvoid.protovia.wire", "ProtoReader");

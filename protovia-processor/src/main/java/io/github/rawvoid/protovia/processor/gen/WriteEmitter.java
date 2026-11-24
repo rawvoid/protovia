@@ -43,12 +43,7 @@ final class WriteEmitter {
         for (FieldModel field : model.fields) {
             writeField(body, field);
         }
-        if (model.unknown != null) {
-            body.addStatement("$T $L = $L", UNKNOWN_FIELDS, model.unknown.localName(), model.unknown.readExpr());
-            body.beginControlFlow("if ($L != null)", model.unknown.localName());
-            body.addStatement("$L.writeTo(writer)", model.unknown.localName());
-            body.endControlFlow();
-        }
+        emitUnknown(body, model, false);
         return MethodSpec.methodBuilder("writeTo")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
