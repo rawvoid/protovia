@@ -55,13 +55,14 @@ final class ProtoNames {
 
     static String qualify(String fullName, String currentPackage) {
         if (WellKnownProtos.isWellKnownFullName(fullName)) {
-            return fullName;
+            return "." + fullName;
         }
         String pkg = packageName(fullName);
-        if (pkg.equals(currentPackage)) {
+        String current = currentPackage == null ? "" : currentPackage;
+        if (pkg.equals(current)) {
             return simpleName(fullName);
         }
-        return fullName;
+        return "." + fullName;
     }
 
     static String messageFullName(TypeElement type) {

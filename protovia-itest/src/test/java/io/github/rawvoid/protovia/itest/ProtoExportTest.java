@@ -102,8 +102,8 @@ class ProtoExportTest {
 
             message Carrier {
               string name = 1;
-              google.protobuf.Any extra = 2;
-              google.protobuf.Int32Value count = 3;
+              .google.protobuf.Any extra = 2;
+              .google.protobuf.Int32Value count = 3;
             }
             """, resource("example/v1/carrier.proto"));
     }
@@ -127,8 +127,8 @@ class ProtoExportTest {
         String timed = resource(MODEL + "timed.proto");
         assertTrue(timed.contains("import \"google/protobuf/duration.proto\";"));
         assertTrue(timed.contains("import \"google/protobuf/timestamp.proto\";"));
-        assertTrue(timed.contains("google.protobuf.Timestamp at = 1;"));
-        assertTrue(timed.contains("google.protobuf.Duration wait = 2;"));
+        assertTrue(timed.contains(".google.protobuf.Timestamp at = 1;"));
+        assertTrue(timed.contains(".google.protobuf.Duration wait = 2;"));
     }
 
     @Test
