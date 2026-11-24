@@ -18,6 +18,9 @@ package io.github.rawvoid.protovia.collect;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.RandomAccess;
 
 /**
  * {@code List<Double>} backed by {@code double[]}.
@@ -26,25 +29,43 @@ import java.util.Collection;
  */
 public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
 
+    private static final double[] EMPTY = new double[0];
+
     private double[] values;
 
     public DoubleArrayList() {
-        this(10);
+        this.values = EMPTY;
     }
 
     public DoubleArrayList(int capacity) {
-        this.values = new double[Math.max(capacity, 1)];
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Illegal capacity: " + capacity);
+        }
+        this.values = capacity == 0 ? EMPTY : new double[capacity];
     }
 
     public DoubleArrayList(Collection<? extends Double> values) {
-        this(values.size());
+        Objects.requireNonNull(values, "values");
+        if (values instanceof DoubleArrayList other) {
+            this.size = other.size;
+            this.values = other.size == 0 ? EMPTY : Arrays.copyOf(other.values, other.size);
+            return;
+        }
+        if (values.isEmpty()) {
+            this.values = EMPTY;
+            return;
+        }
+        int n = values.size();
+        this.values = n > 0 ? new double[n] : EMPTY;
         for (Double value : values) {
             addDouble(value);
         }
     }
 
     public void addDouble(double value) {
-        ensureCapacity(size + 1);
+        if (size == values.length) {
+            values = Arrays.copyOf(values, grow(values.length, size + 1));
+        }
         values[size++] = value;
         modCount++;
     }
@@ -55,13 +76,17 @@ public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
     }
 
     public double[] toDoubleArray() {
-        return Arrays.copyOf(values, size);
+        return size == 0 ? EMPTY : Arrays.copyOf(values, size);
     }
 
     public void ensureCapacity(int minCapacity) {
         if (minCapacity > values.length) {
             values = Arrays.copyOf(values, grow(values.length, minCapacity));
         }
+    }
+
+    int capacity() {
+        return values.length;
     }
 
     @Override
@@ -78,19 +103,48 @@ public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
     @Override
     public Double set(int index, Double value) {
         checkElementIndex(index);
+        double unboxed = value;
         double old = values[index];
-        values[index] = value;
+        values[index] = unboxed;
         return old;
     }
 
     @Override
     public void add(int index, Double value) {
         checkPositionIndex(index);
-        ensureCapacity(size + 1);
+        double unboxed = value;
+        if (size == values.length) {
+            values = Arrays.copyOf(values, grow(values.length, size + 1));
+        }
         System.arraycopy(values, index, values, index + 1, size - index);
-        values[index] = value;
+        values[index] = unboxed;
         size++;
         modCount++;
+    }
+
+    @Override
+    public boolean addAll(Collection<? extends Double> c) {
+        if (c instanceof DoubleArrayList other) {
+            int n = other.size;
+            if (n == 0) {
+                return false;
+            }
+            ensureCapacity(checkedCapacity(size, n));
+            System.arraycopy(other.values, 0, values, size, n);
+            size += n;
+            modCount++;
+            return true;
+        }
+        int n = c.size();
+        if (n > 0) {
+            ensureCapacity(checkedCapacity(size, n));
+        }
+        boolean modified = false;
+        for (Double value : c) {
+            addDouble(value);
+            modified = true;
+        }
+        return modified;
     }
 
     @Override
@@ -104,5 +158,92 @@ public final class DoubleArrayList extends AbstractPrimitiveList<Double> {
         size--;
         modCount++;
         return old;
+    }
+
+    @Override
+    protected void removeRange(int fromIndex, int toIndex) {
+        checkRange(fromIndex, toIndex);
+        modCount++;
+        int removed = toIndex - fromIndex;
+        if (removed > 0) {
+            int moved = size - toIndex;
+            if (moved > 0) {
+                System.arraycopy(values, toIndex, values, fromIndex, moved);
+            }
+            size -= removed;
+        }
+    }
+
+    @Override
+    public int indexOf(Object o) {
+        if (!(o instanceof Double v)) {
+            return -1;
+        }
+        long targetBits = Double.doubleToLongBits(v);
+        for (int i = 0; i < size; i++) {
+            if (Double.doubleToLongBits(values[i]) == targetBits) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+        if (!(o instanceof Double v)) {
+            return -1;
+        }
+        long targetBits = Double.doubleToLongBits(v);
+        for (int i = size - 1; i >= 0; i--) {
+            if (Double.doubleToLongBits(values[i]) == targetBits) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Override
+    public boolean contains(Object o) {
+        return indexOf(o) >= 0;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) {
+            return true;
+        }
+        if (o instanceof DoubleArrayList other) {
+            return size == other.size && Arrays.equals(values, 0, size, other.values, 0, other.size);
+        }
+        if (!(o instanceof List<?> other) || size != other.size()) {
+            return false;
+        }
+        if (other instanceof RandomAccess) {
+            for (int i = 0; i < size; i++) {
+                if (!(other.get(i) instanceof Double v)
+                    || Double.doubleToLongBits(v) != Double.doubleToLongBits(values[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        int i = 0;
+        for (Object elem : other) {
+            if (i >= size
+                || !(elem instanceof Double v)
+                || Double.doubleToLongBits(v) != Double.doubleToLongBits(values[i++])) {
+                return false;
+            }
+        }
+        return i == size;
+    }
+
+    @Override
+    public int hashCode() {
+        int h = 1;
+        for (int i = 0; i < size; i++) {
+            h = 31 * h + Double.hashCode(values[i]);
+        }
+        return h;
     }
 }
