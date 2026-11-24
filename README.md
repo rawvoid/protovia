@@ -1,11 +1,10 @@
 # Protovia
 
-Lightweight compile-time Protobuf for Java 21. **The Java entity is the schema** — you do not write `.proto` files. Compiling emits them.
+Lightweight compile-time Protobuf for Java 21. **The Java entity is the schema** — you do not write `.proto` files; compiling emits them.
 
-Annotate a POJO or record, compile, and get a generated zero-reflection `ProtoCodec` that speaks official proto3 wire format.
+Annotate a POJO, immutable class, or record, compile, and get a generated zero-reflection, zero-`Unsafe` `ProtoCodec` that speaks official proto3 wire format.
 
 ```java
-
 @ProtoMessage
 public class User {
   @ProtoField(number = 1)
@@ -41,20 +40,22 @@ byte[] bytes = Protovia.toBytes(user);
 User back = Protovia.fromBytes(bytes, User.class);
 ```
 
-The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type under `SOURCE_OUTPUT/proto/` (`target/generated-sources/annotations/proto/…`), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). Two types that snake-case to the same path fail compilation (`FooBar` and `Foo_Bar` → `foo_bar.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName=…)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for buf / Go. Files are not written to class output, so they do not enter the jar.
+The bytes are readable by official Protocol Buffers implementations (Go, Python, `protoc` Java, …). Compiling also writes a `.proto` per type under `SOURCE_OUTPUT/proto/` (`target/generated-sources/annotations/proto/…`), using protobuf import paths and `lower_snake_case` file names (`example.v1.User` → `example/v1/user.proto`, `com.acme.FlightOfferId` → `com/acme/flight_offer_id.proto`). Two types that snake-case to the same path fail compilation (`FooBar` and `Foo_Bar` → `foo_bar.proto`). The proto `package` (and Any `type_url`) default to the Java package; override with `@ProtoMessage(packageName = …)`. Optional: `-Aprotovia.protoOut=<dir>` copies that tree to a directory for `buf` / Go. Files are not written to class output, so they do not enter the jar.
 
 ## Modules
 
-| Artifact             | Role                                                |
-|----------------------|-----------------------------------------------------|
-| `protovia-core`      | Annotations, core engine, wire format, adapters, `Protovia` facade |
-| `protovia-processor` | Annotation processor that generates `XxxProtoCodec` |
-| `protovia-itest`     | End-to-end + official protobuf interop tests        |
-| `protovia-bench`     | JMH benchmarks against official `protobuf-java`     |
+| Artifact             | Role                                                             |
+|----------------------|------------------------------------------------------------------|
+| `protovia-core`      | Annotations, wire engine, codecs, built-in adapters, `Protovia` / `ProtoConfig` facade |
+| `protovia-processor` | Isolating annotation processor generating `XxxProtoCodec` and `.proto` files |
+| `protovia-itest`     | End-to-end + official `protobuf-java` interop tests              |
+| `protovia-bench`     | JMH benchmarks against official `protobuf-java`                  |
 
-Runtime has **no third-party dependencies**.
+Runtime has **no third-party dependencies** and uses **no `sun.misc.Unsafe`**.
 
-## Maven
+## Installation
+
+Maven:
 
 ```xml
 <dependency>
@@ -79,7 +80,7 @@ implementation("io.github.rawvoid:protovia-core:1.3.0-SNAPSHOT")
 annotationProcessor("io.github.rawvoid:protovia-processor:1.3.0-SNAPSHOT")
 ```
 
-To copy generated `.proto` files into a directory for buf / Go, pass `-Aprotovia.protoOut`:
+To mirror generated `.proto` files into a directory for `buf` or other languages, pass `-Aprotovia.protoOut`:
 
 Maven:
 
@@ -108,7 +109,7 @@ Without that option, the files still land in generated sources as `proto/example
 
 1. You mark types with `@ProtoMessage` / `@ProtoEnum` and members with `@ProtoField(number = N)`.
 2. At compile time the processor writes `internal.UserProtoCodec` and a `.proto` file under `SOURCE_OUTPUT/proto/` (`example.v1.User` → `proto/example/v1/user.proto`). Nested types become `Outer$InnerProtoCodec`.
-3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention. No reflection on entity fields. The `.proto` is for other languages and docs; the runtime codec does not read it.
+3. `Protovia.codec(User.class)` loads `UserProtoCodec.INSTANCE` by convention and caches it via `ClassValue`. No reflection on entity fields. The `.proto` is for other languages and docs; the runtime codec does not read it.
 
 Generated codecs:
 
@@ -119,46 +120,36 @@ Generated codecs:
 - decode a repeated / map field absent from the wire as an empty collection, never `null` (array-typed repeated fields stay `null`)
 - skip unknown fields (or capture and write them back via `@ProtoUnknown UnknownFields`)
 
-**Decoded collections are mutable.** A repeated / map field is decoded into a mutable implementation
-chosen for the declared type — `ArrayList` (or `protovia-core`'s specialized primitive `*ArrayList` for
-repeated primitive scalars) for `List`/`Collection`, `LinkedHashSet` for `Set`, `TreeSet` for
-`SortedSet`/`NavigableSet`, `LinkedHashMap` for `Map`, `TreeMap` for `SortedMap`/`NavigableMap`,
-`ConcurrentHashMap`/`ConcurrentSkipListMap` for `ConcurrentMap`/`ConcurrentNavigableMap`, or the declared
-concrete mutable type directly (`ArrayList`, `LinkedList`, `HashSet`, `TreeSet`, `HashMap`, `LinkedHashMap`,
-`TreeMap`, `*ArrayList`, …) when it exposes a public no-arg constructor — and the entity owns it. This
-differs from `protobuf-java`, where `Message` getters return read-only collections and all mutation goes
-through a `Builder`. Protovia decodes into user-owned entities, so modifying a decoded collection in place
-is valid. If you need a frozen collection, copy or wrap it in the model itself, for example in a record
-compact constructor (`tags = List.copyOf(tags)`), a setter, or with `Collections.unmodifiableList(...)`.
+**Decoded collections are mutable.** A repeated / map field is decoded into a mutable implementation chosen for the declared type — `ArrayList` (or `protovia-core`'s specialized primitive `*ArrayList` for repeated primitive scalars) for `List`/`Collection`, `LinkedHashSet` for `Set`, `TreeSet` for `SortedSet`/`NavigableSet`, `LinkedHashMap` for `Map`, `TreeMap` for `SortedMap`/`NavigableMap`, `ConcurrentHashMap`/`ConcurrentSkipListMap` for `ConcurrentMap`/`ConcurrentNavigableMap`, or the declared concrete mutable type directly (`ArrayList`, `LinkedList`, `HashSet`, `TreeSet`, `HashMap`, `LinkedHashMap`, `TreeMap`, `*ArrayList`, …) when it exposes a public no-arg constructor — and the entity owns it. This differs from `protobuf-java`, where `Message` getters return read-only collections and all mutation goes through a `Builder`. Protovia decodes into user-owned entities, so modifying a decoded collection in place is valid. If you need a frozen collection, copy or wrap it in the model itself, for example in a record compact constructor (`tags = List.copyOf(tags)`), a setter, or with `Collections.unmodifiableList(...)`.
 
 ## Type mapping
 
 | Java                                                      | Default proto                         | Override with `ProtoType`                 |
 |-----------------------------------------------------------|---------------------------------------|-------------------------------------------|
-| `int` / `Integer`                                         | int32                                 | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
-| `long` / `Long`                                           | int64                                 | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
-| `float` / `Float`                                         | float                                 |                                           |
-| `double` / `Double`                                       | double                                |                                           |
-| `boolean` / `Boolean`                                     | bool                                  |                                           |
-| `String`                                                  | string                                |                                           |
-| `byte[]`, `ByteBuffer`                                    | bytes                                 |                                           |
-| `@ProtoEnum` enum                                         | enum                                  |                                           |
-| `@ProtoMessage` type                                      | message                               |                                           |
-| `@ProtoOneof` field (cases listed on the field)           | oneof (cases flatten onto the parent) |                                           |
+| `int` / `Integer`                                         | `int32`                               | `UINT32`, `SINT32`, `FIXED32`, `SFIXED32` |
+| `long` / `Long`                                           | `int64`                               | `UINT64`, `SINT64`, `FIXED64`, `SFIXED64` |
+| `float` / `Float`                                         | `float`                               |                                           |
+| `double` / `Double`                                       | `double`                              |                                           |
+| `boolean` / `Boolean`                                     | `bool`                                |                                           |
+| `String`                                                  | `string`                              |                                           |
+| `byte[]`, `ByteBuffer`                                    | `bytes`                               |                                           |
+| `@ProtoEnum` enum                                         | `enum`                                |                                           |
+| `@ProtoMessage` type                                      | `message`                             |                                           |
+| `@ProtoOneof` field (cases listed on the field)           | `oneof` (cases flatten onto parent)   |                                           |
 | `java.time.Instant`                                       | `google.protobuf.Timestamp`           |                                           |
 | `java.time.Duration`                                      | `google.protobuf.Duration`            |                                           |
 | `ProtoAny`                                                | `google.protobuf.Any`                 |                                           |
 | `wkt.Int32Value` and the other 8 wrappers                 | wrapper messages                      |                                           |
 | adapted `J` via `@ProtoField(adapter)` / `@ProtoAdapters` | proto scalar of the adapter           |                                           |
-| `List` / `Set` / `Collection` / array (not `byte[]`)      | repeated                              | `packed` (default `true` for scalars)     |
-| `Map<K,V>`                                                | map                                   | `keyType` / `valueType`                   |
-| `Optional<T>`                                             | proto3 optional T                     |                                           |
+| `List` / `Set` / `Collection` / array (not `byte[]`)      | `repeated`                            | `packed` (default `true` for scalars)     |
+| `Map<K, V>`                                               | `map`                                 | `keyType` / `valueType`                   |
+| `Optional<T>`                                             | proto3 `optional T`                   |                                           |
 
 Map keys must be integral, `bool`, or `string`. Field numbers are **required** and must stay stable. Concrete mutable collections/maps with a public no-arg constructor (`ArrayList`, `LinkedList`, `HashSet`, `TreeSet`, `HashMap`, `LinkedHashMap`, `TreeMap`, `*ArrayList`, …), sorted/concurrent interfaces (`SortedSet`, `NavigableSet`, `SortedMap`, `NavigableMap`, `ConcurrentMap`, `ConcurrentNavigableMap`), `byte[][]` (`repeated bytes`), `Map<K, ByteBuffer>`, and `Optional<byte[]>` / `@ProtoField(optional = true) byte[]` are all supported.
 
-**Export names.** Wire uses numbers only. `.proto` field names default to the Java member (or the oneof-case rule below). Override with `@ProtoField(name=…)`, `@ProtoOneof(name=…)`, or `@ProtoOneof.Case(name=…)`. There is no automatic snake_case for fields. Names must be proto identifiers and cannot be keywords (`string`, `message`, …).
+**Export names.** Wire uses numbers only. `.proto` field names default to the Java member (or the oneof-case rule below). Override with `@ProtoField(name = …)`, `@ProtoOneof(name = …)`, or `@ProtoOneof.Case(name = …)`. There is no automatic snake_case for fields. Names must be proto identifiers and cannot be keywords (`string`, `message`, …).
 
-**Enum constants.** Java stays `Status.ACTIVE` (or `Active` / `unknown`). The generated `.proto` prefixes every constant with the enum type name and snake-cases the suffix to `UPPER_SNAKE_CASE` (`STATUS_ACTIVE`, `Status.ActiveUser` → `STATUS_ACTIVE_USER`) so values stay unique under protobuf’s C++ scoping rules. Two Java constants that normalize to the same proto name fail compilation. `@ProtoEnum(name=…)` is the prefix source. `@ProtoReserved(names=…)` on an enum refers to those prefixed proto names.
+**Enum constants.** Java stays `Status.ACTIVE` (or `Active` / `unknown`). The generated `.proto` prefixes every constant with the enum type name and snake-cases the suffix to `UPPER_SNAKE_CASE` (`STATUS_ACTIVE`, `Status.ActiveUser` → `STATUS_ACTIVE_USER`) so values stay unique under protobuf’s C++ scoping rules. Two Java constants that normalize to the same proto name fail compilation. `@ProtoEnum(name = …)` is the prefix source. `@ProtoReserved(names = …)` on an enum refers to those prefixed proto names.
 
 **Reserved.** `@ProtoReserved` on a `@ProtoMessage` / `@ProtoEnum` (or a mixin superclass) occupies retired numbers and proto names so they cannot be reused. They are written into the generated `.proto` as `reserved`.
 
@@ -181,13 +172,11 @@ A mixin superclass annotated `@ProtoDeterministic` applies to **every map** on e
 
 Sort order is Java natural order for `string` / `bool` / signed integers and unsigned order for `uint32` / `fixed32` / `uint64` / `fixed64`. String map keys are ordered by Java `String::compareTo` (UTF-16 code units), which matches UTF-8 byte order for all BMP characters (`U+0000..U+FFFF`) and differs only when comparing supplementary characters (`U+10000+`) against `U+E000..U+FFFF`. Adapted keys are sorted after `toWire`. Deterministic serialization sorts once per map during `computeSize` and caches the sorted snapshot (including single-pass Schwartzian key adaptation) via `SizeCache`, so `writeTo` reuses it without re-sorting or re-adapting. This is not byte-identical to C++ `deterministic_serialization`. Unannotated maps keep the previous write path with no extra allocation. The generated `.proto` is unchanged (`map<k, v>`).
 
-**oneof export.** A wrapper record without `@ProtoMessage` flattens to its payload (`Email(String)` → `string email`). A case type that is itself `@ProtoMessage` exports as that message, even if it has a single string field. Empty `record Ping() {}` becomes a nested `message Ping {}` in the parent file.
-
 ## Custom adapters
 
 Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. Built-in opt-in adapters live in `io.github.rawvoid.protovia.adapter`. They are unused unless named in `@ProtoField(adapter)` / `@ProtoAdapters` — **not** well-known types, and they are not registered in `CodecLookup`.
 
-### Built-in Adapters
+### Built-in adapters
 
 | Category | Java Type | Adapter Class | Proto Wire Type | Description |
 |---|---|---|---|---|
@@ -225,10 +214,26 @@ Map a Java reference type onto an existing proto3 scalar with a `ProtoAdapter`. 
 - `ZonedDateTimeIsoStringAdapter` emits Java's `ISO_ZONED_DATE_TIME` / RFC 9557 extension format (`2026-08-18T15:47:05.123+08:00[Asia/Shanghai]`). Non-Java strict RFC 3339 parsers will not accept the `[Zone]` suffix verbatim without stripping or supporting it; use `OffsetDateTimeIsoStringAdapter` or `Instant` for strict RFC 3339 interoperability.
 - `InetAddressStringAdapter` parses strict IPv4/IPv6 numeric literals purely in memory via `InetAddress.getByAddress` with zero DNS lookups, rejecting empty strings and hostnames.
 
+### Writing & applying adapters
+
+Implement `ProtoAdapter<J, W>` with `@ProtoScalar(...)` and a `public static final INSTANCE` singleton:
+
+```java
+@ProtoScalar(ProtoType.INT64)
+public final class MoneyCentsAdapter implements ProtoAdapter<Money, Long> {
+  public static final MoneyCentsAdapter INSTANCE = new MoneyCentsAdapter();
+  private MoneyCentsAdapter() {}
+
+  @Override public Long toWire(Money value) { return value.cents(); }
+  @Override public Money fromWire(Long wire) { return Money.ofCents(wire); }
+}
+```
+
+Adapter discovery precedence (first match wins): field / oneof case → `@ProtoAdapters` on the `@ProtoMessage` → `@ProtoAdapters` on mixin superclasses (near to far) → `@ProtoAdapters` on the leaf type's `package-info` → `@ProtoAdapted(MoneyCentsAdapter.class)` on user-owned type `J` → built-in scalar / WKT mapping.
+
 **Field-level override** — only this member becomes `int64`:
 
 ```java
-
 @ProtoMessage
 public class Audit {
   @ProtoField(number = 1)
@@ -243,7 +248,6 @@ public class Audit {
 **Class-level override** — every matching field on that message:
 
 ```java
-
 @ProtoMessage
 @ProtoAdapters({InstantEpochMilliAdapter.class, DurationMilliAdapter.class})
 public class Event {
@@ -256,19 +260,18 @@ public class Event {
 }
 ```
 
-A sibling message with no `@ProtoAdapters` still encodes `Instant` as Timestamp.
+A sibling message with no `@ProtoAdapters` still encodes `Instant` as `Timestamp`.
 
-**Presence.** Adapted singular fields use Java reference presence: `null` is omitted; a non-null value is **always written**, including proto3 defaults such as epoch day `0` (`1970-01-01`). Missing on the wire decodes as `null` — do not call `fromWire(0)`. A Go / proto3-Java client using implicit-presence `int32` will omit `0`; Protovia then reads `null`. Use `optional = true` on both sides if unset vs epoch must survive the wire.
+**Presence.** Adapted singular fields use Java reference presence: `null` is omitted; a non-null value is **always written**, including proto3 defaults such as epoch day `0` (`1970-01-01`). Missing on the wire decodes as `null` — `fromWire(0)` is never called. A Go / proto3-Java client using implicit-presence `int32` will omit `0`; Protovia then reads `null`. Use `optional = true` on both sides if unset vs epoch must survive the wire.
 
 ```java
-
 @ProtoField(number = 3, adapter = LocalDateEpochDayAdapter.class)
 LocalDate birthDate;   // 1970-01-01 writes tag + 0x00
 ```
 
 ## oneof
 
-Declare a proto3 `oneof` by placing `@ProtoOneof` on a field, JavaBean getter, or record component. The oneof group itself has no field number; each `@ProtoOneof.Case(number, of)` assigns a field number on the parent message.
+Declare a proto3 `oneof` by placing `@ProtoOneof` on a field, JavaBean getter, or record component. The oneof group itself has no field number; each `@ProtoOneof.Case(number, of)` assigns a field number on the parent message. `sealed` is optional and is not consulted by the processor.
 
 **Polymorphic record wrappers (recommended):**
 
@@ -292,24 +295,26 @@ public record Email(String value) implements Target {}
 public record Home(Address address) implements Target {}
 ```
 
-Wire equivalent:
+Wire & `.proto` equivalent:
 
 ```protobuf
 message Contact {
   string name = 1;
   oneof target {
-    Email email = 10;
-    Home home = 11;
+    string email = 10;
+    Address address = 11;
   }
 }
 ```
 
-- A 1-component record without `@ProtoMessage` (like `Email(String value)`) encodes directly as that scalar wire type (`string`), without an extra nested message envelope.
-- A case holding a `@ProtoMessage` type (like `Address`) encodes as a nested sub-message.
+- A 1-component record without `@ProtoMessage` (like `Email(String value)`) flattens directly to its payload wire type (`string`) with no extra message envelope.
+- A 0-component record (`record Ping() {}`) encodes as an empty message and exports as a nested `message Ping {}` in the parent `.proto`.
+- A case type that is itself `@ProtoMessage` (class or record, including multi-component) encodes as a nested sub-message directly on that instance (`readMessage` / `writeTo`).
+- An unmatched non-null runtime value throws `ProtoException` during `computeSize` / `writeTo`.
 
 **Naked scalar / message cases:**
 
-You can also use raw types directly without custom wrapper records by declaring a common supertype such as `Object`:
+Use raw types directly without wrapper records via a common supertype such as `Object`:
 
 ```java
 @ProtoMessage
@@ -325,8 +330,6 @@ public class Bag {
 Naked `String` and `byte[]` default to proto names `string` / `bytes`, which are keywords — set `name` to override.
 
 **Case-level type & adapter overrides:**
-
-Individual oneof cases can customize their scalar wire type or adapter:
 
 ```java
 @ProtoOneof({
@@ -354,7 +357,7 @@ private Event event;
   1. `@ProtoCreator` constructor or static factory
   2. `@ProtoBuilder` (non-standard `builder()` / setter names)
   3. `builder()` + `build()` + a setter per proto member (Lombok `@Builder` / `@SuperBuilder`, handwritten)
-  4. Public all-args constructor or public static factory whose parameters match proto members
+  4. Public all-args constructor or public static factory whose parameters match proto members (without `-parameters`, positional binding requires unambiguous parameter types)
 - Generated codecs live in `*.internal`, so the constructor / factory / `builder()` must be **public**. Lombok `@Value` defaults to a private constructor — use `@Builder`, `@Value(staticConstructor = "of")`, or `@AllArgsConstructor(access = PUBLIC)`
 - `mergeFrom` returns a new instance
 
@@ -369,12 +372,6 @@ private Event event;
 - A `0` value is required (proto3)
 - Unknown enum numbers on the wire are captured in `@ProtoUnknown UnknownFields` when declared (including raw full map entries for unknown enum map values). On the entity fields themselves, singular/oneof fields decode to `null` (or `@ProtoUnrecognized` if declared; `Optional.empty()` / `Optional.of(UNRECOGNIZED)` for `Optional`), repeated unknown values are skipped, and map entries with unknown enum values are omitted without coercing to `0`
 - `@ProtoUnrecognized` is a Java-only sentinel and is never written as a number
-
-**oneof**
-
-- Mark the field `@ProtoOneof({ @ProtoOneof.Case(number, of), ... })`. The group has no field number; each `Case.number` belongs to the parent message.
-- `of` is a 0- or 1-component record, a `@ProtoMessage` (class or record, including multi-component), or a naked scalar / enum / `byte[]`. `sealed` is optional and is not consulted.
-- A one-component scalar record without `@ProtoMessage` encodes as that scalar, not a nested message. A `@ProtoMessage` case is `readMessage` / `writeTo` on that instance. A naked `String` case stores the string directly.
 
 **Inheritance**
 
@@ -404,7 +401,7 @@ Protovia.fromBytes(bytes, User.class);
 Protovia.fromBytes(bytes, offset, length, User.class);
 Protovia.toByteBuffer(message);
 Protovia.fromByteBuffer(byteBuffer, User.class);      // zero-copy for heap buffers; position/limit unchanged
-Protovia.mergeFrom(bytes, existingUser);              // proto3 merge (scalars overwrite, repeated append, nested merge)
+Protovia.mergeFrom(bytes, existingUser);              // proto3 merge (mutates POJO / returns new record)
 Protovia.write(outputStream, message);
 Protovia.read(inputStream, User.class);
 Protovia.writeDelimited(outputStream, message);       // varint32 length-prefixed framing
@@ -422,15 +419,34 @@ User back = Protovia.unpack(packed, User.class);
 User boundedAny = packed.unpack(Protovia.codec(User.class), limits);
 ```
 
-`pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. Blank `packageName` defaults to the Java package (`demo.User` → `type.googleapis.com/demo.User`). `Integer` stays int32; use `Int32Value` when you need the wrapper message.
+`pack` uses `@ProtoMessage(packageName, name)`, not the Java FQCN. Blank `packageName` defaults to the Java package (`demo.User` → `type.googleapis.com/demo.User`). `Integer` stays `int32`; use `Int32Value` when you need the wrapper message.
 
-**`Protovia.register(...)` scope:** `Protovia.register(type, codec)` overrides top-level `Protovia.*` / `ProtoConfig.*` lookups (including `Protovia.unpack` and `ProtoConfig.unpack`). Generated codecs invoke child `XxxProtoCodec.INSTANCE` directly for static dispatch, so registering an override for a nested child type does not intercept generated parent codecs — to customize a nested type, replace the parent codec, invoke a custom codec at the call site, or use a `ProtoAdapter`.
+### Merge semantics (`mergeFrom`)
 
-**Safety limits:** Default limits are 64 MiB per message and nesting depth 100. Prefer immutable `ProtoConfig` (`Protovia.withLimits(maxMessageSize, maxDepth)` / `Protovia.config()`) for isolated per-call or multi-tenant limits without mutating global defaults (`Protovia.setMaxMessageSize` / `setMaxDepth`). `ProtoConfig` exposes the same encoding, decoding, merging, `ByteBuffer`, delimited stream, and `Any` operations as `Protovia`; `ProtoAny.unpack(codec, config)` also accepts a `ProtoConfig`.
+`Protovia.mergeFrom` and `ProtoConfig.mergeFrom` follow official proto3 merge rules. Mutable POJOs are updated in place and returned; records and immutable classes return a new merged instance.
+
+| Field kind | Merge behavior |
+|---|---|
+| Scalar / enum / `optional` (`Optional<T>`) | Incoming wire value overwrites existing value (absent wire fields keep existing value) |
+| Repeated (`List` / `Set` / `Collection` / array) | Incoming elements append to existing elements |
+| `Map<K, V>` | Separate wire entries replace per key (`put`); duplicate value tags within a single wire entry merge message values |
+| Nested `@ProtoMessage` | Recursive field-level merge into the existing sub-message |
+| `oneof` | Incoming message case matching the current branch merges recursively; any other branch replaces the whole oneof |
+| `@ProtoUnknown UnknownFields` | Appends newly captured fields; strips overwritten singular/oneof unknown enum entries |
+| Well-known types (`Timestamp`, `Duration`, `ProtoAny`, wrappers) | Field-level merge (an empty wire payload does not wipe existing fields) |
+| Adapted fields | Follow the corresponding scalar, repeated, map, or oneof merge rule |
+
+### `Protovia.register(...)` scope
+
+`Protovia.register(type, codec)` overrides top-level `Protovia.*` / `ProtoConfig.*` lookups (including `Protovia.unpack` and `ProtoConfig.unpack`). Generated codecs invoke child `XxxProtoCodec.INSTANCE` directly for static dispatch, so registering an override for a nested child type does not intercept generated parent codecs — to customize a nested type, replace the parent codec, invoke a custom codec at the call site, or use a `ProtoAdapter`.
+
+### Safety limits
+
+Default limits are 64 MiB per message and nesting depth 100. Prefer immutable `ProtoConfig` (`Protovia.withLimits(maxMessageSize, maxDepth)` / `Protovia.config()`) for isolated per-call or multi-tenant limits without mutating global defaults (`Protovia.setMaxMessageSize` / `setMaxDepth`). `ProtoConfig` exposes the same encoding, decoding, merging, `ByteBuffer`, delimited stream, and `Any` operations as `Protovia`; `ProtoAny.unpack(codec, config)` also accepts a `ProtoConfig`.
 
 ## Not in this release
 
-`.proto` import (Java stays the schema), proto2 required/default, `Struct` / `Value`.
+`Struct` / `Value` / `ListValue`, proto3 JSON mapping, streaming `InputStream` refill, `.proto` import (Java stays the schema), proto2 required/default.
 
 ## Build
 
@@ -442,7 +458,7 @@ Java 21. Interop tests compare Protovia bytes with `protobuf-java` `DynamicMessa
 
 ## Benchmarks
 
-`protovia-bench` compares Protovia with `protobuf-java` **4.36.2 generated** messages (not `DynamicMessage`):
+`protovia-bench` compares Protovia against `protobuf-java` **4.36.2 generated** messages (not `DynamicMessage`):
 
 ```bash
 mvn -pl protovia-bench -am package
