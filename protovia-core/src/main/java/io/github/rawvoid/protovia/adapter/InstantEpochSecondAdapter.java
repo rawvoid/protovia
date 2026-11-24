@@ -16,10 +16,12 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 
 /**
@@ -45,6 +47,10 @@ public final class InstantEpochSecondAdapter implements ProtoAdapter<Instant, Lo
 
     @Override
     public Instant fromWire(Long wire) {
-        return Instant.ofEpochSecond(wire);
+        try {
+            return Instant.ofEpochSecond(wire);
+        } catch (DateTimeException e) {
+            throw new ProtoException("Instant epoch second out of range: " + wire, e);
+        }
     }
 }

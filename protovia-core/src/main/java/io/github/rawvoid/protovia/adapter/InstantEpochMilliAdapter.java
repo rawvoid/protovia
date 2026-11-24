@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
@@ -39,7 +40,11 @@ public final class InstantEpochMilliAdapter implements ProtoAdapter<Instant, Lon
 
     @Override
     public Long toWire(Instant value) {
-        return value.toEpochMilli();
+        try {
+            return value.toEpochMilli();
+        } catch (ArithmeticException e) {
+            throw new ProtoException("Instant out of int64 epoch milliseconds range: " + value, e);
+        }
     }
 
     @Override

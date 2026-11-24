@@ -21,8 +21,8 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
+import java.time.DateTimeException;
 import java.time.Period;
-import java.time.format.DateTimeParseException;
 
 /**
  * Opt-in {@link Period} as proto3 {@code string} in ISO-8601 period format (e.g. {@code "P1Y2M3D"}).
@@ -47,7 +47,7 @@ public final class PeriodIsoStringAdapter implements ProtoAdapter<Period, String
     public Period fromWire(String wire) {
         try {
             return Period.parse(wire);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeException | ArithmeticException e) {
             throw new ProtoException("invalid Period string: " + wire, e);
         }
     }

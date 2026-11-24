@@ -21,8 +21,8 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
+import java.time.DateTimeException;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 
 /**
  * Opt-in {@link OffsetDateTime} as proto3 {@code string} formatted in standard ISO-8601 / RFC 3339
@@ -48,7 +48,7 @@ public final class OffsetDateTimeIsoStringAdapter implements ProtoAdapter<Offset
     public OffsetDateTime fromWire(String wire) {
         try {
             return OffsetDateTime.parse(wire);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeException e) {
             throw new ProtoException("invalid OffsetDateTime string: " + wire, e);
         }
     }

@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
@@ -44,7 +45,11 @@ public final class LocalDateTimeEpochMilliAdapter implements ProtoAdapter<LocalD
 
     @Override
     public Long toWire(LocalDateTime value) {
-        return value.toInstant(ZoneOffset.UTC).toEpochMilli();
+        try {
+            return value.toInstant(ZoneOffset.UTC).toEpochMilli();
+        } catch (ArithmeticException e) {
+            throw new ProtoException("LocalDateTime out of int64 epoch milliseconds range: " + value, e);
+        }
     }
 
     @Override
