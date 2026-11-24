@@ -20,7 +20,9 @@ import java.lang.annotation.*;
 
 /**
  * Marks the single {@code UnknownFields} slot on a {@link ProtoMessage}.
- * Unrecognized tags are appended here and written back after known fields.
+ * Unrecognized tags, unknown enum values, and raw map entries with unknown enum values
+ * are captured here and written back after known fields (with overwritten singular/oneof
+ * unknown enum entries automatically excluded).
  * At most one per message. The Java type must be {@code UnknownFields}.
  *
  * @author Rawvoid

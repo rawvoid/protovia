@@ -20,7 +20,7 @@ import java.lang.annotation.*;
 
 /**
  * Marks a Java class or record as a Protobuf message. The processor generates
- * {@code <SimpleName>ProtoCodec} in the same package.
+ * {@code <SimpleName>ProtoCodec} in the {@code internal} subpackage.
  *
  * <p>Decoded repeated and map fields are never {@code null}: a field absent from the
  * wire decodes to an empty collection. That collection is mutable and owned by the

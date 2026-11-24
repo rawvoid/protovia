@@ -86,7 +86,9 @@ public final class CodecLookup {
     }
 
     /**
-     * Replaces any previous mapping for {@code type}.
+     * Replaces any previous top-level lookup mapping for {@code type}. Affects {@link #get(Class)}
+     * (and callers such as {@code Protovia.*} and {@code ProtoConfig.*}, including {@code unpack});
+     * generated codecs call child {@code XxxProtoCodec.INSTANCE} directly for static dispatch.
      *
      * @param type  entity class
      * @param codec codec to use

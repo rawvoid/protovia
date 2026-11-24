@@ -31,7 +31,7 @@ public final class CodedSize {
     }
 
     /**
-     * Varint size via leading-zero count. Same formula as protobuf-java 4.35.1
+     * Varint size via leading-zero count. Same formula as protobuf-java 4.36.2
      * {@code CodedOutputStream.computeUInt32SizeNoTag}.
      */
     public static int uint32(int value) {
@@ -40,7 +40,7 @@ public final class CodedSize {
     }
 
     /**
-     * Varint size via leading-zero count. Same formula as protobuf-java 4.35.1
+     * Varint size via leading-zero count. Same formula as protobuf-java 4.36.2
      * {@code CodedOutputStream.computeUInt64SizeNoTag}.
      */
     public static int uint64(long value) {
