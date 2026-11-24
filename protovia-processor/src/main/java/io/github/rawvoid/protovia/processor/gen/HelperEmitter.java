@@ -44,11 +44,12 @@ final class HelperEmitter {
     private HelperEmitter() {
     }
 
-    static List<MethodSpec> helpers(MessageModel model) {
+    static List<MethodSpec> helpers(MessageModel model, TypeName msgType) {
         List<MethodSpec> methods = new ArrayList<>();
         collectEnumHelpers(model, methods);
         collectPackedSizeHelpers(model, methods);
         collectMapHelpers(model, methods);
+        collectUnknownExclusionHelpers(model, msgType, methods);
         return methods;
     }
 
@@ -175,20 +176,21 @@ final class HelperEmitter {
     }
 
     private static MethodSpec mapEntrySize(FieldModel field) {
+        boolean preAdaptedKey = isDeterministicAdaptedKey(field);
         CodeBlock.Builder body = CodeBlock.builder();
         body.beginControlFlow("if (k == null || v == null)");
         body.addStatement("throw new $T($S)", PROTO_EXCEPTION, "map entry for field " + field.name + " cannot contain null");
         body.endControlFlow();
         body.addStatement("int entrySlot = cache.reserve()");
         body.addStatement("int entrySize = 0");
-        mapEntrySizeAdd(body, field.mapKey, "k", 1, "entrySize");
-        mapEntrySizeAdd(body, field.mapValue, "v", 2, "entrySize");
+        mapEntrySizeAdd(body, field.mapKey, "k", 1, "entrySize", preAdaptedKey);
+        mapEntrySizeAdd(body, field.mapValue, "v", 2, "entrySize", false);
         body.addStatement("cache.set(entrySlot, entrySize)");
         body.addStatement("return entrySize");
         return MethodSpec.methodBuilder(mapEntrySizeOf(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.INT)
-            .addParameter(boxedType(field.mapKey), "k")
+            .addParameter(mapEntryKeyParamType(field), "k")
             .addParameter(boxedType(field.mapValue), "v")
             .addParameter(SIZE_CACHE, "cache")
             .addCode(body.build())
@@ -196,21 +198,22 @@ final class HelperEmitter {
     }
 
     private static MethodSpec mapEntryWriteMethod(FieldModel field) {
+        boolean preAdaptedKey = isDeterministicAdaptedKey(field);
         CodeBlock.Builder body = CodeBlock.builder();
         body.beginControlFlow("if (k == null || v == null)");
         body.addStatement("throw new $T($S)", PROTO_EXCEPTION, "map entry for field " + field.name + " cannot contain null");
         body.endControlFlow();
         body.addStatement("int entrySize = writer.hasCachedSize() ? writer.takeSize() : $L(k, v, $T.NOOP)",
             mapEntrySizeOf(field), SIZE_CACHE);
-        body.addStatement("writer.writeUInt32NoTag($L)", Names.tagConstant(field.number));
+        writeTag(body, WireType.tag(field.number, WireType.LEN), Names.tagConstant(field.number));
         body.addStatement("writer.writeUInt32NoTag(entrySize)");
-        mapEntryPartWrite(body, field.mapKey, "k", 1);
-        mapEntryPartWrite(body, field.mapValue, "v", 2);
+        mapEntryPartWrite(body, field.mapKey, "k", 1, preAdaptedKey);
+        mapEntryPartWrite(body, field.mapValue, "v", 2, false);
         return MethodSpec.methodBuilder(mapEntryWrite(field))
             .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
             .returns(TypeName.VOID)
             .addParameter(PROTO_WRITER, "writer")
-            .addParameter(boxedType(field.mapKey), "k")
+            .addParameter(mapEntryKeyParamType(field), "k")
             .addParameter(boxedType(field.mapValue), "v")
             .addCode(body.build())
             .build();
@@ -292,5 +295,55 @@ final class HelperEmitter {
             method.addParameter(UNKNOWN_FIELDS_BUILDER, "_ub");
         }
         return method.addCode(body.build()).build();
+    }
+
+    private static void collectUnknownExclusionHelpers(
+        MessageModel model, TypeName msgType, List<MethodSpec> methods) {
+        if (!shouldSplit(model) || model.unknown == null || countUnknownEnumExclusions(model) == 0) {
+            return;
+        }
+        List<FieldModel> exclFields = unknownExclusionFields(model);
+        TypeName intArray = com.palantir.javapoet.ArrayTypeName.of(TypeName.INT);
+        if (exclFields.size() <= CHUNK_SIZE) {
+            CodeBlock.Builder body = CodeBlock.builder();
+            body.addStatement("int _exclN = 0");
+            emitUnknownExclusionChecks(body, exclFields, true);
+            body.addStatement("return _exclN");
+            methods.add(MethodSpec.methodBuilder("_collectExcludedEnums")
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(TypeName.INT)
+                .addParameter(msgType, "value")
+                .addParameter(intArray, "_excl")
+                .addCode(body.build())
+                .build());
+            return;
+        }
+        List<List<FieldModel>> chunks = chunkFields(exclFields);
+        CodeBlock.Builder main = CodeBlock.builder();
+        main.addStatement("int _exclN = 0");
+        for (int i = 0; i < chunks.size(); i++) {
+            main.addStatement("_exclN = _collectExcludedEnums_$L(value, _excl, _exclN)", i);
+        }
+        main.addStatement("return _exclN");
+        methods.add(MethodSpec.methodBuilder("_collectExcludedEnums")
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.INT)
+            .addParameter(msgType, "value")
+            .addParameter(intArray, "_excl")
+            .addCode(main.build())
+            .build());
+        for (int i = 0; i < chunks.size(); i++) {
+            CodeBlock.Builder chunkBody = CodeBlock.builder();
+            emitUnknownExclusionChecks(chunkBody, chunks.get(i), true);
+            chunkBody.addStatement("return _exclN");
+            methods.add(MethodSpec.methodBuilder("_collectExcludedEnums_" + i)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(TypeName.INT)
+                .addParameter(msgType, "value")
+                .addParameter(intArray, "_excl")
+                .addParameter(TypeName.INT, "_exclN")
+                .addCode(chunkBody.build())
+                .build());
+        }
     }
 }

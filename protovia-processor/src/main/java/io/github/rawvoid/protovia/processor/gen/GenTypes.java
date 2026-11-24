@@ -39,12 +39,14 @@ final class GenTypes {
     static final ClassName PROTO_READER = ClassName.get("io.github.rawvoid.protovia.wire", "ProtoReader");
     static final ClassName PROTO_WRITER = ClassName.get("io.github.rawvoid.protovia.wire", "ProtoWriter");
     static final ClassName PROTO_MAPS = ClassName.get("io.github.rawvoid.protovia.wire", "ProtoMaps");
+    static final ClassName PROTO_MAPS_KEYED_ENTRY = PROTO_MAPS.nestedClass("KeyedEntry");
     static final ClassName SIZE_CACHE = ClassName.get("io.github.rawvoid.protovia.wire", "SizeCache");
     static final ClassName COMPARATOR = ClassName.get("java.util", "Comparator");
     static final ClassName WIRE_TYPE = ClassName.get("io.github.rawvoid.protovia.wire", "WireType");
     static final ClassName PROTO_LISTS = ClassName.get("io.github.rawvoid.protovia.collect", "ProtoLists");
     static final ClassName OPTIONAL = ClassName.get("java.util", "Optional");
     static final ClassName MAP = ClassName.get("java.util", "Map");
+    static final ClassName MAP_ENTRY = MAP.nestedClass("Entry");
     static final ClassName ARRAY_LIST = ClassName.get("java.util", "ArrayList");
     static final ClassName BYTE_BUFFER = ClassName.get("java.nio", "ByteBuffer");
 

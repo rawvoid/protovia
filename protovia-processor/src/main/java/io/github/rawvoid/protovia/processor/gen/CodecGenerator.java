@@ -72,17 +72,50 @@ public final class CodecGenerator {
             .returns(TypeName.BOOLEAN)
             .addStatement("return true")
             .build());
+        if (!needsSizeCache(model)) {
+            type.addMethod(MethodSpec.methodBuilder("needsSizeCache")
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .returns(TypeName.BOOLEAN)
+                .addStatement("return false")
+                .build());
+        }
 
         SizeEmitter.computeSizeMethods(model, msgType).forEach(type::addMethod);
-        type.addMethod(WriteEmitter.writeTo(model, msgType));
-        ReadEmitter.readMethods(model, msgType).forEach(type::addMethod);
-        HelperEmitter.helpers(model).forEach(type::addMethod);
+        WriteEmitter.writeToMethods(model, msgType).forEach(type::addMethod);
+        ReadEmitter.emit(type, codecType, model, msgType);
+        HelperEmitter.helpers(model, msgType).forEach(type::addMethod);
 
         JavaFile file = JavaFile.builder(model.codecPackageName, type.build())
             .skipJavaLangImports(true)
             .indent("    ")
             .build();
         return compactTagConstants(file.toString());
+    }
+
+    static boolean needsSizeCache(MessageModel model) {
+        for (FieldModel field : model.fields) {
+            switch (field.kind) {
+                case MESSAGE, MAP -> {
+                    return true;
+                }
+                case REPEATED -> {
+                    if ((field.packed && field.packable()) || field.element.kind == FieldKind.MESSAGE) {
+                        return true;
+                    }
+                }
+                case ONEOF -> {
+                    for (OneofCaseModel c : field.oneofCases) {
+                        if (!c.empty() && (c.selfMessage || c.payload.kind == FieldKind.MESSAGE)) {
+                            return true;
+                        }
+                    }
+                }
+                case SCALAR, ENUM -> {
+                }
+            }
+        }
+        return false;
     }
 
     /**

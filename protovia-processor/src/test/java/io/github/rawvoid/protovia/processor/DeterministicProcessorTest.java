@@ -67,7 +67,7 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(f_scores, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntriesArray(f_scores, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
@@ -93,7 +93,7 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(f_headers, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntriesArray(f_headers, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
@@ -127,11 +127,11 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(f_inherited, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntriesArray(f_inherited, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(f_own, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntriesArray(f_own, Comparator.naturalOrder())");
     }
 
     @Test
@@ -276,11 +276,11 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("UuidString.INSTANCE.toWire(k)");
+            .contains("UuidString.INSTANCE.toWire(_k)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries");
+            .contains("ProtoMaps.sortedAdaptedEntries");
     }
 
     @Test
@@ -307,7 +307,7 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("sortedEntries(f_values, Long::compareUnsigned)");
+            .contains("sortedEntriesArray(f_values, Long::compareUnsigned)");
     }
 
     @Test
