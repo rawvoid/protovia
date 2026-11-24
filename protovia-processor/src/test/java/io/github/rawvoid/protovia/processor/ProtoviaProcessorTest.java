@@ -2211,7 +2211,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("writeUInt32NoTag(TAG_10)");
+            .contains("writeRawByte(TAG_10)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
@@ -3812,7 +3812,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.MapHolderWithUnknownProtoCodec")
             .contentsAsUtf8String()
-            .contains("readEntry_1(reader, msg.states, _ub)");
+            .contains("readEntry_1(reader, _col_1, _ub)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.MapHolderWithUnknownProtoCodec")
             .contentsAsUtf8String()
@@ -3824,7 +3824,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.MapHolderBareProtoCodec")
             .contentsAsUtf8String()
-            .contains("readEntry_1(reader, msg.states)");
+            .contains("readEntry_1(reader, _col_1)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.MapHolderBareProtoCodec")
             .contentsAsUtf8String()

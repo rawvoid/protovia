@@ -17,6 +17,7 @@
 package io.github.rawvoid.protovia.processor.gen;
 
 import com.palantir.javapoet.ClassName;
+import io.github.rawvoid.protovia.processor.model.CollectionKind;
 import io.github.rawvoid.protovia.processor.model.FieldKind;
 import io.github.rawvoid.protovia.processor.model.FieldModel;
 import lombok.Getter;
@@ -54,6 +55,28 @@ enum PrimitiveListSpec {
         if (field.primitiveListType() == null) {
             return null;
         }
+        return forElement(field);
+    }
+
+    /**
+     * Returns the specialized primitive list spec for any repeated field whose runtime backing
+     * collection can be a {@code protovia.collect.*ArrayList} (primitive arrays, {@code List<T>},
+     * {@code Collection<T>}, or concrete {@code *ArrayList}).
+     */
+    static PrimitiveListSpec ofPacked(FieldModel field) {
+        if (field.primitiveListType() != null) {
+            return forElement(field);
+        }
+        if (!field.array
+            && field.collectionKind == CollectionKind.COLLECTION
+            && field.implType != null
+            && field.implType.getQualifiedName().toString().startsWith("io.github.rawvoid.protovia.collect.")) {
+            return forElement(field);
+        }
+        return null;
+    }
+
+    private static PrimitiveListSpec forElement(FieldModel field) {
         FieldModel el = field.kind == FieldKind.REPEATED ? field.element : field;
         if (el == null || el.protoType == null || el.adapterType != null) {
             return null;

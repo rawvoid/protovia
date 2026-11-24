@@ -25,6 +25,7 @@ import io.github.rawvoid.protovia.processor.model.MessageModel;
 import io.github.rawvoid.protovia.processor.model.OneofCaseModel;
 
 import javax.lang.model.element.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
@@ -43,14 +44,43 @@ final class SizeEmitter {
     }
 
     static List<MethodSpec> computeSizeMethods(MessageModel model, TypeName msgType) {
-        MethodSpec simple = MethodSpec.methodBuilder("computeSize")
+        List<MethodSpec> methods = new ArrayList<>();
+        methods.add(MethodSpec.methodBuilder("computeSize")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeName.INT)
             .addParameter(msgType, "value")
             .addStatement("return computeSize(value, $T.NOOP)", SIZE_CACHE)
-            .build();
-        return List.of(simple, computeSizeWithCache(model, msgType));
+            .build());
+        if (!shouldSplit(model)) {
+            methods.add(computeSizeWithCache(model, msgType));
+            return methods;
+        }
+        List<List<FieldModel>> chunks = chunkFields(model.fields);
+        CodeBlock.Builder body = CodeBlock.builder();
+        body.addStatement("int size = 0");
+        for (int i = 0; i < chunks.size(); i++) {
+            body.addStatement("size += _computeSize_$L(value, cache)", i);
+        }
+        if (model.unknown != null) {
+            body.addStatement("size += _unknownSize(value)");
+        }
+        body.addStatement("return size");
+        methods.add(MethodSpec.methodBuilder("computeSize")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeName.INT)
+            .addParameter(msgType, "value")
+            .addParameter(SIZE_CACHE, "cache")
+            .addCode(body.build())
+            .build());
+        for (int i = 0; i < chunks.size(); i++) {
+            methods.add(computeSizeChunk(i, chunks.get(i), msgType));
+        }
+        if (model.unknown != null) {
+            methods.add(unknownSizeMethod(model, msgType));
+        }
+        return methods;
     }
 
     private static MethodSpec computeSizeWithCache(MessageModel model, TypeName msgType) {
@@ -67,6 +97,45 @@ final class SizeEmitter {
             .returns(TypeName.INT)
             .addParameter(msgType, "value")
             .addParameter(SIZE_CACHE, "cache")
+            .addCode(body.build())
+            .build();
+    }
+
+    private static MethodSpec computeSizeChunk(int index, List<FieldModel> fields, TypeName msgType) {
+        CodeBlock.Builder body = CodeBlock.builder();
+        body.addStatement("int size = 0");
+        for (FieldModel field : fields) {
+            computeField(body, field);
+        }
+        body.addStatement("return size");
+        return MethodSpec.methodBuilder("_computeSize_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.INT)
+            .addParameter(msgType, "value")
+            .addParameter(SIZE_CACHE, "cache")
+            .addCode(body.build())
+            .build();
+    }
+
+    private static MethodSpec unknownSizeMethod(MessageModel model, TypeName msgType) {
+        CodeBlock.Builder body = CodeBlock.builder();
+        String uLocal = model.unknown.localName();
+        body.addStatement("$T $L = $L", UNKNOWN_FIELDS, uLocal, model.unknown.readExpr());
+        int maxExcluded = countUnknownEnumExclusions(model);
+        if (maxExcluded == 0) {
+            body.addStatement("return $L != null ? $L.serializedSize() : 0", uLocal, uLocal);
+        } else {
+            body.beginControlFlow("if ($L != null && !$L.isEmpty())", uLocal, uLocal);
+            body.addStatement("int[] _excl = new int[$L]", maxExcluded);
+            body.addStatement("int _exclN = _collectExcludedEnums(value, _excl)");
+            body.addStatement("return $L.serializedSizeExcluding(_excl, _exclN)", uLocal);
+            body.endControlFlow();
+            body.addStatement("return 0");
+        }
+        return MethodSpec.methodBuilder("_unknownSize")
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.INT)
+            .addParameter(msgType, "value")
             .addCode(body.build())
             .build();
     }
@@ -178,9 +247,9 @@ final class SizeEmitter {
 
     private static void computeMap(CodeBlock.Builder b, FieldModel field) {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", field.localName, field.localName);
-        forEachMapEntry(b, field);
-        b.addStatement("size += $T.lengthDelimited($L, $L(e.getKey(), e.getValue(), cache))",
-            CODED_SIZE, field.number, mapEntrySizeOf(field));
+        beginMapLoop(b, field, true);
+        b.addStatement("size += $T.lengthDelimited($L, $L($L, $L, cache))",
+            CODED_SIZE, field.number, mapEntrySizeOf(field), mapEntryKeyExpr(field), mapEntryValueExpr(field));
         b.endControlFlow();
         b.endControlFlow();
     }

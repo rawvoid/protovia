@@ -41,7 +41,53 @@ import static io.github.rawvoid.protovia.processor.model.Names.enumNumberOf;
  */
 final class WireCodegen {
 
+    static final int SPLIT_THRESHOLD = 48;
+    static final int CHUNK_SIZE = 32;
+
     private WireCodegen() {
+    }
+
+    static boolean shouldSplit(MessageModel model) {
+        int units = 0;
+        for (FieldModel field : model.fields) {
+            units += fieldUnits(field);
+            if (units > SPLIT_THRESHOLD) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static List<List<FieldModel>> chunkFields(List<FieldModel> fields) {
+        List<List<FieldModel>> chunks = new ArrayList<>();
+        List<FieldModel> current = new ArrayList<>();
+        int currentUnits = 0;
+        for (FieldModel field : fields) {
+            int units = fieldUnits(field);
+            if (!current.isEmpty() && currentUnits + units > CHUNK_SIZE) {
+                chunks.add(current);
+                current = new ArrayList<>();
+                currentUnits = 0;
+            }
+            current.add(field);
+            currentUnits += units;
+        }
+        if (!current.isEmpty()) {
+            chunks.add(current);
+        }
+        return chunks;
+    }
+
+    static <T> List<List<T>> chunkList(List<T> items) {
+        List<List<T>> chunks = new ArrayList<>();
+        for (int i = 0; i < items.size(); i += CHUNK_SIZE) {
+            chunks.add(items.subList(i, Math.min(i + CHUNK_SIZE, items.size())));
+        }
+        return chunks;
+    }
+
+    private static int fieldUnits(FieldModel field) {
+        return field.kind == FieldKind.ONEOF ? Math.max(1, field.oneofCases.size()) : 1;
     }
 
     static void loadField(CodeBlock.Builder b, FieldModel field) {
@@ -59,6 +105,18 @@ final class WireCodegen {
             case BYTES -> ArrayTypeName.of(TypeName.BYTE);
             default -> field.wireJavaType != null ? TypeName.get(field.wireJavaType) : TypeName.INT;
         };
+    }
+
+    static TypeName wireBoxedType(FieldModel field) {
+        return wireLocalType(field).box();
+    }
+
+    static boolean isDeterministicAdaptedKey(FieldModel field) {
+        return field.deterministic && field.mapKey.adapterType != null;
+    }
+
+    static TypeName mapEntryKeyParamType(FieldModel field) {
+        return isDeterministicAdaptedKey(field) ? wireBoxedType(field.mapKey) : boxedType(field.mapKey);
     }
 
     static String wireLocal(FieldModel field) {
@@ -83,28 +141,54 @@ final class WireCodegen {
     }
 
     /**
-     * Iterates map entries in write order: sorted by wire key when
-     * {@link FieldModel#deterministic} is set, otherwise {@code entrySet()}.
-     * Size and write must use the same order so {@code SizeCache} stays aligned.
+     * Begins a loop over map entries in write order: sorted by wire key (cached in {@link SizeCache})
+     * when {@link FieldModel#deterministic} is set, otherwise {@code entrySet()}.
+     * Size and write use the exact same order so {@code SizeCache} slots and objects stay aligned.
      */
-    static void forEachMapEntry(CodeBlock.Builder b, FieldModel field) {
-        if (field.deterministic) {
-            b.beginControlFlow("for ($T.Entry<$T, $T> e : $T.sortedEntries($L, $L))",
-                MAP, boxedType(field.mapKey), boxedType(field.mapValue),
-                PROTO_MAPS, field.localName, keyComparator(field));
-        } else {
-            b.beginControlFlow("for ($T.Entry<$T, $T> e : $L.entrySet())",
+    static void beginMapLoop(CodeBlock.Builder b, FieldModel field, boolean computeSize) {
+        if (!field.deterministic) {
+            b.beginControlFlow("for ($T.Entry<$T, $T> _e : $L.entrySet())",
                 MAP, boxedType(field.mapKey), boxedType(field.mapValue), field.localName);
+            return;
+        }
+        String sorted = "_sorted_" + field.number;
+        if (field.mapKey.adapterType != null) {
+            TypeName entryType = ParameterizedTypeName.get(
+                PROTO_MAPS_KEYED_ENTRY, wireBoxedType(field.mapKey), boxedType(field.mapValue));
+            TypeName arrayType = ArrayTypeName.of(entryType);
+            CodeBlock sortCall = CodeBlock.of("$T.sortedAdaptedEntries($L, _k -> $L.toWire(_k), $L)",
+                PROTO_MAPS, field.localName, adapterInstance(field.mapKey), wireKeyOrder(field.mapKey.protoType));
+            if (computeSize) {
+                b.addStatement("$T $L = $L", arrayType, sorted, sortCall);
+                b.addStatement("cache.pushObject($L)", sorted);
+            } else {
+                b.addStatement("$T $L = writer.hasCachedObject() ? writer.takeObject() : $L",
+                    arrayType, sorted, sortCall);
+            }
+            b.beginControlFlow("for ($T _e : $L)", entryType, sorted);
+        } else {
+            TypeName entryType = ParameterizedTypeName.get(
+                MAP_ENTRY, boxedType(field.mapKey), boxedType(field.mapValue));
+            TypeName arrayType = ArrayTypeName.of(entryType);
+            CodeBlock sortCall = CodeBlock.of("$T.sortedEntriesArray($L, $L)",
+                PROTO_MAPS, field.localName, wireKeyOrder(field.mapKey.protoType));
+            if (computeSize) {
+                b.addStatement("$T $L = $L", arrayType, sorted, sortCall);
+                b.addStatement("cache.pushObject($L)", sorted);
+            } else {
+                b.addStatement("$T $L = writer.hasCachedObject() ? writer.takeObject() : $L",
+                    arrayType, sorted, sortCall);
+            }
+            b.beginControlFlow("for ($T _e : $L)", entryType, sorted);
         }
     }
 
-    static CodeBlock keyComparator(FieldModel field) {
-        CodeBlock wireOrder = wireKeyOrder(field.mapKey.protoType);
-        if (field.mapKey.adapterType == null) {
-            return wireOrder;
-        }
-        return CodeBlock.of("$T.comparing(k -> $L.toWire(k), $L)",
-            COMPARATOR, adapterInstance(field.mapKey), wireOrder);
+    static String mapEntryKeyExpr(FieldModel field) {
+        return isDeterministicAdaptedKey(field) ? "_e.wireKey()" : "_e.getKey()";
+    }
+
+    static String mapEntryValueExpr(FieldModel field) {
+        return isDeterministicAdaptedKey(field) ? "_e.value()" : "_e.getValue()";
     }
 
     static CodeBlock wireKeyOrder(ProtoType protoType) {
@@ -135,8 +219,12 @@ final class WireCodegen {
         return CodeBlock.of("$L.fromWire($L)", adapterInstance(field), read);
     }
 
-    static void writeTag(CodeBlock.Builder b, Object tag) {
-        b.addStatement("writer.writeUInt32NoTag($L)", tag);
+    static void writeTag(CodeBlock.Builder b, int tagValue, Object tagExpr) {
+        if ((tagValue & ~0x7F) == 0) {
+            b.addStatement("writer.writeRawByte($L)", tagExpr);
+        } else {
+            b.addStatement("writer.writeUInt32NoTag($L)", tagExpr);
+        }
     }
 
     static void writeCachedMessage(CodeBlock.Builder b, FieldModel field, String value, String sizeLocal) {
@@ -355,14 +443,6 @@ final class WireCodegen {
         return CodeBlock.of("$T.$L($L, $L)", PROTO_LISTS, spec.add(), list, value);
     }
 
-    static CodeBlock packedEnsure(FieldModel field, String list) {
-        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
-        if (spec == null) {
-            return null;
-        }
-        return CodeBlock.of("$T.$L($L, reader.remaining())", PROTO_LISTS, spec.ensure(), list);
-    }
-
     static void packedElements(CodeBlock.Builder b, FieldModel field, boolean write) {
         String list = write ? field.localName : "values";
         PrimitiveListSpec spec = PrimitiveListSpec.of(field);
@@ -424,7 +504,8 @@ final class WireCodegen {
         b.endControlFlow();
     }
 
-    static void mapEntrySizeAdd(CodeBlock.Builder b, FieldModel part, String var, int number, String sizeVar) {
+    static void mapEntrySizeAdd(
+        CodeBlock.Builder b, FieldModel part, String var, int number, String sizeVar, boolean preAdapted) {
         if (part.kind == FieldKind.MESSAGE) {
             b.addStatement("int $LSlot = cache.reserve()", var);
             b.addStatement("int $LSize = $L.computeSize($L, cache)", var, codecInstance(part), var);
@@ -440,7 +521,9 @@ final class WireCodegen {
             return;
         }
         String sizeValue = var;
-        if (part.adapterType != null) {
+        if (preAdapted) {
+            b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, sizeValue));
+        } else if (part.adapterType != null) {
             sizeValue = var + "Wire";
             assignToWire(b, part, var, sizeValue);
             b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, sizeValue));
@@ -451,30 +534,33 @@ final class WireCodegen {
         b.endControlFlow();
     }
 
-    static void mapEntryPartWrite(CodeBlock.Builder b, FieldModel part, String var, int number) {
+    static void mapEntryPartWrite(
+        CodeBlock.Builder b, FieldModel part, String var, int number, boolean preAdapted) {
         int tag = WireType.tag(number, unpackedWire(part));
         if (part.kind == FieldKind.MESSAGE) {
-            writeTag(b, tag);
+            writeTag(b, tag, tag);
             writeCachedMessage(b, part, var, var + "Size");
             return;
         }
         if (part.kind == FieldKind.ENUM) {
             b.addStatement("int $LN = $L($L)", var, enumNumberOf(part.enumModel), var);
             b.beginControlFlow("if ($LN != 0)", var);
-            writeTag(b, tag);
+            writeTag(b, tag, tag);
             b.addStatement("writer.writeInt32NoTag($LN)", var);
             b.endControlFlow();
             return;
         }
         String writeValue = var;
-        if (part.adapterType != null) {
+        if (preAdapted) {
+            b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, writeValue));
+        } else if (part.adapterType != null) {
             writeValue = var + "Wire";
             assignToWire(b, part, var, writeValue);
             b.beginControlFlow("if ($L)", wireDefaultPresent(part.protoType, writeValue));
         } else {
             b.beginControlFlow("if ($L)", mapDefaultSkip(part, var));
         }
-        writeTag(b, tag);
+        writeTag(b, tag, tag);
         b.addStatement("$L", writeNoTag("writer", part, writeValue));
         b.endControlFlow();
     }
@@ -519,13 +605,7 @@ final class WireCodegen {
         b.beginControlFlow("if ($L != null && !$L.isEmpty())", uLocal, uLocal);
         b.addStatement("int[] _excl = new int[$L]", maxExcluded);
         b.addStatement("int _exclN = 0");
-        for (FieldModel field : model.fields) {
-            if (field.kind == FieldKind.ENUM) {
-                emitSingularEnumExclusion(b, field);
-            } else if (field.kind == FieldKind.ONEOF) {
-                emitOneofEnumExclusion(b, field);
-            }
-        }
+        emitUnknownExclusionChecks(b, model.fields, false);
         if (computeSize) {
             b.addStatement("size += $L.serializedSizeExcluding(_excl, _exclN)", uLocal);
         } else {
@@ -534,7 +614,7 @@ final class WireCodegen {
         b.endControlFlow();
     }
 
-    private static int countUnknownEnumExclusions(MessageModel model) {
+    static int countUnknownEnumExclusions(MessageModel model) {
         int count = 0;
         for (FieldModel field : model.fields) {
             if (field.kind == FieldKind.ENUM) {
@@ -548,6 +628,48 @@ final class WireCodegen {
             }
         }
         return count;
+    }
+
+    static List<FieldModel> unknownExclusionFields(MessageModel model) {
+        List<FieldModel> result = new ArrayList<>();
+        for (FieldModel field : model.fields) {
+            if (field.kind == FieldKind.ENUM) {
+                result.add(field);
+            } else if (field.kind == FieldKind.ONEOF) {
+                for (OneofCaseModel c : field.oneofCases) {
+                    if (c.payload != null && c.payload.kind == FieldKind.ENUM) {
+                        result.add(field);
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    static void emitUnknownExclusionChecks(CodeBlock.Builder b, List<FieldModel> fields, boolean loadFromValue) {
+        for (FieldModel field : fields) {
+            if (field.kind == FieldKind.ENUM) {
+                if (loadFromValue) {
+                    loadField(b, field);
+                }
+                emitSingularEnumExclusion(b, field);
+            } else if (field.kind == FieldKind.ONEOF) {
+                boolean hasEnum = false;
+                for (OneofCaseModel c : field.oneofCases) {
+                    if (c.payload != null && c.payload.kind == FieldKind.ENUM) {
+                        hasEnum = true;
+                        break;
+                    }
+                }
+                if (hasEnum) {
+                    if (loadFromValue) {
+                        loadField(b, field);
+                    }
+                    emitOneofEnumExclusion(b, field);
+                }
+            }
+        }
     }
 
     private static void emitSingularEnumExclusion(CodeBlock.Builder b, FieldModel field) {

@@ -16,9 +16,12 @@
 
 package io.github.rawvoid.protovia.processor.gen;
 
+import com.palantir.javapoet.ClassName;
 import com.palantir.javapoet.CodeBlock;
+import com.palantir.javapoet.FieldSpec;
 import com.palantir.javapoet.MethodSpec;
 import com.palantir.javapoet.TypeName;
+import com.palantir.javapoet.TypeSpec;
 import io.github.rawvoid.protovia.processor.model.*;
 
 import javax.lang.model.element.Modifier;
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 
 import static io.github.rawvoid.protovia.processor.gen.GenTypes.*;
 import static io.github.rawvoid.protovia.processor.gen.WireCodegen.*;
+import static io.github.rawvoid.protovia.processor.gen.WireTypes.packedFixedWidth;
 import static io.github.rawvoid.protovia.processor.model.Names.enumFrom;
 import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
 
@@ -38,10 +42,63 @@ import static io.github.rawvoid.protovia.processor.model.Names.mapEntryRead;
  */
 final class ReadEmitter {
 
+    private enum ReadMode {
+        POJO,
+        POJO_SPLIT,
+        LOCALS,
+        LOCALS_SPLIT;
+
+        boolean usesLocals() {
+            return this == LOCALS || this == LOCALS_SPLIT;
+        }
+
+        boolean usesColCache() {
+            return this == POJO;
+        }
+
+        String localRef(FieldModel field) {
+            return this == LOCALS_SPLIT ? "_s." + field.localName : field.localName;
+        }
+
+        String arrayBuilderRef(FieldModel field) {
+            String var = "_builder_" + field.number;
+            return switch (this) {
+                case POJO, LOCALS -> var;
+                case POJO_SPLIT -> "_arr." + var;
+                case LOCALS_SPLIT -> "_s." + var;
+            };
+        }
+
+        String unknownBuilderRef() {
+            return this == LOCALS_SPLIT ? "_s._ub" : "_ub";
+        }
+
+        String repeatedVar(FieldModel field) {
+            if (field.array) {
+                return arrayBuilderRef(field);
+            }
+            return switch (this) {
+                case POJO -> collectionCacheVar(field);
+                case POJO_SPLIT -> field.accessKind == AccessKind.FIELD ? field.accessOn("msg") : field.localName;
+                case LOCALS -> field.localName;
+                case LOCALS_SPLIT -> "_s." + field.localName;
+            };
+        }
+
+        String mapVar(FieldModel field) {
+            return switch (this) {
+                case POJO -> collectionCacheVar(field);
+                case POJO_SPLIT -> field.accessKind == AccessKind.FIELD ? field.accessOn("msg") : field.localName;
+                case LOCALS -> field.localName;
+                case LOCALS_SPLIT -> "_s." + field.localName;
+            };
+        }
+    }
+
     private ReadEmitter() {
     }
 
-    static List<MethodSpec> readMethods(MessageModel model, TypeName msgType) {
+    static void emit(TypeSpec.Builder type, ClassName codecType, MessageModel model, TypeName msgType) {
         MethodSpec.Builder readFrom = MethodSpec.methodBuilder("readFrom")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
@@ -50,44 +107,50 @@ final class ReadEmitter {
         if (model.instantiation.usesLocals()) {
             readFrom.addStatement("return mergeFrom(reader, null)");
         } else {
-            readFrom.addStatement("return mergeFrom(reader, new $T())", messageType(model));
+            readFrom.addStatement("return mergeFrom(reader, new $T())", msgType);
         }
-        return List.of(readFrom.build(), mergeFrom(model, msgType));
-    }
+        type.addMethod(readFrom.build());
 
-    private static MethodSpec mergeFrom(MessageModel model, TypeName msgType) {
-        CodeBlock.Builder body = CodeBlock.builder();
+        boolean split = shouldSplitRead(model);
         if (model.instantiation.usesLocals()) {
-            readLocals(body, model);
+            if (split) {
+                emitLocalsSplit(type, codecType, model, msgType);
+            } else {
+                type.addMethod(mergeFromLocals(model, msgType));
+            }
         } else {
-            readPojo(body, model);
+            if (split) {
+                emitPojoSplit(type, codecType, model, msgType);
+            } else {
+                type.addMethod(mergeFromPojo(model, msgType));
+            }
         }
-        return MethodSpec.methodBuilder("mergeFrom")
-            .addAnnotation(Override.class)
-            .addModifiers(Modifier.PUBLIC)
-            .returns(msgType)
-            .addParameter(PROTO_READER, "reader")
-            .addParameter(msgType, "existing")
-            .addCode(body.build())
-            .build();
     }
 
-    private static void readPojo(CodeBlock.Builder b, MessageModel model) {
-        b.addStatement("$T msg = existing != null ? existing : new $T()", messageType(model), messageType(model));
+    private static boolean shouldSplitRead(MessageModel model) {
+        return shouldSplit(model) || (model.record && model.recordComponents.size() > SPLIT_THRESHOLD);
+    }
+
+    private static MethodSpec mergeFromPojo(MessageModel model, TypeName msgType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        b.addStatement("$T msg = existing != null ? existing : new $T()", msgType, msgType);
+        initCollectionCaches(b, model);
         initArrayBuilders(b, model);
         if (model.unknown != null) {
             unknownInit(b, model);
         }
-        readLoop(b, model, false);
-        finalizeArrayBuilders(b, model, "msg");
-        fillAbsentCollections(b, model);
+        readLoop(b, model, ReadMode.POJO);
+        finalizeArrayBuilders(b, model, ReadMode.POJO, "msg");
+        fillAbsentCollections(b, model, true);
         if (model.unknown != null) {
             unknownStore(b, model);
         }
         b.addStatement("return msg");
+        return mergeFromSpec(msgType, b.build());
     }
 
-    private static void readLocals(CodeBlock.Builder b, MessageModel model) {
+    private static MethodSpec mergeFromLocals(MessageModel model, TypeName msgType) {
+        CodeBlock.Builder b = CodeBlock.builder();
         if (model.record) {
             for (MessageModel.RecordComponentModel component : model.recordComponents) {
                 recordComponentInit(b, model, component);
@@ -101,26 +164,348 @@ final class ReadEmitter {
             }
         }
         initArrayBuilders(b, model);
-        readLoop(b, model, true);
-        finalizeArrayBuilders(b, model, null);
+        readLoop(b, model, ReadMode.LOCALS);
+        finalizeArrayBuilders(b, model, ReadMode.LOCALS, null);
         if (model.unknown != null) {
             b.addStatement("$T $L = _ub.build()", UNKNOWN_FIELDS, model.unknown.localName());
         }
-        instantiate(b, model);
+        instantiate(b, model, false);
+        return mergeFromSpec(msgType, b.build());
     }
 
-    private static void instantiate(CodeBlock.Builder b, MessageModel model) {
+    private static void emitPojoSplit(
+        TypeSpec.Builder type, ClassName codecType, MessageModel model, TypeName msgType) {
+        List<FieldModel> arrayFields = arrayFields(model);
+        List<FieldModel> collectionFields = collectionFields(model);
+        boolean hasArrays = !arrayFields.isEmpty();
+        ClassName arrayStateType = codecType.nestedClass("_ArrayState");
+
+        if (hasArrays) {
+            TypeSpec.Builder arrState = TypeSpec.classBuilder("_ArrayState")
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL);
+            for (FieldModel field : arrayFields) {
+                arrState.addField(FieldSpec.builder(arrayBuilderType(field), arrayBuilderVar(field)).build());
+            }
+            type.addType(arrState.build());
+        }
+
+        List<List<FieldModel>> chunks = chunkFields(model.fields);
+        CodeBlock.Builder b = CodeBlock.builder();
+        b.addStatement("$T msg = existing != null ? existing : new $T()", msgType, msgType);
+        if (hasArrays) {
+            b.addStatement("$T _arr = new $T()", arrayStateType, arrayStateType);
+        }
+        if (model.unknown != null) {
+            unknownInit(b, model);
+        }
+        b.addStatement("int tag");
+        b.beginControlFlow("while ((tag = reader.readTag()) != 0)");
+        String extraArgs = (hasArrays ? ", _arr" : "") + (model.unknown != null ? ", _ub" : "");
+        for (int i = 0; i < chunks.size(); i++) {
+            b.beginControlFlow("if (_readChunk_$L(reader, tag, msg$L))", i, extraArgs);
+            b.addStatement("continue");
+            b.endControlFlow();
+        }
+        if (model.unknown != null) {
+            b.addStatement("_ub.merge(reader)");
+        } else {
+            b.addStatement("reader.skipField()");
+        }
+        b.endControlFlow();
+
+        List<List<FieldModel>> arrayChunks = hasArrays ? chunkList(arrayFields) : List.of();
+        for (int i = 0; i < arrayChunks.size(); i++) {
+            b.addStatement("_finalizeArrays_$L(_arr, msg)", i);
+        }
+        List<List<FieldModel>> collectionChunks = collectionFields.isEmpty() ? List.of() : chunkList(collectionFields);
+        for (int i = 0; i < collectionChunks.size(); i++) {
+            b.addStatement("_fillAbsent_$L(msg)", i);
+        }
+        if (model.unknown != null) {
+            unknownStore(b, model);
+        }
+        b.addStatement("return msg");
+        type.addMethod(mergeFromSpec(msgType, b.build()));
+
+        for (int i = 0; i < chunks.size(); i++) {
+            type.addMethod(pojoReadChunk(i, chunks.get(i), model, msgType, hasArrays ? arrayStateType : null));
+        }
+        for (int i = 0; i < arrayChunks.size(); i++) {
+            type.addMethod(pojoFinalizeArraysChunk(i, arrayChunks.get(i), msgType, arrayStateType));
+        }
+        for (int i = 0; i < collectionChunks.size(); i++) {
+            type.addMethod(pojoFillAbsentChunk(i, collectionChunks.get(i), msgType));
+        }
+    }
+
+    private static MethodSpec pojoReadChunk(
+        int index, List<FieldModel> fields, MessageModel model, TypeName msgType, ClassName arrayStateType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        b.beginControlFlow("switch (tag)");
+        for (FieldModel field : fields) {
+            readCases(b, field, ReadMode.POJO_SPLIT, model);
+        }
+        b.beginControlFlow("default ->");
+        b.addStatement("return false");
+        b.endControlFlow();
+        b.endControlFlow();
+        b.addStatement("return true");
+        MethodSpec.Builder m = MethodSpec.methodBuilder("_readChunk_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.BOOLEAN)
+            .addParameter(PROTO_READER, "reader")
+            .addParameter(TypeName.INT, "tag")
+            .addParameter(msgType, "msg");
+        if (arrayStateType != null) {
+            m.addParameter(arrayStateType, "_arr");
+        }
+        if (model.unknown != null) {
+            m.addParameter(UNKNOWN_FIELDS_BUILDER, "_ub");
+        }
+        return m.addCode(b.build()).build();
+    }
+
+    private static MethodSpec pojoFinalizeArraysChunk(
+        int index, List<FieldModel> fields, TypeName msgType, ClassName arrayStateType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        for (FieldModel field : fields) {
+            String builderVar = ReadMode.POJO_SPLIT.arrayBuilderRef(field);
+            b.beginControlFlow("if ($L != null)", builderVar);
+            assign(b, field, "msg", toArray(field, builderVar));
+            b.endControlFlow();
+        }
+        return MethodSpec.methodBuilder("_finalizeArrays_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.VOID)
+            .addParameter(arrayStateType, "_arr")
+            .addParameter(msgType, "msg")
+            .addCode(b.build())
+            .build();
+    }
+
+    private static MethodSpec pojoFillAbsentChunk(int index, List<FieldModel> fields, TypeName msgType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        for (FieldModel field : fields) {
+            b.beginControlFlow("if ($L == null)", field.accessOn("msg"));
+            assign(b, field, "msg", newImpl(field));
+            b.endControlFlow();
+        }
+        return MethodSpec.methodBuilder("_fillAbsent_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.VOID)
+            .addParameter(msgType, "msg")
+            .addCode(b.build())
+            .build();
+    }
+
+    private static void emitLocalsSplit(
+        TypeSpec.Builder type, ClassName codecType, MessageModel model, TypeName msgType) {
+        ClassName stateType = codecType.nestedClass("_ReadState");
+        List<FieldModel> arrayFields = arrayFields(model);
+
+        TypeSpec.Builder state = TypeSpec.classBuilder("_ReadState")
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL);
+        if (model.record) {
+            for (MessageModel.RecordComponentModel component : model.recordComponents) {
+                if (model.unknown != null && component.name().equals(model.unknown.name())) {
+                    continue;
+                }
+                state.addField(FieldSpec.builder(javaType(component.type()), Names.safeLocal(component.name())).build());
+            }
+        } else {
+            for (FieldModel field : model.fields) {
+                state.addField(FieldSpec.builder(javaType(field), field.localName).build());
+            }
+        }
+        for (FieldModel field : arrayFields) {
+            state.addField(FieldSpec.builder(arrayBuilderType(field), arrayBuilderVar(field)).build());
+        }
+        if (model.unknown != null) {
+            state.addField(FieldSpec.builder(UNKNOWN_FIELDS_BUILDER, "_ub").build());
+        }
+        type.addType(state.build());
+
+        List<MethodSpec> initMethods = buildStateInitMethods(model, msgType, stateType);
+        List<List<FieldModel>> chunks = chunkFields(model.fields);
+        List<List<FieldModel>> arrayChunks = arrayFields.isEmpty() ? List.of() : chunkList(arrayFields);
+
+        CodeBlock.Builder b = CodeBlock.builder();
+        b.addStatement("$T _s = new $T()", stateType, stateType);
+        for (int i = 0; i < initMethods.size(); i++) {
+            b.addStatement("_initState_$L(_s, existing)", i);
+        }
+        if (model.unknown != null) {
+            b.addStatement("_s._ub = $T.newBuilder(existing != null ? $L : null)",
+                UNKNOWN_FIELDS, model.unknown.accessOn("existing"));
+        }
+        b.addStatement("int tag");
+        b.beginControlFlow("while ((tag = reader.readTag()) != 0)");
+        for (int i = 0; i < chunks.size(); i++) {
+            b.beginControlFlow("if (_readChunk_$L(reader, tag, _s))", i);
+            b.addStatement("continue");
+            b.endControlFlow();
+        }
+        if (model.unknown != null) {
+            b.addStatement("_s._ub.merge(reader)");
+        } else {
+            b.addStatement("reader.skipField()");
+        }
+        b.endControlFlow();
+        for (int i = 0; i < arrayChunks.size(); i++) {
+            b.addStatement("_finalizeArrays_$L(_s)", i);
+        }
+        if (model.unknown != null) {
+            b.addStatement("$T $L = _s._ub.build()", UNKNOWN_FIELDS, model.unknown.localName());
+        }
+        instantiate(b, model, true);
+        type.addMethod(mergeFromSpec(msgType, b.build()));
+
+        initMethods.forEach(type::addMethod);
+        for (int i = 0; i < chunks.size(); i++) {
+            type.addMethod(localsReadChunk(i, chunks.get(i), model, stateType));
+        }
+        for (int i = 0; i < arrayChunks.size(); i++) {
+            type.addMethod(localsFinalizeArraysChunk(i, arrayChunks.get(i), stateType));
+        }
+    }
+
+    private static List<MethodSpec> buildStateInitMethods(
+        MessageModel model, TypeName msgType, ClassName stateType) {
+        List<MethodSpec> methods = new ArrayList<>();
+        if (model.record) {
+            List<MessageModel.RecordComponentModel> components = new ArrayList<>();
+            for (MessageModel.RecordComponentModel component : model.recordComponents) {
+                if (model.unknown != null && component.name().equals(model.unknown.name())) {
+                    continue;
+                }
+                components.add(component);
+            }
+            List<List<MessageModel.RecordComponentModel>> chunks = chunkList(components);
+            for (int i = 0; i < chunks.size(); i++) {
+                CodeBlock.Builder b = CodeBlock.builder();
+                for (MessageModel.RecordComponentModel component : chunks.get(i)) {
+                    String target = "_s." + Names.safeLocal(component.name());
+                    String fromExisting = "existing." + component.name() + "()";
+                    FieldModel field = component.field();
+                    if (field != null && isCollection(field)) {
+                        assignCollectionState(b, field, target, fromExisting);
+                    } else {
+                        b.addStatement("$L = existing != null ? $L : $L",
+                            target, fromExisting, defaultValue(component.type()));
+                    }
+                }
+                methods.add(stateInitMethodSpec(i, stateType, msgType, b.build()));
+            }
+        } else {
+            List<List<FieldModel>> chunks = chunkList(model.fields);
+            for (int i = 0; i < chunks.size(); i++) {
+                CodeBlock.Builder b = CodeBlock.builder();
+                for (FieldModel field : chunks.get(i)) {
+                    String target = "_s." + field.localName;
+                    String fromExisting = field.accessOn("existing");
+                    if (isCollection(field)) {
+                        assignCollectionState(b, field, target, fromExisting);
+                    } else {
+                        b.addStatement("$L = existing != null ? $L : $L",
+                            target, fromExisting, defaultValue(field.javaType));
+                    }
+                }
+                methods.add(stateInitMethodSpec(i, stateType, msgType, b.build()));
+            }
+        }
+        return methods;
+    }
+
+    private static MethodSpec stateInitMethodSpec(
+        int index, ClassName stateType, TypeName msgType, CodeBlock body) {
+        return MethodSpec.methodBuilder("_initState_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.VOID)
+            .addParameter(stateType, "_s")
+            .addParameter(msgType, "existing")
+            .addCode(body)
+            .build();
+    }
+
+    private static void assignCollectionState(
+        CodeBlock.Builder b, FieldModel field, String target, String fromExisting) {
+        if (field.implCopyConstructor) {
+            b.addStatement("$L = existing != null && $L != null ? $L : $L",
+                target, fromExisting, newImpl(field, fromExisting), newImpl(field));
+            return;
+        }
+        b.addStatement("$L = $L", target, newImpl(field));
+        b.beginControlFlow("if (existing != null && $L != null)", fromExisting);
+        if (field.kind == FieldKind.MAP) {
+            b.addStatement("$L.putAll($L)", target, fromExisting);
+        } else {
+            b.addStatement("$L.addAll($L)", target, fromExisting);
+        }
+        b.endControlFlow();
+    }
+
+    private static MethodSpec localsReadChunk(
+        int index, List<FieldModel> fields, MessageModel model, ClassName stateType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        b.beginControlFlow("switch (tag)");
+        for (FieldModel field : fields) {
+            readCases(b, field, ReadMode.LOCALS_SPLIT, model);
+        }
+        b.beginControlFlow("default ->");
+        b.addStatement("return false");
+        b.endControlFlow();
+        b.endControlFlow();
+        b.addStatement("return true");
+        return MethodSpec.methodBuilder("_readChunk_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.BOOLEAN)
+            .addParameter(PROTO_READER, "reader")
+            .addParameter(TypeName.INT, "tag")
+            .addParameter(stateType, "_s")
+            .addCode(b.build())
+            .build();
+    }
+
+    private static MethodSpec localsFinalizeArraysChunk(
+        int index, List<FieldModel> fields, ClassName stateType) {
+        CodeBlock.Builder b = CodeBlock.builder();
+        for (FieldModel field : fields) {
+            String builderVar = ReadMode.LOCALS_SPLIT.arrayBuilderRef(field);
+            b.beginControlFlow("if ($L != null)", builderVar);
+            b.addStatement("$L = $L", ReadMode.LOCALS_SPLIT.localRef(field), toArray(field, builderVar));
+            b.endControlFlow();
+        }
+        return MethodSpec.methodBuilder("_finalizeArrays_" + index)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .returns(TypeName.VOID)
+            .addParameter(stateType, "_s")
+            .addCode(b.build())
+            .build();
+    }
+
+    private static MethodSpec mergeFromSpec(TypeName msgType, CodeBlock body) {
+        return MethodSpec.methodBuilder("mergeFrom")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(msgType)
+            .addParameter(PROTO_READER, "reader")
+            .addParameter(msgType, "existing")
+            .addCode(body)
+            .build();
+    }
+
+    private static void instantiate(CodeBlock.Builder b, MessageModel model, boolean splitLocals) {
         TypeName msgType = messageType(model);
         switch (model.instantiation) {
             case Instantiation.Constructor(var slots) -> {
                 String args = slots.stream()
-                    .map(Instantiation.Slot::localName)
+                    .map(slot -> slotExpr(slot.localName(), slot.unknown(), splitLocals))
                     .collect(Collectors.joining(", "));
                 b.addStatement("return new $T($L)", msgType, args);
             }
             case Instantiation.Factory(var method, var slots) -> {
                 String args = slots.stream()
-                    .map(Instantiation.Slot::localName)
+                    .map(slot -> slotExpr(slot.localName(), slot.unknown(), splitLocals))
                     .collect(Collectors.joining(", "));
                 b.addStatement("return $T.$L($L)", msgType, method, args);
             }
@@ -131,12 +516,18 @@ final class ReadEmitter {
                     b.addStatement("var builder = new $T.$L()", msgType, nested);
                 }
                 for (Instantiation.BuilderBinding binding : bindings) {
-                    b.addStatement("builder.$L($L)", binding.setterName(), binding.localName());
+                    b.addStatement("builder.$L($L)",
+                        binding.setterName(),
+                        slotExpr(binding.localName(), binding.unknown(), splitLocals));
                 }
                 b.addStatement("return builder.$L()", build);
             }
             case Instantiation.Mutable() -> throw new IllegalStateException("locals path requires a constructor, factory, or builder");
         }
+    }
+
+    private static String slotExpr(String localName, boolean unknown, boolean splitLocals) {
+        return splitLocals && !unknown ? "_s." + localName : localName;
     }
 
     private static void fieldLocalInit(CodeBlock.Builder b, FieldModel field) {
@@ -171,6 +562,38 @@ final class ReadEmitter {
         return field.kind == FieldKind.REPEATED && !field.array || field.kind == FieldKind.MAP;
     }
 
+    private static List<FieldModel> arrayFields(MessageModel model) {
+        List<FieldModel> result = new ArrayList<>();
+        for (FieldModel field : model.fields) {
+            if (field.array) {
+                result.add(field);
+            }
+        }
+        return result;
+    }
+
+    private static List<FieldModel> collectionFields(MessageModel model) {
+        List<FieldModel> result = new ArrayList<>();
+        for (FieldModel field : model.fields) {
+            if (isCollection(field)) {
+                result.add(field);
+            }
+        }
+        return result;
+    }
+
+    private static String collectionCacheVar(FieldModel field) {
+        return "_col_" + field.number;
+    }
+
+    private static void initCollectionCaches(CodeBlock.Builder b, MessageModel model) {
+        for (FieldModel field : model.fields) {
+            if (isCollection(field)) {
+                b.addStatement("$T $L = null", javaType(field), collectionCacheVar(field));
+            }
+        }
+    }
+
     private static void unknownLocalInit(CodeBlock.Builder b, MessageModel model) {
         b.addStatement("$T _ub = $T.newBuilder(existing != null ? $L : null)",
             UNKNOWN_FIELDS_BUILDER, UNKNOWN_FIELDS, model.unknown.accessOn("existing"));
@@ -181,10 +604,15 @@ final class ReadEmitter {
      * the official implementations hand out empty collections rather than null. A mutable target starts from the
      * model's own (possibly null) fields, so fill them once the read loop is done.
      */
-    private static void fillAbsentCollections(CodeBlock.Builder b, MessageModel model) {
+    private static void fillAbsentCollections(CodeBlock.Builder b, MessageModel model, boolean useColCache) {
         for (FieldModel field : model.fields) {
             if (isCollection(field)) {
-                b.beginControlFlow("if ($L == null)", field.accessOn("msg"));
+                if (useColCache) {
+                    b.beginControlFlow("if ($L == null && $L == null)",
+                        collectionCacheVar(field), field.accessOn("msg"));
+                } else {
+                    b.beginControlFlow("if ($L == null)", field.accessOn("msg"));
+                }
                 assign(b, field, "msg", newImpl(field));
                 b.endControlFlow();
             }
@@ -203,15 +631,16 @@ final class ReadEmitter {
         }
     }
 
-    private static void finalizeArrayBuilders(CodeBlock.Builder b, MessageModel model, String assignTarget) {
+    private static void finalizeArrayBuilders(
+        CodeBlock.Builder b, MessageModel model, ReadMode mode, String assignTarget) {
         for (FieldModel field : model.fields) {
             if (!field.array) {
                 continue;
             }
-            String builderVar = arrayBuilderVar(field);
+            String builderVar = mode.arrayBuilderRef(field);
             b.beginControlFlow("if ($L != null)", builderVar);
             if (assignTarget == null) {
-                b.addStatement("$L = $L", field.localName, toArray(field, builderVar));
+                b.addStatement("$L = $L", mode.localRef(field), toArray(field, builderVar));
             } else {
                 assign(b, field, assignTarget, toArray(field, builderVar));
             }
@@ -219,19 +648,19 @@ final class ReadEmitter {
         }
     }
 
-    private static void readLoop(CodeBlock.Builder b, MessageModel model, boolean record) {
+    private static void readLoop(CodeBlock.Builder b, MessageModel model, ReadMode mode) {
         b.addStatement("int tag");
         b.beginControlFlow("while ((tag = reader.readTag()) != 0)");
         b.beginControlFlow("switch (tag)");
         for (FieldModel field : model.fields) {
-            readCases(b, field, record, model);
+            readCases(b, field, mode, model);
         }
-        unknownDefault(b, model);
+        unknownDefault(b, model, mode);
         b.endControlFlow();
         b.endControlFlow();
     }
 
-    private static void readCases(CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model) {
+    private static void readCases(CodeBlock.Builder b, FieldModel field, ReadMode mode, MessageModel model) {
         String tag = Names.tagConstant(field.number);
         switch (field.kind) {
             case SCALAR -> {
@@ -240,60 +669,61 @@ final class ReadEmitter {
                 if (field.adapterType != null) {
                     read = fromWire(field, read);
                 }
-                store(b, field, record, wrapOptional(field, read));
+                store(b, field, mode, wrapOptional(field, read));
                 b.endControlFlow();
             }
             case ENUM -> {
                 b.beginControlFlow("case $L ->", tag);
-                readEnumField(b, field, record, model, tag);
+                readEnumField(b, field, mode, model, tag);
                 b.endControlFlow();
             }
             case MESSAGE -> {
                 b.beginControlFlow("case $L ->", tag);
-                readMessage(b, field, record);
+                readMessage(b, field, mode);
                 b.endControlFlow();
             }
-            case REPEATED -> readRepeated(b, field, record, tag, model);
+            case REPEATED -> readRepeated(b, field, mode, tag, model);
             case MAP -> {
                 b.beginControlFlow("case $L ->", tag);
-                ensureMap(b, field, record);
+                ensureMap(b, field, mode);
                 if (field.mapValue.kind == FieldKind.ENUM && model.unknown != null) {
-                    b.addStatement("$L(reader, $L, _ub)", mapEntryRead(field), mapVar(field, record));
+                    b.addStatement("$L(reader, $L, $L)",
+                        mapEntryRead(field), mode.mapVar(field), mode.unknownBuilderRef());
                 } else {
-                    b.addStatement("$L(reader, $L)", mapEntryRead(field), mapVar(field, record));
+                    b.addStatement("$L(reader, $L)", mapEntryRead(field), mode.mapVar(field));
                 }
                 b.endControlFlow();
             }
-            case ONEOF -> readOneof(b, field, record, model);
+            case ONEOF -> readOneof(b, field, mode, model);
         }
     }
 
     private static void readEnumField(
-        CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model, String tag) {
+        CodeBlock.Builder b, FieldModel field, ReadMode mode, MessageModel model, String tag) {
         b.addStatement("int _n = reader.readEnum()");
         b.addStatement("$T _e = $L(_n)", enumType(field.enumModel), enumFrom(field.enumModel));
         if (field.enumModel.unrecognized != null) {
             b.beginControlFlow("if (_e == $L)", enumConstant(field.enumModel, field.enumModel.unrecognized));
-            mergeUnknownVarint(b, model, tag);
-            store(b, field, record, wrapOptional(field, "_e"));
+            mergeUnknownVarint(b, model, mode, tag);
+            store(b, field, mode, wrapOptional(field, "_e"));
             b.nextControlFlow("else if (_e != null)");
-            removeUnknownField(b, model, field.number);
-            store(b, field, record, wrapOptional(field, "_e"));
+            removeUnknownField(b, model, mode, field.number);
+            store(b, field, mode, wrapOptional(field, "_e"));
             b.endControlFlow();
         } else {
             b.beginControlFlow("if (_e != null)");
-            removeUnknownField(b, model, field.number);
-            store(b, field, record, wrapOptional(field, "_e"));
+            removeUnknownField(b, model, mode, field.number);
+            store(b, field, mode, wrapOptional(field, "_e"));
             b.nextControlFlow("else");
-            mergeUnknownVarint(b, model, tag);
-            store(b, field, record, field.javaOptional
+            mergeUnknownVarint(b, model, mode, tag);
+            store(b, field, mode, field.javaOptional
                 ? CodeBlock.of("$T.empty()", OPTIONAL)
                 : CodeBlock.of("null"));
             b.endControlFlow();
         }
     }
 
-    private static void readOneof(CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model) {
+    private static void readOneof(CodeBlock.Builder b, FieldModel field, ReadMode mode, MessageModel model) {
         List<Integer> enumCaseNumbers = oneofEnumNumbers(field);
         for (OneofCaseModel c : field.oneofCases) {
             b.beginControlFlow("case $L ->", c.tagConstant);
@@ -303,58 +733,60 @@ final class ReadEmitter {
                 b.addStatement("reader.skipField()");
                 b.endControlFlow();
                 b.addStatement("reader.popLimit(_old)");
-                removeUnknownFields(b, model, enumCaseNumbers);
-                store(b, field, record, CodeBlock.of("new $T()", oneofCaseType(c)));
+                removeUnknownFields(b, model, mode, enumCaseNumbers);
+                store(b, field, mode, CodeBlock.of("new $T()", oneofCaseType(c)));
             } else if (c.selfMessage) {
-                readOneofSelfMessage(b, field, record, c);
-                removeUnknownFields(b, model, enumCaseNumbers);
+                readOneofSelfMessage(b, field, mode, c);
+                removeUnknownFields(b, model, mode, enumCaseNumbers);
             } else if (c.payload.kind == FieldKind.MESSAGE) {
-                readOneofWrappedMessage(b, field, record, c);
-                removeUnknownFields(b, model, enumCaseNumbers);
+                readOneofWrappedMessage(b, field, mode, c);
+                removeUnknownFields(b, model, mode, enumCaseNumbers);
             } else if (c.payload.kind == FieldKind.ENUM) {
-                readOneofEnum(b, field, record, model, c, enumCaseNumbers);
+                readOneofEnum(b, field, mode, model, c, enumCaseNumbers);
             } else {
                 CodeBlock read = readCall(c.payload);
                 if (c.payload.adapterType != null) {
                     read = fromWire(c.payload, read);
                 }
                 if (c.accessor == null) {
-                    store(b, field, record, read);
+                    store(b, field, mode, read);
                 } else {
-                    store(b, field, record, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
+                    store(b, field, mode, CodeBlock.of("new $T($L)", oneofCaseType(c), read));
                 }
-                removeUnknownFields(b, model, enumCaseNumbers);
+                removeUnknownFields(b, model, mode, enumCaseNumbers);
             }
             b.endControlFlow();
         }
     }
 
-    private static void readOneofSelfMessage(CodeBlock.Builder b, FieldModel field, boolean record, OneofCaseModel c) {
+    private static void readOneofSelfMessage(
+        CodeBlock.Builder b, FieldModel field, ReadMode mode, OneofCaseModel c) {
         TypeName caseType = oneofCaseType(c);
         CodeBlock codec = codecInstance(c.payload);
-        if (record) {
-            store(b, field, true, CodeBlock.of(
+        if (mode.usesLocals()) {
+            store(b, field, mode, CodeBlock.of(
                 "reader.readMessage($L, $L instanceof $T _prev ? _prev : null)",
-                codec, field.localName, caseType));
+                codec, mode.localRef(field), caseType));
             return;
         }
         b.addStatement("Object _cur = $L", field.accessOn("msg"));
-        store(b, field, false, CodeBlock.of(
+        store(b, field, mode, CodeBlock.of(
             "reader.readMessage($L, _cur instanceof $T _prev ? _prev : null)",
             codec, caseType));
     }
 
-    private static void readOneofWrappedMessage(CodeBlock.Builder b, FieldModel field, boolean record, OneofCaseModel c) {
+    private static void readOneofWrappedMessage(
+        CodeBlock.Builder b, FieldModel field, ReadMode mode, OneofCaseModel c) {
         TypeName caseType = oneofCaseType(c);
         CodeBlock codec = codecInstance(c.payload);
-        if (record) {
-            store(b, field, true, CodeBlock.of(
+        if (mode.usesLocals()) {
+            store(b, field, mode, CodeBlock.of(
                 "new $T(reader.readMessage($L, $L instanceof $T _prev ? _prev.$L : null))",
-                caseType, codec, field.localName, caseType, c.accessor));
+                caseType, codec, mode.localRef(field), caseType, c.accessor));
             return;
         }
         b.addStatement("Object _cur = $L", field.accessOn("msg"));
-        store(b, field, false, CodeBlock.of(
+        store(b, field, mode, CodeBlock.of(
             "new $T(reader.readMessage($L, _cur instanceof $T _prev ? _prev.$L : null))",
             caseType, codec, caseType, c.accessor));
     }
@@ -362,7 +794,7 @@ final class ReadEmitter {
     private static void readOneofEnum(
         CodeBlock.Builder b,
         FieldModel field,
-        boolean record,
+        ReadMode mode,
         MessageModel model,
         OneofCaseModel c,
         List<Integer> enumCaseNumbers) {
@@ -377,60 +809,131 @@ final class ReadEmitter {
             : CodeBlock.of("new $T(_e)", oneofCaseType(c));
         if (enums.unrecognized != null) {
             b.beginControlFlow("if (_e == $L)", enumConstant(enums, enums.unrecognized));
-            removeUnknownFields(b, model, otherEnumCaseNumbers);
-            mergeUnknownVarint(b, model, c.tagConstant);
-            store(b, field, record, constructed);
+            removeUnknownFields(b, model, mode, otherEnumCaseNumbers);
+            mergeUnknownVarint(b, model, mode, c.tagConstant);
+            store(b, field, mode, constructed);
             b.nextControlFlow("else if (_e != null)");
-            removeUnknownFields(b, model, enumCaseNumbers);
-            store(b, field, record, constructed);
+            removeUnknownFields(b, model, mode, enumCaseNumbers);
+            store(b, field, mode, constructed);
             b.endControlFlow();
         } else {
             b.beginControlFlow("if (_e != null)");
-            removeUnknownFields(b, model, enumCaseNumbers);
-            store(b, field, record, constructed);
+            removeUnknownFields(b, model, mode, enumCaseNumbers);
+            store(b, field, mode, constructed);
             b.nextControlFlow("else");
-            removeUnknownFields(b, model, otherEnumCaseNumbers);
-            mergeUnknownVarint(b, model, c.tagConstant);
-            store(b, field, record, CodeBlock.of("null"));
+            removeUnknownFields(b, model, mode, otherEnumCaseNumbers);
+            mergeUnknownVarint(b, model, mode, c.tagConstant);
+            store(b, field, mode, CodeBlock.of("null"));
             b.endControlFlow();
         }
     }
 
-    private static void readRepeated(CodeBlock.Builder b, FieldModel field, boolean record, String tag, MessageModel model) {
+    private static void readRepeated(
+        CodeBlock.Builder b, FieldModel field, ReadMode mode, String tag, MessageModel model) {
         if (field.packable()) {
+            int width = packedFixedWidth(field.element);
+            PrimitiveListSpec spec = PrimitiveListSpec.ofPacked(field);
+            boolean directPrimitive = spec != null && (field.array || javaType(field).equals(spec.listType()));
             b.beginControlFlow("case $L, $L_PACKED ->", tag, tag);
             b.beginControlFlow("if (reader.wireType() == $T.LEN)", WIRE_TYPE);
-            b.addStatement("int oldLimit = reader.pushLengthDelimited()");
-            ensureRepeated(b, field, record);
-            ensurePackedCapacity(b, field, record);
-            b.beginControlFlow("while (reader.remaining() > 0)");
-            repeatedAdd(b, field, record, model);
-            b.endControlFlow();
-            b.addStatement("reader.popLimit(oldLimit)");
+            b.addStatement("int _oldLimit = reader.pushLengthDelimited()");
+            if (width == 8) {
+                b.addStatement("int _rem = reader.remaining()");
+                b.beginControlFlow("if ((_rem & 7) != 0)");
+                b.addStatement("throw $T.truncated(\"packed fixed64 length \" + _rem + \" is not a multiple of 8\")",
+                    PROTO_EXCEPTION);
+                b.endControlFlow();
+            } else if (width == 4) {
+                b.addStatement("int _rem = reader.remaining()");
+                b.beginControlFlow("if ((_rem & 3) != 0)");
+                b.addStatement("throw $T.truncated(\"packed fixed32 length \" + _rem + \" is not a multiple of 4\")",
+                    PROTO_EXCEPTION);
+                b.endControlFlow();
+            }
+            ensureRepeated(b, field, mode);
+            emitPackedLoop(b, field, mode, model, spec, directPrimitive, width);
+            b.addStatement("reader.popLimit(_oldLimit)");
             b.nextControlFlow("else");
-            ensureRepeated(b, field, record);
-            repeatedAdd(b, field, record, model);
+            ensureRepeated(b, field, mode);
+            repeatedAdd(b, field, mode, model);
             b.endControlFlow();
             b.endControlFlow();
         } else {
             b.beginControlFlow("case $L ->", tag);
-            ensureRepeated(b, field, record);
-            repeatedAdd(b, field, record, model);
+            ensureRepeated(b, field, mode);
+            repeatedAdd(b, field, mode, model);
             b.endControlFlow();
         }
     }
 
-    private static void ensureRepeated(CodeBlock.Builder b, FieldModel field, boolean record) {
-        if (field.array) {
-            String builderVar = arrayBuilderVar(field);
-            b.beginControlFlow("if ($L == null)", builderVar);
-            b.addStatement("$L = new $T()", builderVar, WireCodegen.arrayBuilderType(field));
-            seedArrayBuilder(b, field, record);
+    private static void emitPackedLoop(
+        CodeBlock.Builder b,
+        FieldModel field,
+        ReadMode mode,
+        MessageModel model,
+        PrimitiveListSpec spec,
+        boolean directPrimitive,
+        int width) {
+        String target = mode.repeatedVar(field);
+        if (directPrimitive) {
+            emitPackedCapacity(b, spec, target, width);
+            b.beginControlFlow("while (reader.remaining() > 0)");
+            b.addStatement("$L.$L($L)", target, spec.add(), readCall(field.element));
             b.endControlFlow();
             return;
         }
-        if (record) {
+        if (spec != null) {
+            b.beginControlFlow("if ($L instanceof $T _prim)", target, spec.listType());
+            emitPackedCapacity(b, spec, "_prim", width);
+            b.beginControlFlow("while (reader.remaining() > 0)");
+            b.addStatement("_prim.$L($L)", spec.add(), readCall(field.element));
+            b.endControlFlow();
+            b.nextControlFlow("else");
+            b.beginControlFlow("while (reader.remaining() > 0)");
+            b.addStatement("$L.add($L)", target, readCall(field.element));
+            b.endControlFlow();
+            b.endControlFlow();
+            return;
+        }
+        b.beginControlFlow("while (reader.remaining() > 0)");
+        repeatedAdd(b, field, mode, model);
+        b.endControlFlow();
+    }
+
+    private static void emitPackedCapacity(
+        CodeBlock.Builder b, PrimitiveListSpec spec, String listExpr, int width) {
+        if (width == 8) {
+            b.beginControlFlow("if (_rem > 0)");
+            b.addStatement("$T.$L($L, _rem >>> 3)", PROTO_LISTS, spec.ensure(), listExpr);
+            b.endControlFlow();
+        } else if (width == 4) {
+            b.beginControlFlow("if (_rem > 0)");
+            b.addStatement("$T.$L($L, _rem >>> 2)", PROTO_LISTS, spec.ensure(), listExpr);
+            b.endControlFlow();
+        } else if (width == 1) {
+            b.addStatement("$T.$L($L, reader.remaining())", PROTO_LISTS, spec.ensure(), listExpr);
+        }
+    }
+
+    private static void ensureRepeated(CodeBlock.Builder b, FieldModel field, ReadMode mode) {
+        if (field.array) {
+            String builderVar = mode.arrayBuilderRef(field);
+            b.beginControlFlow("if ($L == null)", builderVar);
+            b.addStatement("$L = new $T()", builderVar, WireCodegen.arrayBuilderType(field));
+            seedArrayBuilder(b, field, mode);
+            b.endControlFlow();
+            return;
+        }
+        if (mode.usesLocals()) {
             // The locals path starts every collection out as a fresh mutable instance, so there is nothing to ensure.
+            return;
+        }
+        if (mode.usesColCache()) {
+            String col = collectionCacheVar(field);
+            b.beginControlFlow("if ($L == null)", col);
+            b.addStatement("$L = $L", col, collectionEnsure(field.accessOn("msg"), field));
+            assign(b, field, "msg", col);
+            b.endControlFlow();
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
@@ -448,9 +951,9 @@ final class ReadEmitter {
             UNKNOWN_FIELDS_BUILDER, UNKNOWN_FIELDS, model.unknown.accessOn("msg"));
     }
 
-    private static void unknownDefault(CodeBlock.Builder b, MessageModel model) {
+    private static void unknownDefault(CodeBlock.Builder b, MessageModel model, ReadMode mode) {
         if (model.unknown != null) {
-            b.addStatement("default -> _ub.merge(reader)");
+            b.addStatement("default -> $L.merge(reader)", mode.unknownBuilderRef());
         } else {
             b.addStatement("default -> reader.skipField()");
         }
@@ -483,10 +986,10 @@ final class ReadEmitter {
             javaType(component.type()), local, fromExisting, defaultValue(component.type()));
     }
 
-    private static void readMessage(CodeBlock.Builder b, FieldModel field, boolean record) {
+    private static void readMessage(CodeBlock.Builder b, FieldModel field, ReadMode mode) {
         CodeBlock codec = codecInstance(field);
-        if (record) {
-            String current = field.localName;
+        if (mode.usesLocals()) {
+            String current = mode.localRef(field);
             if (field.javaOptional) {
                 b.addStatement("$L = $L", current, wrapOptional(field,
                     CodeBlock.of("reader.readMessage($L, $L != null && $L.isPresent() ? $L.get() : null)",
@@ -507,16 +1010,16 @@ final class ReadEmitter {
         assign(b, field, "msg", CodeBlock.of("reader.readMessage($L, $L)", codec, current));
     }
 
-    private static void seedArrayBuilder(CodeBlock.Builder b, FieldModel field, boolean record) {
-        String existing = record
-            ? field.localName
+    private static void seedArrayBuilder(CodeBlock.Builder b, FieldModel field, ReadMode mode) {
+        String existing = mode.usesLocals()
+            ? mode.localRef(field)
             : field.accessOn("msg");
-        String builderVar = arrayBuilderVar(field);
+        String builderVar = mode.arrayBuilderRef(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         b.beginControlFlow("if ($L != null)", existing);
         b.beginControlFlow("for ($T item : $L)", javaType(field.element), existing);
-        CodeBlock add = primitiveAdd(field, builderVar, CodeBlock.of("item"));
-        if (add != null) {
-            b.addStatement("$L", add);
+        if (spec != null) {
+            b.addStatement("$L.$L(item)", builderVar, spec.add());
         } else {
             b.addStatement("$L.add(item)", builderVar);
         }
@@ -524,14 +1027,7 @@ final class ReadEmitter {
         b.endControlFlow();
     }
 
-    private static void ensurePackedCapacity(CodeBlock.Builder b, FieldModel field, boolean record) {
-        CodeBlock ensure = packedEnsure(field, repeatedVar(field, record));
-        if (ensure != null) {
-            b.addStatement("$L", ensure);
-        }
-    }
-
-    private static void repeatedAdd(CodeBlock.Builder b, FieldModel field, boolean record, MessageModel model) {
+    private static void repeatedAdd(CodeBlock.Builder b, FieldModel field, ReadMode mode, MessageModel model) {
         if (field.element.kind == FieldKind.ENUM) {
             EnumModel enums = field.element.enumModel;
             b.addStatement("int _n = reader.readEnum()");
@@ -539,16 +1035,16 @@ final class ReadEmitter {
             String tag = Names.tagConstant(field.number);
             if (enums.unrecognized != null) {
                 b.beginControlFlow("if (_item == $L)", enumConstant(enums, enums.unrecognized));
-                mergeUnknownVarint(b, model, tag);
+                mergeUnknownVarint(b, model, mode, tag);
                 b.nextControlFlow("else if (_item != null)");
-                repeatedAddValue(b, field, record, CodeBlock.of("_item"));
+                repeatedAddValue(b, field, mode, CodeBlock.of("_item"));
                 b.endControlFlow();
             } else {
                 b.beginControlFlow("if (_item != null)");
-                repeatedAddValue(b, field, record, CodeBlock.of("_item"));
+                repeatedAddValue(b, field, mode, CodeBlock.of("_item"));
                 if (model.unknown != null) {
                     b.nextControlFlow("else");
-                    b.addStatement("_ub.mergeVarint($L, _n)", tag);
+                    mergeUnknownVarint(b, model, mode, tag);
                 }
                 b.endControlFlow();
             }
@@ -560,11 +1056,16 @@ final class ReadEmitter {
         if (field.element.adapterType != null) {
             addend = fromWire(field.element, addend);
         }
-        repeatedAddValue(b, field, record, addend);
+        repeatedAddValue(b, field, mode, addend);
     }
 
-    private static void repeatedAddValue(CodeBlock.Builder b, FieldModel field, boolean record, CodeBlock addend) {
-        String target = repeatedVar(field, record);
+    private static void repeatedAddValue(CodeBlock.Builder b, FieldModel field, ReadMode mode, CodeBlock addend) {
+        String target = mode.repeatedVar(field);
+        PrimitiveListSpec spec = PrimitiveListSpec.of(field);
+        if (spec != null && (field.array || javaType(field).equals(spec.listType()))) {
+            b.addStatement("$L.$L($L)", target, spec.add(), addend);
+            return;
+        }
         CodeBlock add = primitiveAdd(field, target, addend);
         if (add != null) {
             b.addStatement("$L", add);
@@ -573,19 +1074,17 @@ final class ReadEmitter {
         }
     }
 
-    private static String repeatedVar(FieldModel field, boolean record) {
-        if (field.array) {
-            return arrayBuilderVar(field);
-        }
-        if (record || field.accessKind != AccessKind.FIELD) {
-            return field.localName;
-        }
-        return field.accessOn("msg");
-    }
-
-    private static void ensureMap(CodeBlock.Builder b, FieldModel field, boolean record) {
-        if (record) {
+    private static void ensureMap(CodeBlock.Builder b, FieldModel field, ReadMode mode) {
+        if (mode.usesLocals()) {
             // Same as a repeated local: the map exists before the first entry is read.
+            return;
+        }
+        if (mode.usesColCache()) {
+            String col = collectionCacheVar(field);
+            b.beginControlFlow("if ($L == null)", col);
+            b.addStatement("$L = $L", col, mapEnsure(field.accessOn("msg"), field));
+            assign(b, field, "msg", col);
+            b.endControlFlow();
             return;
         }
         if (field.accessKind == AccessKind.FIELD) {
@@ -598,19 +1097,9 @@ final class ReadEmitter {
         }
     }
 
-    private static String mapVar(FieldModel field, boolean record) {
-        if (record) {
-            return field.localName;
-        }
-        if (field.accessKind == AccessKind.FIELD) {
-            return field.accessOn("msg");
-        }
-        return field.localName;
-    }
-
-    private static void store(CodeBlock.Builder b, FieldModel field, boolean record, CodeBlock expr) {
-        if (record) {
-            b.addStatement("$L = $L", field.localName, expr);
+    private static void store(CodeBlock.Builder b, FieldModel field, ReadMode mode, CodeBlock expr) {
+        if (mode.usesLocals()) {
+            b.addStatement("$L = $L", mode.localRef(field), expr);
         } else {
             assign(b, field, "msg", expr);
         }
@@ -634,28 +1123,28 @@ final class ReadEmitter {
         return numbers;
     }
 
-    private static void mergeUnknownVarint(CodeBlock.Builder b, MessageModel model, String tag) {
+    private static void mergeUnknownVarint(CodeBlock.Builder b, MessageModel model, ReadMode mode, String tag) {
         if (model.unknown != null) {
-            b.addStatement("_ub.mergeVarint($L, _n)", tag);
+            b.addStatement("$L.mergeVarint($L, _n)", mode.unknownBuilderRef(), tag);
         }
     }
 
-    private static void removeUnknownField(CodeBlock.Builder b, MessageModel model, int fieldNumber) {
+    private static void removeUnknownField(CodeBlock.Builder b, MessageModel model, ReadMode mode, int fieldNumber) {
         if (model.unknown != null) {
-            b.addStatement("_ub.removeField($L)", fieldNumber);
+            b.addStatement("$L.removeField($L)", mode.unknownBuilderRef(), fieldNumber);
         }
     }
 
-    private static void removeUnknownFields(CodeBlock.Builder b, MessageModel model, List<Integer> fieldNumbers) {
+    private static void removeUnknownFields(
+        CodeBlock.Builder b, MessageModel model, ReadMode mode, List<Integer> fieldNumbers) {
         if (model.unknown == null || fieldNumbers.isEmpty()) {
             return;
         }
         if (fieldNumbers.size() == 1) {
-            b.addStatement("_ub.removeField($L)", fieldNumbers.getFirst());
+            b.addStatement("$L.removeField($L)", mode.unknownBuilderRef(), fieldNumbers.getFirst());
             return;
         }
         String args = fieldNumbers.stream().map(String::valueOf).collect(Collectors.joining(", "));
-        b.addStatement("_ub.removeFields($L)", args);
+        b.addStatement("$L.removeFields($L)", mode.unknownBuilderRef(), args);
     }
-
 }
