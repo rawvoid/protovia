@@ -46,11 +46,11 @@ class ExportNameProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("packedSizeOfTags");
+            .contains("packedSizeOf_1");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("packedSizeOfThe_tags");
+            .doesNotContain("the_tags");
     }
 
     @Test

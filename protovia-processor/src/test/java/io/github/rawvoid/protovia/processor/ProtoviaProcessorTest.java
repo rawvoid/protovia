@@ -260,7 +260,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
-            .contains("else if (target instanceof Home");
+            .contains("else if (f_target instanceof Home");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
@@ -527,7 +527,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
-            .contains("else if (data instanceof Home");
+            .contains("else if (f_data instanceof Home");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
@@ -555,7 +555,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxRecordProtoCodec")
             .contentsAsUtf8String()
-            .contains("Target data = existing != null ? existing.data() : null");
+            .contains("Target f_data = existing != null ? existing.data() : null");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxRecordProtoCodec")
             .contentsAsUtf8String()
@@ -666,7 +666,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
-            .contains("Object data =");
+            .contains("Object f_data =");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BoxProtoCodec")
             .contentsAsUtf8String()
@@ -928,7 +928,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
-            .contains("else if (target instanceof Home");
+            .contains("else if (f_target instanceof Home");
     }
 
     @Test
@@ -1057,7 +1057,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
-            .contains("else if (target instanceof Home");
+            .contains("else if (f_target instanceof Home");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.ContactProtoCodec")
             .contentsAsUtf8String()
@@ -1460,7 +1460,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.NumsProtoCodec")
             .contentsAsUtf8String()
-            .contains("toArray(new Integer[0])");
+            .contains("toArray(Integer[]::new)");
     }
 
     @Test
@@ -1893,15 +1893,15 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("if (birthDate != null)");
+            .contains("if (f_birthDate != null)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("birthDate != 0");
+            .doesNotContain("f_birthDate != 0");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("int birthDateWire =");
+            .contains("int _wire_3 =");
     }
 
     @Test
@@ -1998,7 +1998,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
-            .contains("writeUInt64NoTag(createdWire)");
+            .contains("writeUInt64NoTag(_wire_2)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
@@ -2006,7 +2006,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.AuditProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("TimestampCodec.INSTANCE.writeTo(writer, created)");
+            .doesNotContain("TimestampCodec.INSTANCE.writeTo(writer, f_created)");
     }
 
     @Test
@@ -2195,11 +2195,15 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("int dWire = LocalDateEpochDay.INSTANCE.toWire(_c.d())");
+            .contains("int _wire_10 = LocalDateEpochDay.INSTANCE.toWire(_p)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("CodedSize.int32(10, dWire)");
+            .contains("if (_p == null)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("CodedSize.int32(10, _wire_10)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
@@ -2207,7 +2211,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("writeInt32NoTag(dWire)");
+            .contains("writeInt32NoTag(_wire_10)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
@@ -2215,7 +2219,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("if (dWire != 0)");
+            .doesNotContain("if (_wire_10 != 0)");
     }
 
     @Test
@@ -2241,11 +2245,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("LocalDateEpochDay.INSTANCE.toWire(birth)");
+            .contains("LocalDateEpochDay.INSTANCE.toWire(f_birth)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("LocalDateEpochDay.INSTANCE.toWire(hired)");
+            .contains("LocalDateEpochDay.INSTANCE.toWire(f_hired)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
@@ -2276,11 +2280,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("LocalDateEpochDay.INSTANCE.toWire(birth)");
+            .contains("LocalDateEpochDay.INSTANCE.toWire(f_birth)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.PersonProtoCodec")
             .contentsAsUtf8String()
-            .contains("LocalDateIso.INSTANCE.toWire(hired)");
+            .contains("LocalDateIso.INSTANCE.toWire(f_hired)");
     }
 
     @Test
@@ -2340,11 +2344,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
-            .contains("InstantEpochMilli.INSTANCE.toWire(created)");
+            .contains("InstantEpochMilli.INSTANCE.toWire(f_created)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
-            .contains("InstantEpochMilli.INSTANCE.toWire(updated)");
+            .contains("InstantEpochMilli.INSTANCE.toWire(f_updated)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.EventProtoCodec")
             .contentsAsUtf8String()
@@ -2380,11 +2384,11 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
-            .contains("if (count != null)");
+            .contains("if (f_count != null)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("count != 0");
+            .doesNotContain("f_count != 0");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.CounterProtoCodec")
             .contentsAsUtf8String()
@@ -2442,7 +2446,7 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.OrderProtoCodec")
             .contentsAsUtf8String()
-            .contains("if (total != null)");
+            .contains("if (f_total != null)");
     }
 
     @Test
@@ -2793,15 +2797,15 @@ class ProtoviaProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
             .contentsAsUtf8String()
-            .contains("if (raw != null)");
+            .contains("if (f_raw != null)");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
             .contentsAsUtf8String()
-            .doesNotContain("raw.length != 0");
+            .doesNotContain("f_raw.length != 0");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
             .contentsAsUtf8String()
-            .contains("if (opt != null && opt.isPresent())");
+            .contains("if (f_opt != null && f_opt.isPresent())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
             .contentsAsUtf8String()
@@ -3064,6 +3068,469 @@ class ProtoviaProcessorTest {
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
             .doesNotContain("new TaggedMap(existing.entries())");
+    }
+
+    @Test
+    void collidingFieldNamesCompileOnPublicPojoGettersPojoRecordAndBuilder() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                uuidAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Addr",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.State",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum State { @ProtoEnumValue(0) UNKNOWN, @ProtoEnumValue(1) ON }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Wrap",
+                    "package demo;",
+                    "import java.time.LocalDate;",
+                    "public record Wrap(LocalDate f_x) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingPublicPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoAdapters;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoDeterministic;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.time.LocalDate;",
+                    "import java.util.List;",
+                    "import java.util.Map;",
+                    "import java.util.UUID;",
+                    "@ProtoMessage",
+                    "@ProtoAdapters({LocalDateEpochDay.class, UuidString.class})",
+                    "public class CollidingPublicPojo {",
+                    "  @ProtoField(number = 1) public String value;",
+                    "  @ProtoField(number = 2) public int size;",
+                    "  @ProtoField(number = 3) public String cache;",
+                    "  @ProtoField(number = 4) public String writer;",
+                    "  @ProtoField(number = 5) public String reader;",
+                    "  @ProtoField(number = 6) public String existing;",
+                    "  @ProtoField(number = 7) public String msg;",
+                    "  @ProtoField(number = 8) public int tag;",
+                    "  @ProtoField(number = 9) public List<String> item;",
+                    "  @ProtoField(number = 10) public Map<String, Integer> e;",
+                    "  @ProtoField(number = 11) public List<Integer> oldLimit;",
+                    "  @ProtoField(number = 12) public State _n;",
+                    "  @ProtoField(number = 13) public State _e;",
+                    "  @ProtoField(number = 14) public String _c;",
+                    "  @ProtoField(number = 15) public String _p;",
+                    "  @ProtoField(number = 16) public List<State> _item;",
+                    "  @ProtoField(number = 17) public String builder;",
+                    "  @ProtoField(number = 18) public String f_size;",
+                    "  @ProtoField(number = 19) public String _sz_1;",
+                    "  @ProtoField(number = 20) public List<Integer> foo;",
+                    "  @ProtoField(number = 21) public List<Integer> Foo;",
+                    "  @ProtoField(number = 22) public Map<String, Integer> bar;",
+                    "  @ProtoField(number = 23) public Map<String, Integer> Bar;",
+                    "  @ProtoField(number = 24) public Addr x;",
+                    "  @ProtoField(number = 25) public int xSize;",
+                    "  @ProtoField(number = 26) public int xSlot;",
+                    "  @ProtoField(number = 27) public int[] arr;",
+                    "  @ProtoField(number = 28) public String arrBuilder;",
+                    "  @ProtoField(number = 29) public List<Integer> nums;",
+                    "  @ProtoField(number = 30) public String numsPacked;",
+                    "  @ProtoField(number = 31) public String numsPrim;",
+                    "  @ProtoField(number = 32) public LocalDate day;",
+                    "  @ProtoField(number = 33) public String dayWire;",
+                    "  @ProtoField(number = 34) public State st;",
+                    "  @ProtoField(number = 35) public String stNumber;",
+                    "  @ProtoField(number = 36) public String k;",
+                    "  @ProtoField(number = 37) @ProtoDeterministic public Map<UUID, Integer> detMap;",
+                    "  @ProtoField(number = 38) public String xWire;",
+                    "  @ProtoOneof({ @ProtoOneof.Case(number = 50, of = Wrap.class) }) public Object choice;",
+                    "  @ProtoUnknown public UnknownFields _old;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingGetterPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.List;",
+                    "import java.util.Map;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public class CollidingGetterPojo {",
+                    "  @ProtoField(number = 1) private List<String> msg;",
+                    "  @ProtoField(number = 2) private Map<String, Integer> existing;",
+                    "  @ProtoField(number = 3) private List<Integer> oldLimit;",
+                    "  @ProtoField(number = 4) private int[] builder;",
+                    "  @ProtoField(number = 5) private Optional<Addr> _cur = Optional.empty();",
+                    "  @ProtoUnknown private UnknownFields tag;",
+                    "  public List<String> getMsg() { return msg; }",
+                    "  public void setMsg(List<String> msg) { this.msg = msg; }",
+                    "  public Map<String, Integer> getExisting() { return existing; }",
+                    "  public void setExisting(Map<String, Integer> existing) { this.existing = existing; }",
+                    "  public List<Integer> getOldLimit() { return oldLimit; }",
+                    "  public void setOldLimit(List<Integer> oldLimit) { this.oldLimit = oldLimit; }",
+                    "  public int[] getBuilder() { return builder; }",
+                    "  public void setBuilder(int[] builder) { this.builder = builder; }",
+                    "  public Optional<Addr> get_cur() { return _cur; }",
+                    "  public void set_cur(Optional<Addr> _cur) { this._cur = _cur; }",
+                    "  public UnknownFields getTag() { return tag; }",
+                    "  public void setTag(UnknownFields tag) { this.tag = tag; }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingUnknownMsgPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "@ProtoMessage",
+                    "public class CollidingUnknownMsgPojo {",
+                    "  @ProtoField(number = 1) public String value;",
+                    "  @ProtoUnknown public UnknownFields msg;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.UnknownFields;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnknown;",
+                    "import java.util.List;",
+                    "import java.util.Map;",
+                    "@ProtoMessage",
+                    "public record CollidingRecord(",
+                    "  @ProtoField(number = 1) String value,",
+                    "  @ProtoField(number = 2) int size,",
+                    "  @ProtoField(number = 3) String cache,",
+                    "  @ProtoField(number = 4) String writer,",
+                    "  @ProtoField(number = 5) String reader,",
+                    "  @ProtoField(number = 6) String existing,",
+                    "  @ProtoField(number = 7) String msg,",
+                    "  @ProtoField(number = 8) int tag,",
+                    "  @ProtoField(number = 9) List<String> item,",
+                    "  @ProtoField(number = 10) Map<String, Integer> e,",
+                    "  @ProtoField(number = 11) List<Integer> oldLimit,",
+                    "  @ProtoField(number = 12) String _n,",
+                    "  @ProtoField(number = 13) String _e,",
+                    "  @ProtoField(number = 14) String _c,",
+                    "  @ProtoField(number = 15) String _p,",
+                    "  @ProtoField(number = 16) String _item,",
+                    "  @ProtoField(number = 17) String builder,",
+                    "  @ProtoField(number = 18) int[] x,",
+                    "  @ProtoField(number = 19) String xBuilder,",
+                    "  @ProtoField(number = 20) List<Integer> foo,",
+                    "  @ProtoField(number = 21) List<Integer> Foo,",
+                    "  @ProtoUnknown UnknownFields _old,",
+                    "  int _i,",
+                    "  String _cur) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.CollidingBuilderEntity",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage",
+                    "public class CollidingBuilderEntity {",
+                    "  @ProtoField(number = 1) private final String builder;",
+                    "  @ProtoField(number = 2) private final int size;",
+                    "  private CollidingBuilderEntity(String builder, int size) { this.builder = builder; this.size = size; }",
+                    "  public String getBuilder() { return builder; }",
+                    "  public int getSize() { return size; }",
+                    "  public static Builder builder() { return new Builder(); }",
+                    "  public static final class Builder {",
+                    "    private String builder;",
+                    "    private int size;",
+                    "    public Builder builder(String builder) { this.builder = builder; return this; }",
+                    "    public Builder size(int size) { this.size = size; return this; }",
+                    "    public CollidingBuilderEntity build() { return new CollidingBuilderEntity(builder, size); }",
+                    "  }",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.CollidingPublicPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("packedSizeOf_20");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.CollidingPublicPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("packedSizeOf_21");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.CollidingPublicPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("sizeOfEntry_22");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.CollidingPublicPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("sizeOfEntry_23");
+    }
+
+    @Test
+    void crossPackageSameSimpleNameEnumsCompileInSameMessage() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "com.a.Status",
+                    "package com.a;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum Status { @ProtoEnumValue(0) UNKNOWN, @ProtoEnumValue(1) A_ONE }"),
+                JavaFileObjects.forSourceLines(
+                    "com.b.Status",
+                    "package com.b;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                    "@ProtoEnum public enum Status {",
+                    "  @ProtoEnumValue(0) UNKNOWN,",
+                    "  @ProtoEnumValue(2) B_TWO,",
+                    "  @ProtoUnrecognized UNRECOGNIZED",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "com.a_b.Status",
+                    "package com.a_b;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum Status { @ProtoEnumValue(0) ZERO, @ProtoEnumValue(3) THREE }"),
+                JavaFileObjects.forSourceLines(
+                    "com.a.b_Status",
+                    "package com.a;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum b_Status { @ProtoEnumValue(0) ZERO, @ProtoEnumValue(4) FOUR }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.List;",
+                    "import java.util.Map;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public class Holder {",
+                    "  @ProtoField(number = 1) public com.a.Status first;",
+                    "  @ProtoField(number = 2) public com.b.Status second;",
+                    "  @ProtoField(number = 3) public Optional<com.b.Status> optSecond = Optional.empty();",
+                    "  @ProtoField(number = 4) public List<com.a.Status> firstList;",
+                    "  @ProtoField(number = 5) public Map<String, com.b.Status> secondMap;",
+                    "  @ProtoField(number = 6) public com.a_b.Status third;",
+                    "  @ProtoField(number = 7) public com.a.b_Status fourth;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("numberOf_com_a_Status");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("numberOf_com_b_Status");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("numberOf_com_a_0b_Status");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("numberOf_com_a_b_0Status");
+    }
+
+    @Test
+    void optionalMessageAndOptionalEnumCompileOnPojoAndRecord() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.Addr",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public record Addr(@ProtoField(number = 1) String city) {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Status",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;",
+                    "@ProtoEnum public enum Status {",
+                    "  @ProtoEnumValue(0) UNKNOWN,",
+                    "  @ProtoEnumValue(1) ACTIVE,",
+                    "  @ProtoUnrecognized UNRECOGNIZED",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Kind",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnum;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoEnumValue;",
+                    "@ProtoEnum public enum Kind { @ProtoEnumValue(0) NONE, @ProtoEnumValue(1) ONE }"),
+                JavaFileObjects.forSourceLines(
+                    "demo.OptPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.Instant;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public class OptPojo {",
+                    "  @ProtoField(number = 1) public Optional<Addr> addr = Optional.empty();",
+                    "  @ProtoField(number = 2) public Optional<Status> status = Optional.empty();",
+                    "  @ProtoField(number = 3) public Optional<Kind> kind = Optional.empty();",
+                    "  @ProtoField(number = 4) public Optional<Instant> at = Optional.empty();",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.OptRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.time.Instant;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public record OptRecord(",
+                    "  @ProtoField(number = 1) Optional<Addr> addr,",
+                    "  @ProtoField(number = 2) Optional<Status> status,",
+                    "  @ProtoField(number = 3) Optional<Kind> kind,",
+                    "  @ProtoField(number = 4) Optional<Instant> at) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OptPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (f_addr != null && f_addr.isPresent())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OptPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (f_status != null && f_status.isPresent())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OptPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (_ev_2 != Status.UNRECOGNIZED)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OptRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("Instant _msg_4 = f_at.get()");
+    }
+
+    @Test
+    void mapOfByteBufferAndByteArrayArrayCompileOnPojoAndRecord() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.BytesPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.nio.ByteBuffer;",
+                    "import java.util.Map;",
+                    "@ProtoMessage",
+                    "public class BytesPojo {",
+                    "  @ProtoField(number = 1) public Map<String, ByteBuffer> buffers;",
+                    "  @ProtoField(number = 2) public byte[][] chunks;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BytesRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.nio.ByteBuffer;",
+                    "import java.util.Map;",
+                    "@ProtoMessage",
+                    "public record BytesRecord(",
+                    "  @ProtoField(number = 1) Map<String, ByteBuffer> buffers,",
+                    "  @ProtoField(number = 2) byte[][] chunks) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BytesPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ByteBuffer.allocate(0)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BytesPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("toArray(byte[][]::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BytesRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ByteBuffer.allocate(0)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BytesRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("toArray(byte[][]::new)");
+    }
+
+    @Test
+    void oneofWrapperScalarNullGuardEmittedOnlyForNonPrimitiveScalars() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                localDateAdapter(),
+                JavaFileObjects.forSourceLines(
+                    "demo.Item",
+                    "package demo;",
+                    "import java.time.LocalDate;",
+                    "public sealed interface Item permits Email, Count, Num, Born, Blob {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Email",
+                    "package demo;",
+                    "public record Email(String value) implements Item {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Count",
+                    "package demo;",
+                    "public record Count(int n) implements Item {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Num",
+                    "package demo;",
+                    "public record Num(Integer n) implements Item {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Born",
+                    "package demo;",
+                    "import java.time.LocalDate;",
+                    "public record Born(LocalDate d) implements Item {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Blob",
+                    "package demo;",
+                    "public record Blob(byte[] data) implements Item {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoOneof;",
+                    "@ProtoMessage",
+                    "public class Holder {",
+                    "  @ProtoOneof({",
+                    "    @ProtoOneof.Case(number = 10, of = Email.class),",
+                    "    @ProtoOneof.Case(number = 11, of = Count.class),",
+                    "    @ProtoOneof.Case(number = 12, of = Num.class),",
+                    "    @ProtoOneof.Case(number = 13, of = Born.class, adapter = LocalDateEpochDay.class),",
+                    "    @ProtoOneof.Case(number = 14, of = Blob.class)",
+                    "  })",
+                    "  public Item item;",
+                    "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("oneof case email payload cannot be null");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("oneof case num payload cannot be null");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("oneof case born payload cannot be null");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("oneof case blob payload cannot be null");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("oneof case count payload cannot be null");
     }
 
     private static java.util.List<javax.tools.JavaFileObject> withFieldOneof(

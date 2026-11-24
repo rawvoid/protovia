@@ -45,6 +45,7 @@ final class GenTypes {
     static final ClassName OPTIONAL = ClassName.get("java.util", "Optional");
     static final ClassName MAP = ClassName.get("java.util", "Map");
     static final ClassName ARRAY_LIST = ClassName.get("java.util", "ArrayList");
+    static final ClassName BYTE_BUFFER = ClassName.get("java.nio", "ByteBuffer");
 
     private GenTypes() {
     }
@@ -70,6 +71,14 @@ final class GenTypes {
 
     static TypeName javaType(TypeMirror type) {
         return TypeName.get(type);
+    }
+
+    static TypeName optionalValueType(FieldModel field) {
+        TypeName name = javaType(field);
+        if (name instanceof ParameterizedTypeName parameterized && !parameterized.typeArguments().isEmpty()) {
+            return parameterized.typeArguments().getFirst();
+        }
+        return name;
     }
 
     static TypeName boxedType(FieldModel field) {

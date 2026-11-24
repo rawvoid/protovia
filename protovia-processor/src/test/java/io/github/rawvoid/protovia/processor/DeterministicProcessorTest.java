@@ -67,11 +67,11 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(scores, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntries(f_scores, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("extra.entrySet()");
+            .contains("f_extra.entrySet()");
     }
 
     @Test
@@ -93,11 +93,11 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(headers, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntries(f_headers, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("blobs.entrySet()");
+            .contains("f_blobs.entrySet()");
     }
 
     @Test
@@ -127,11 +127,11 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(inherited, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntries(f_inherited, Comparator.naturalOrder())");
         assertThat(compilation)
             .generatedSourceFile("demo.internal.UserProtoCodec")
             .contentsAsUtf8String()
-            .contains("ProtoMaps.sortedEntries(own, Comparator.naturalOrder())");
+            .contains("ProtoMaps.sortedEntries(f_own, Comparator.naturalOrder())");
     }
 
     @Test
@@ -307,7 +307,7 @@ class DeterministicProcessorTest {
         assertThat(compilation)
             .generatedSourceFile("demo.internal.HolderProtoCodec")
             .contentsAsUtf8String()
-            .contains("sortedEntries(values, Long::compareUnsigned)");
+            .contains("sortedEntries(f_values, Long::compareUnsigned)");
     }
 
     @Test

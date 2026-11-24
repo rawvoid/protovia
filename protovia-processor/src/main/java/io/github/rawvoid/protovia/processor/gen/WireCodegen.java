@@ -58,7 +58,7 @@ final class WireCodegen {
     }
 
     static String wireLocal(FieldModel field) {
-        return field.localName + "Wire";
+        return "_wire_" + field.number;
     }
 
     static void assignToWire(CodeBlock.Builder b, FieldModel field, String javaValue) {
@@ -112,11 +112,19 @@ final class WireCodegen {
     }
 
     static String oneofWireLocal(OneofCaseModel c) {
-        String accessor = c.accessor;
-        if (accessor != null && accessor.endsWith("()")) {
-            return accessor.substring(0, accessor.length() - 2) + "Wire";
+        return "_wire_" + c.number;
+    }
+
+    static String oneofScalarPayload(CodeBlock.Builder b, OneofCaseModel c, String value) {
+        if (c.accessor == null || c.payload.primitive) {
+            return value;
         }
-        return wireLocal(c.payload);
+        b.addStatement("$T _p = $L", javaType(c.payload), value);
+        b.beginControlFlow("if (_p == null)");
+        b.addStatement("throw new $T($S)", PROTO_EXCEPTION,
+            "oneof case " + c.exportName() + " payload cannot be null");
+        b.endControlFlow();
+        return "_p";
     }
 
     static CodeBlock fromWire(FieldModel field, CodeBlock read) {
@@ -290,6 +298,9 @@ final class WireCodegen {
         if (part.byteArray) {
             return CodeBlock.of("new byte[0]");
         }
+        if (part.byteBuffer) {
+            return CodeBlock.of("$T.allocate(0)", BYTE_BUFFER);
+        }
         return switch (part.protoType) {
             case BOOL -> CodeBlock.of("false");
             case STRING -> CodeBlock.of("$S", "");
@@ -329,7 +340,7 @@ final class WireCodegen {
         if (spec != null) {
             return CodeBlock.of("$L.$L()", listVar, spec.toArray());
         }
-        return CodeBlock.of("$L.toArray(new $T[0])", listVar, javaType(field.element));
+        return CodeBlock.of("$L.toArray($T[]::new)", listVar, javaType(field.element));
     }
 
     static CodeBlock primitiveAdd(FieldModel field, String list, CodeBlock value) {
@@ -359,7 +370,7 @@ final class WireCodegen {
             return;
         }
         if (spec != null && !field.array && (write || width == 0)) {
-            String prim = field.localName + "Prim";
+            String prim = "_prim_" + field.number;
             b.beginControlFlow("if ($L instanceof $T $L)", list, spec.listType(), prim);
             primitivePackedLoop(b, field, spec, prim, write);
             b.nextControlFlow("else");

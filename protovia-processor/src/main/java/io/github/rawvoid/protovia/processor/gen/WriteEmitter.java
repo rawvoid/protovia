@@ -77,31 +77,60 @@ final class WriteEmitter {
                 b.endControlFlow();
             }
             case ENUM -> writeEnum(b, field, tag);
-            case MESSAGE -> {
-                b.beginControlFlow("if ($L != null)", field.localName);
-                writeTag(b, tag);
-                writeCachedMessage(b, field, field.localName, field.localName + "Size");
-                b.endControlFlow();
-            }
+            case MESSAGE -> writeMessage(b, field, tag);
             case REPEATED -> writeRepeated(b, field);
             case MAP -> writeMap(b, field);
             case ONEOF -> writeOneof(b, field);
         }
     }
 
+    private static void writeMessage(CodeBlock.Builder b, FieldModel field, String tag) {
+        String sz = "_sz_" + field.number;
+        if (field.javaOptional) {
+            String msgVar = "_msg_" + field.number;
+            b.beginControlFlow("if ($L != null && $L.isPresent())", field.localName, field.localName);
+            b.addStatement("$T $L = $L.get()", optionalValueType(field), msgVar, field.localName);
+            writeTag(b, tag);
+            writeCachedMessage(b, field, msgVar, sz);
+            b.endControlFlow();
+        } else {
+            b.beginControlFlow("if ($L != null)", field.localName);
+            writeTag(b, tag);
+            writeCachedMessage(b, field, field.localName, sz);
+            b.endControlFlow();
+        }
+    }
+
     private static void writeEnum(CodeBlock.Builder b, FieldModel field, String tag) {
         String helper = enumNumberOf(field.enumModel);
+        if (field.javaOptional) {
+            String ev = "_ev_" + field.number;
+            b.beginControlFlow("if ($L != null && $L.isPresent())", field.localName, field.localName);
+            b.addStatement("$T $L = $L.get()", enumType(field.enumModel), ev, field.localName);
+            if (field.enumModel.unrecognized != null) {
+                b.beginControlFlow("if ($L != $L)", ev, enumConstant(field.enumModel, field.enumModel.unrecognized));
+                writeTag(b, tag);
+                b.addStatement("writer.writeInt32NoTag($L($L))", helper, ev);
+                b.endControlFlow();
+            } else {
+                writeTag(b, tag);
+                b.addStatement("writer.writeInt32NoTag($L($L))", helper, ev);
+            }
+            b.endControlFlow();
+            return;
+        }
         if (field.optional) {
             b.beginControlFlow("if ($L)", enumPresent(field, field.localName));
             writeTag(b, tag);
             b.addStatement("writer.writeInt32NoTag($L($L))", helper, field.localName);
             b.endControlFlow();
         } else {
+            String numVar = "_num_" + field.number;
             b.beginControlFlow("if ($L)", enumPresent(field, field.localName));
-            b.addStatement("int $LNumber = $L($L)", field.localName, helper, field.localName);
-            b.beginControlFlow("if ($LNumber != 0)", field.localName);
+            b.addStatement("int $L = $L($L)", numVar, helper, field.localName);
+            b.beginControlFlow("if ($L != 0)", numVar);
             writeTag(b, tag);
-            b.addStatement("writer.writeInt32NoTag($LNumber)", field.localName);
+            b.addStatement("writer.writeInt32NoTag($L)", numVar);
             b.endControlFlow();
             b.endControlFlow();
         }
@@ -111,10 +140,11 @@ final class WriteEmitter {
         b.beginControlFlow("if ($L)", presentRepeated(field));
         String tag = Names.tagConstant(field.number);
         if (field.packed && field.packable()) {
-            b.addStatement("int $LPacked = writer.hasCachedSize() ? writer.takeSize() : $L($L)",
-                field.localName, packedSizeOf(field), field.localName);
+            String packed = "_packed_" + field.number;
+            b.addStatement("int $L = writer.hasCachedSize() ? writer.takeSize() : $L($L)",
+                packed, packedSizeOf(field), field.localName);
             b.addStatement("writer.writeUInt32NoTag($L_PACKED)", tag);
-            b.addStatement("writer.writeUInt32NoTag($LPacked)", field.localName);
+            b.addStatement("writer.writeUInt32NoTag($L)", packed);
             packedElements(b, field, true);
         } else {
             b.beginControlFlow("for ($T item : $L)", javaType(field.element), field.localName);
@@ -146,26 +176,29 @@ final class WriteEmitter {
             b.addStatement("writer.writeUInt32NoTag(0)");
         } else if (c.selfMessage) {
             writeTag(b, c.tagConstant);
-            writeCachedMessage(b, c.payload, "_c", c.tagConstant + "_sz");
+            writeCachedMessage(b, c.payload, "_c", "_sz_" + c.number);
         } else if (c.payload.kind == FieldKind.MESSAGE) {
             b.addStatement("$T _p = $L", javaType(c.payload), value);
             b.beginControlFlow("if (_p != null)");
             writeTag(b, c.tagConstant);
-            writeCachedMessage(b, c.payload, "_p", c.tagConstant + "_sz");
+            writeCachedMessage(b, c.payload, "_p", "_sz_" + c.number);
             b.endControlFlow();
         } else if (c.payload.kind == FieldKind.ENUM) {
             b.beginControlFlow("if ($L)", enumPresent(c.payload, value));
             writeTag(b, c.tagConstant);
             b.addStatement("writer.writeInt32NoTag($L($L))", enumNumberOf(c.payload.enumModel), value);
             b.endControlFlow();
-        } else if (c.payload.adapterType != null) {
-            String w = oneofWireLocal(c);
-            assignToWire(b, c.payload, value, w);
-            writeTag(b, c.tagConstant);
-            b.addStatement("$L", writeNoTag("writer", c.payload, w));
         } else {
-            writeTag(b, c.tagConstant);
-            b.addStatement("$L", writeNoTag("writer", c.payload, value));
+            String scalarValue = oneofScalarPayload(b, c, value);
+            if (c.payload.adapterType != null) {
+                String w = oneofWireLocal(c);
+                assignToWire(b, c.payload, scalarValue, w);
+                writeTag(b, c.tagConstant);
+                b.addStatement("$L", writeNoTag("writer", c.payload, w));
+            } else {
+                writeTag(b, c.tagConstant);
+                b.addStatement("$L", writeNoTag("writer", c.payload, scalarValue));
+            }
         }
     }
 

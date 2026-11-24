@@ -21,7 +21,6 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import java.util.Set;
 
 /**
  * Identifier helpers for generated Java (packages, codec names, tags, helpers).
@@ -29,15 +28,6 @@ import java.util.Set;
  * @author Rawvoid
  */
 public final class Names {
-
-    private static final Set<String> KEYWORDS = Set.of(
-        "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
-        "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
-        "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
-        "interface", "long", "native", "new", "package", "private", "protected", "public",
-        "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
-        "throw", "throws", "transient", "try", "void", "volatile", "while", "var", "yield",
-        "record", "sealed", "permits", "non-sealed", "true", "false", "null");
 
     private Names() {
     }
@@ -104,7 +94,7 @@ public final class Names {
     }
 
     public static String safeLocal(String name) {
-        return KEYWORDS.contains(name) ? "f_" + name : name;
+        return "f_" + name;
     }
 
     public static String capitalize(String name) {
@@ -205,30 +195,51 @@ public final class Names {
     }
 
     public static String enumNumberOf(EnumModel model) {
-        return "numberOf" + sanitizeTypeName(model.typeName);
+        return "numberOf_" + sanitizeFqn(enumFqn(model));
     }
 
     public static String enumFrom(EnumModel model) {
-        return "from" + sanitizeTypeName(model.typeName);
+        return "from_" + sanitizeFqn(enumFqn(model));
     }
 
     public static String packedSizeOf(FieldModel field) {
-        return "packedSizeOf" + capitalize(field.name);
+        return "packedSizeOf_" + field.number;
     }
 
     public static String mapEntrySizeOf(FieldModel field) {
-        return "sizeOf" + capitalize(field.name) + "Entry";
+        return "sizeOfEntry_" + field.number;
     }
 
     public static String mapEntryWrite(FieldModel field) {
-        return "write" + capitalize(field.name) + "Entry";
+        return "writeEntry_" + field.number;
     }
 
     public static String mapEntryRead(FieldModel field) {
-        return "read" + capitalize(field.name) + "Entry";
+        return "readEntry_" + field.number;
     }
 
-    private static String sanitizeTypeName(String typeName) {
-        return typeName.replace(".", "_");
+    private static String enumFqn(EnumModel model) {
+        return model.type != null ? model.type.getQualifiedName().toString() : model.typeName;
+    }
+
+    /**
+     * Injectively encodes a Java qualified name into a valid Java identifier
+     * fragment: {@code _} becomes {@code _0} and {@code .} becomes {@code _}.
+     * Because a Java identifier segment after {@code .} can never start with
+     * {@code '0'}, {@code _0} uniquely denotes a literal underscore.
+     */
+    static String sanitizeFqn(String fqn) {
+        StringBuilder out = new StringBuilder(fqn.length() + 8);
+        for (int i = 0; i < fqn.length(); i++) {
+            char c = fqn.charAt(i);
+            if (c == '_') {
+                out.append("_0");
+            } else if (c == '.') {
+                out.append('_');
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 }
