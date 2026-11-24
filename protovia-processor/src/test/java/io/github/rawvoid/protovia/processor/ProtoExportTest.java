@@ -778,6 +778,35 @@ class ProtoExportTest {
             """, proto(compilation, "demo/holder.proto"));
     }
 
+    @Test
+    void exportsOptionalBytesForByteArrayAndOptionalByteArray() {
+        Compilation compilation = compile(
+            src("demo.Blob", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                import java.util.Optional;
+                @ProtoMessage
+                public class Blob {
+                  @ProtoField(number = 1) public byte[] plain;
+                  @ProtoField(number = 2, optional = true) public byte[] raw;
+                  @ProtoField(number = 3) public Optional<byte[]> opt;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            package demo;
+
+            message Blob {
+              bytes plain = 1;
+              optional bytes raw = 2;
+              optional bytes opt = 3;
+            }
+            """, proto(compilation, "demo/blob.proto"));
+    }
+
     private static String proto(Compilation compilation, String path) {
         String sourcePath = "proto/" + path;
         JavaFileObject file = compilation.generatedFile(StandardLocation.SOURCE_OUTPUT, sourcePath)

@@ -302,13 +302,14 @@ final class WireCodegen {
 
     static CodeBlock collectionEnsure(String container, FieldModel field) {
         CodeBlock ctor = implConstructorRef(field);
-        if (field.implType != null && field.implType.getQualifiedName().toString().contains("Set")) {
-            return CodeBlock.of("$T.ensureMutableSet($L, $L)", PROTO_LISTS, container, ctor);
-        }
-        if (PrimitiveListSpec.of(field) != null && !field.array) {
-            return CodeBlock.of("$T.ensureMutablePrimitiveList($L, $L)", PROTO_LISTS, container, ctor);
-        }
-        return CodeBlock.of("$T.ensureMutableList($L, $L)", PROTO_LISTS, container, ctor);
+        return switch (field.collectionKind) {
+            case SET -> CodeBlock.of("$T.ensureMutableSet($L, $L)", PROTO_LISTS, container, ctor);
+            case COLLECTION -> CodeBlock.of("$T.ensureMutableCollection($L, $L)", PROTO_LISTS, container, ctor);
+            case LIST -> PrimitiveListSpec.of(field) != null && !field.array
+                ? CodeBlock.of("$T.ensureMutablePrimitiveList($L, $L)", PROTO_LISTS, container, ctor)
+                : CodeBlock.of("$T.ensureMutableList($L, $L)", PROTO_LISTS, container, ctor);
+            case NONE -> throw new IllegalStateException("unexpected non-collection field " + field.name);
+        };
     }
 
     static CodeBlock mapEnsure(String container, FieldModel field) {
@@ -351,6 +352,12 @@ final class WireCodegen {
         String list = write ? field.localName : "values";
         PrimitiveListSpec spec = PrimitiveListSpec.of(field);
         int width = packedFixedWidth(field.element);
+        if (spec != null && !field.array && javaType(field).equals(spec.listType())) {
+            if (write || width == 0) {
+                primitivePackedLoop(b, field, spec, list, write);
+            }
+            return;
+        }
         if (spec != null && !field.array && (write || width == 0)) {
             String prim = field.localName + "Prim";
             b.beginControlFlow("if ($L instanceof $T $L)", list, spec.listType(), prim);

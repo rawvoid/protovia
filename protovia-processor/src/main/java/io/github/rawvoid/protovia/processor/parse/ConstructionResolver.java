@@ -120,17 +120,24 @@ final class ConstructionResolver {
             return builder;
         }
 
-        Instantiation ctor = uniqueMatchingConstructor(type, members);
+        List<String> ambiguousErrors = new ArrayList<>();
+        Instantiation ctor = uniqueMatchingConstructor(type, members, ambiguousErrors);
         if (ctor != null) {
             return ctor;
         }
-        Instantiation factory = uniqueMatchingFactory(type, members);
+        Instantiation factory = uniqueMatchingFactory(type, members, ambiguousErrors);
         if (factory != null) {
             return factory;
         }
 
         if (allowDefer && hasLombokConstruction(type)) {
             deferred = true;
+            return null;
+        }
+        if (!ambiguousErrors.isEmpty()) {
+            for (String error : ambiguousErrors) {
+                diag.error(type, error);
+            }
             return null;
         }
         diag.error(type, "@ProtoMessage class " + type.getSimpleName()
@@ -204,7 +211,7 @@ final class ConstructionResolver {
                 return null;
             }
         }
-        List<Instantiation.Slot> slots = bindParameters(exec, members, errors);
+        List<Instantiation.Slot> slots = bindParameters(exec, members, errors, null);
         if (slots == null) {
             return null;
         }
@@ -254,8 +261,11 @@ final class ConstructionResolver {
         return true;
     }
 
-    private Instantiation uniqueMatchingConstructor(TypeElement type, List<ProtoMember> members) {
-        List<ExecutableElement> matches = new ArrayList<>();
+    private Instantiation uniqueMatchingConstructor(
+        TypeElement type,
+        List<ProtoMember> members,
+        List<String> ambiguousErrors) {
+        List<List<Instantiation.Slot>> matches = new ArrayList<>();
         for (ExecutableElement ctor : ElementFilter.constructorsIn(type.getEnclosedElements())) {
             if (!ctor.getModifiers().contains(Modifier.PUBLIC)) {
                 continue;
@@ -263,19 +273,24 @@ final class ConstructionResolver {
             if (ctor.getParameters().isEmpty()) {
                 continue;
             }
-            List<String> errors = new ArrayList<>();
-            if (bindParameters(ctor, members, errors) != null) {
-                matches.add(ctor);
+            List<Instantiation.Slot> slots = bindParameters(ctor, members, new ArrayList<>(), ambiguousErrors);
+            if (slots != null) {
+                matches.add(slots);
             }
         }
         if (matches.size() != 1) {
             return null;
         }
-        return new Instantiation.Constructor(bindParameters(matches.getFirst(), members, new ArrayList<>()));
+        return new Instantiation.Constructor(matches.getFirst());
     }
 
-    private Instantiation uniqueMatchingFactory(TypeElement type, List<ProtoMember> members) {
-        List<ExecutableElement> matches = new ArrayList<>();
+    private Instantiation uniqueMatchingFactory(
+        TypeElement type,
+        List<ProtoMember> members,
+        List<String> ambiguousErrors) {
+        ExecutableElement matchedMethod = null;
+        List<Instantiation.Slot> matchedSlots = null;
+        int matchCount = 0;
         for (ExecutableElement method : ElementFilter.methodsIn(type.getEnclosedElements())) {
             if (!method.getModifiers().contains(Modifier.PUBLIC)
                 || !method.getModifiers().contains(Modifier.STATIC)
@@ -288,18 +303,17 @@ final class ConstructionResolver {
             if (name.equals("builder") || name.equals("toBuilder")) {
                 continue;
             }
-            List<String> errors = new ArrayList<>();
-            if (bindParameters(method, members, errors) != null) {
-                matches.add(method);
+            List<Instantiation.Slot> slots = bindParameters(method, members, new ArrayList<>(), ambiguousErrors);
+            if (slots != null) {
+                matchedMethod = method;
+                matchedSlots = slots;
+                matchCount++;
             }
         }
-        if (matches.size() != 1) {
+        if (matchCount != 1) {
             return null;
         }
-        ExecutableElement method = matches.getFirst();
-        return new Instantiation.Factory(
-            method.getSimpleName().toString(),
-            bindParameters(method, members, new ArrayList<>()));
+        return new Instantiation.Factory(matchedMethod.getSimpleName().toString(), matchedSlots);
     }
 
     private Instantiation detectBuilder(TypeElement type, List<ProtoMember> members, ProtoBuilder ann) {
@@ -353,7 +367,8 @@ final class ConstructionResolver {
     private List<Instantiation.Slot> bindParameters(
         ExecutableElement exec,
         List<ProtoMember> members,
-        List<String> errors) {
+        List<String> errors,
+        List<String> ambiguousErrors) {
         List<? extends VariableElement> params = exec.getParameters();
         String execName = exec.getKind() == ElementKind.CONSTRUCTOR
             ? "constructor"
@@ -395,6 +410,22 @@ final class ConstructionResolver {
                 return null;
             }
             positional.add(member);
+        }
+        for (int i = 0; i < members.size(); i++) {
+            ProtoMember member = members.get(i);
+            for (int j = 0; j < params.size(); j++) {
+                if (i != j && env.types.isAssignable(member.type, params.get(j).asType())) {
+                    String message = "cannot bind " + execName
+                        + " by parameter names (ambiguous positional match between proto member '"
+                        + member.name + "' and parameter '" + params.get(j).getSimpleName()
+                        + "'); match parameter names to proto members";
+                    errors.add(message);
+                    if (ambiguousErrors != null) {
+                        ambiguousErrors.add(message);
+                    }
+                    return null;
+                }
+            }
         }
         return toSlots(positional);
     }

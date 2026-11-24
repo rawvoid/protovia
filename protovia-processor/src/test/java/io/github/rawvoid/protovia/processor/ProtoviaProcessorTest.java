@@ -2666,6 +2666,406 @@ class ProtoviaProcessorTest {
         assertThat(compilation).hadErrorContaining("handles UUID, not Map");
     }
 
+    @Test
+    void overloadedGettersAndSettersPickCompatibleOverloads() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.Overloaded",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage",
+                "public class Overloaded {",
+                "  @ProtoField(number = 1) private String name;",
+                "  @ProtoField(number = 2) private boolean active;",
+                "  private String title;",
+                "  public String getName() { return name; }",
+                "  public String getName(int index) { return name; }",
+                "  public void setName(String name) { this.name = name; }",
+                "  public void setName(int index) {}",
+                "  public String isActive() { return String.valueOf(active); }",
+                "  public boolean getActive() { return active; }",
+                "  public void setActive(String wrong) {}",
+                "  public void setActive(boolean active) { this.active = active; }",
+                "  @ProtoField(number = 3) public String getTitle() { return title; }",
+                "  public String getTitle(int index) { return title; }",
+                "  public void setTitle(int wrong) {}",
+                "  public void setTitle(String title) { this.title = title; }",
+                "}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.getName()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.setName(");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.getActive()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.setActive(");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("value.getTitle()");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.OverloadedProtoCodec")
+            .contentsAsUtf8String()
+            .contains("msg.setTitle(");
+    }
+
+    @Test
+    void incompatibleSetterOverloadIsNotTreatedAsWritable() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.BadSetter",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage",
+                "public class BadSetter {",
+                "  @ProtoField(number = 1) private String name;",
+                "  public String getName() { return name; }",
+                "  public void setName(int wrong) {}",
+                "}"));
+        assertThat(compilation).hadErrorContaining("cannot be instantiated");
+    }
+
+    @Test
+    void unnamedDefaultPackageMessageFails() {
+        Compilation pojo = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "RootMessage",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage",
+                "public class RootMessage {",
+                "  @ProtoField(number = 1) public String name;",
+                "}"));
+        assertThat(pojo).hadErrorContaining("cannot be in the default (unnamed) package");
+
+        Compilation record = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "RootRecord",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "@ProtoMessage",
+                "public record RootRecord(@ProtoField(number = 1) String name) {}"));
+        assertThat(record).hadErrorContaining("cannot be in the default (unnamed) package");
+    }
+
+    @Test
+    void optionalByteArrayAndJavaOptionalByteArrayCompile() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.BlobPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public class BlobPojo {",
+                    "  @ProtoField(number = 1, optional = true) public byte[] raw;",
+                    "  @ProtoField(number = 2) public Optional<byte[]> opt = Optional.empty();",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BlobRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import java.util.Optional;",
+                    "@ProtoMessage",
+                    "public record BlobRecord(",
+                    "  @ProtoField(number = 1, optional = true) byte[] raw,",
+                    "  @ProtoField(number = 2) Optional<byte[]> opt) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (raw != null)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("raw.length != 0");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("if (opt != null && opt.isPresent())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BlobPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("Optional.of(reader.readBytes())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.BlobRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("Optional.of(reader.readBytes())");
+    }
+
+    @Test
+    void unsupportedAbstractCollectionsAndMapsFail() {
+        Compilation queue = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.BadQueue",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import java.util.Queue;",
+                "@ProtoMessage public class BadQueue {",
+                "  @ProtoField(number = 1) public Queue<String> items;",
+                "}"));
+        assertThat(queue).hadErrorContaining("unsupported collection type Queue");
+
+        Compilation deque = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(JavaFileObjects.forSourceLines(
+                "demo.BadDeque",
+                "package demo;",
+                "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                "import java.util.Deque;",
+                "@ProtoMessage public class BadDeque {",
+                "  @ProtoField(number = 1) public Deque<String> items;",
+                "}"));
+        assertThat(deque).hadErrorContaining("unsupported collection type Deque");
+
+        Compilation customMap = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.MyMap",
+                    "package demo;",
+                    "import java.util.Map;",
+                    "public interface MyMap<K, V> extends Map<K, V> {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BadMap",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class BadMap {",
+                    "  @ProtoField(number = 1) public MyMap<String, Integer> scores;",
+                    "}"));
+        assertThat(customMap).hadErrorContaining("unsupported map type MyMap");
+
+        Compilation noDefaultCtor = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.NoDefaultList",
+                    "package demo;",
+                    "import java.util.ArrayList;",
+                    "public class NoDefaultList<E> extends ArrayList<E> {",
+                    "  public NoDefaultList(int cap) { super(cap); }",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BadList",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class BadList {",
+                    "  @ProtoField(number = 1) public NoDefaultList<String> items;",
+                    "}"));
+        assertThat(noDefaultCtor).hadErrorContaining("must have a public no-arg constructor");
+
+        Compilation hiddenList = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.HiddenList",
+                    "package demo;",
+                    "import java.util.ArrayList;",
+                    "class HiddenList extends ArrayList<String> {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.BadHidden",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage public class BadHidden {",
+                    "  @ProtoField(number = 1) public HiddenList items;",
+                    "}"));
+        assertThat(hiddenList).hadErrorContaining("is not accessible from demo.internal");
+    }
+
+    @Test
+    void concreteSortedAndPrimitiveCollectionsCompileOnPojoAndRecord() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.StringList",
+                    "package demo;",
+                    "import java.util.ArrayList;",
+                    "public class StringList extends ArrayList<String> {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.ScoreMap",
+                    "package demo;",
+                    "import java.util.HashMap;",
+                    "public class ScoreMap extends HashMap<String, Integer> {}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.AllCollectionsPojo",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.collect.BooleanArrayList;",
+                    "import io.github.rawvoid.protovia.collect.DoubleArrayList;",
+                    "import io.github.rawvoid.protovia.collect.FloatArrayList;",
+                    "import io.github.rawvoid.protovia.collect.IntArrayList;",
+                    "import io.github.rawvoid.protovia.collect.LongArrayList;",
+                    "import java.util.*;",
+                    "import java.util.concurrent.*;",
+                    "@ProtoMessage",
+                    "public class AllCollectionsPojo {",
+                    "  @ProtoField(number = 1) public ArrayList<String> arrayList;",
+                    "  @ProtoField(number = 2) public LinkedList<String> linkedList;",
+                    "  @ProtoField(number = 3) public LinkedList<Integer> linkedInts;",
+                    "  @ProtoField(number = 4) public HashSet<String> hashSet;",
+                    "  @ProtoField(number = 5) public LinkedHashSet<String> linkedHashSet;",
+                    "  @ProtoField(number = 6) public TreeSet<String> treeSet;",
+                    "  @ProtoField(number = 7) public SortedSet<String> sortedSet;",
+                    "  @ProtoField(number = 8) public NavigableSet<String> navigableSet;",
+                    "  @ProtoField(number = 9) public Collection<String> collection;",
+                    "  @ProtoField(number = 10) public Collection<Integer> intCollection;",
+                    "  @ProtoField(number = 11) public ArrayDeque<String> arrayDeque;",
+                    "  @ProtoField(number = 12) public IntArrayList ints;",
+                    "  @ProtoField(number = 13) public LongArrayList longs;",
+                    "  @ProtoField(number = 14) public FloatArrayList floats;",
+                    "  @ProtoField(number = 15) public DoubleArrayList doubles;",
+                    "  @ProtoField(number = 16) public BooleanArrayList bools;",
+                    "  @ProtoField(number = 17) public HashMap<String, Integer> hashMap;",
+                    "  @ProtoField(number = 18) public LinkedHashMap<String, Integer> linkedHashMap;",
+                    "  @ProtoField(number = 19) public TreeMap<String, Integer> treeMap;",
+                    "  @ProtoField(number = 20) public SortedMap<String, Integer> sortedMap;",
+                    "  @ProtoField(number = 21) public NavigableMap<String, Integer> navigableMap;",
+                    "  @ProtoField(number = 22) public ConcurrentMap<String, Integer> concurrentMap;",
+                    "  @ProtoField(number = 23) public ConcurrentNavigableMap<String, Integer> concurrentNavigableMap;",
+                    "  @ProtoField(number = 24) public ConcurrentHashMap<String, Integer> concurrentHashMap;",
+                    "  @ProtoField(number = 25) public StringList customList;",
+                    "  @ProtoField(number = 26) public ScoreMap customMap;",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.AllCollectionsRecord",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "import io.github.rawvoid.protovia.collect.IntArrayList;",
+                    "import java.util.*;",
+                    "import java.util.concurrent.*;",
+                    "@ProtoMessage",
+                    "public record AllCollectionsRecord(",
+                    "  @ProtoField(number = 1) ArrayList<String> arrayList,",
+                    "  @ProtoField(number = 2) LinkedList<String> linkedList,",
+                    "  @ProtoField(number = 3) HashSet<String> hashSet,",
+                    "  @ProtoField(number = 4) TreeSet<String> treeSet,",
+                    "  @ProtoField(number = 5) SortedSet<String> sortedSet,",
+                    "  @ProtoField(number = 6) NavigableSet<String> navigableSet,",
+                    "  @ProtoField(number = 7) Collection<String> collection,",
+                    "  @ProtoField(number = 8) Collection<Integer> intCollection,",
+                    "  @ProtoField(number = 9) IntArrayList ints,",
+                    "  @ProtoField(number = 10) HashMap<String, Integer> hashMap,",
+                    "  @ProtoField(number = 11) LinkedHashMap<String, Integer> linkedHashMap,",
+                    "  @ProtoField(number = 12) TreeMap<String, Integer> treeMap,",
+                    "  @ProtoField(number = 13) SortedMap<String, Integer> sortedMap,",
+                    "  @ProtoField(number = 14) NavigableMap<String, Integer> navigableMap,",
+                    "  @ProtoField(number = 15) StringList customList,",
+                    "  @ProtoField(number = 16) ScoreMap customMap) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoLists.ensureMutableCollection(msg.collection, ArrayList::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoLists.ensureMutableCollection(msg.intCollection, IntArrayList::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoLists.ensureMutableSet(msg.sortedSet, TreeSet::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoLists.ensureMutablePrimitiveList(msg.ints, IntArrayList::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsPojoProtoCodec")
+            .contentsAsUtf8String()
+            .contains("ProtoLists.ensureMutableMap(msg.sortedMap, TreeMap::new)");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("new TreeSet<>(existing.sortedSet())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("customList.addAll(existing.customList())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.AllCollectionsRecordProtoCodec")
+            .contentsAsUtf8String()
+            .contains("customMap.putAll(existing.customMap())");
+    }
+
+    @Test
+    void nonCollectionOneArgConstructorIsNotTreatedAsCopyConstructor() {
+        Compilation compilation = javac()
+            .withProcessors(new ProtoviaProcessor())
+            .compile(
+                JavaFileObjects.forSourceLines(
+                    "demo.TaggedList",
+                    "package demo;",
+                    "import java.io.Serializable;",
+                    "import java.util.ArrayList;",
+                    "public class TaggedList extends ArrayList<String> {",
+                    "  public TaggedList() {}",
+                    "  public TaggedList(Object tag) {}",
+                    "  public TaggedList(Serializable tag) {}",
+                    "  public TaggedList(Iterable<String> it) {}",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.TaggedMap",
+                    "package demo;",
+                    "import java.util.HashMap;",
+                    "public class TaggedMap extends HashMap<String, Integer> {",
+                    "  public TaggedMap() {}",
+                    "  public TaggedMap(Object tag) {}",
+                    "}"),
+                JavaFileObjects.forSourceLines(
+                    "demo.Holder",
+                    "package demo;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoField;",
+                    "import io.github.rawvoid.protovia.annotation.ProtoMessage;",
+                    "@ProtoMessage",
+                    "public record Holder(",
+                    "  @ProtoField(number = 1) TaggedList items,",
+                    "  @ProtoField(number = 2) TaggedMap entries) {}"));
+        assertThat(compilation).succeeded();
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("items.addAll(existing.items())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .contains("entries.putAll(existing.entries())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("new TaggedList(existing.items())");
+        assertThat(compilation)
+            .generatedSourceFile("demo.internal.HolderProtoCodec")
+            .contentsAsUtf8String()
+            .doesNotContain("new TaggedMap(existing.entries())");
+    }
+
     private static java.util.List<javax.tools.JavaFileObject> withFieldOneof(
         javax.tools.JavaFileObject... extras) {
         java.util.ArrayList<javax.tools.JavaFileObject> files = new java.util.ArrayList<>();

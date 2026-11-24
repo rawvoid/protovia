@@ -63,6 +63,10 @@ public final class FieldModel {
     public final TypeMirror javaType;
     public final String implTypeName;
     public final TypeElement implType;
+    @Builder.Default
+    public final CollectionKind collectionKind = CollectionKind.NONE;
+    @Builder.Default
+    public final boolean implCopyConstructor = true;
     public final String codecName;
     public final TypeElement adapterType;
     public final TypeMirror wireJavaType;
@@ -122,7 +126,7 @@ public final class FieldModel {
         if (array) {
             return element != null && element.primitive ? primitiveListClass() : null;
         }
-        if (implType != null) {
+        if (collectionKind == CollectionKind.LIST && implType != null) {
             String qn = implType.getQualifiedName().toString();
             if (qn.startsWith("io.github.rawvoid.protovia.collect.")) {
                 return qn;

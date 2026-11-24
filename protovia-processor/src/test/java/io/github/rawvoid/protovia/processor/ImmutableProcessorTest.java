@@ -268,6 +268,141 @@ class ImmutableProcessorTest {
         assertThat(compilation).hadErrorContaining("constructor has 1 parameters but the message has 2 proto members");
     }
 
+    @Test
+    void ambiguousPositionalConstructorFails() {
+        Compilation compilation = compile(src("demo.Person", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class Person {
+              @ProtoField(number = 1) private final String d;
+              @ProtoField(number = 2) private final String b;
+              @ProtoField(number = 3) private final String c;
+              @ProtoField(number = 4) private final String a;
+              public Person(String w, String x, String y, String z) {
+                this.d = w; this.b = x; this.c = y; this.a = z;
+              }
+              public String getD() { return d; }
+              public String getB() { return b; }
+              public String getC() { return c; }
+              public String getA() { return a; }
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("ambiguous positional match");
+    }
+
+    @Test
+    void ambiguousPositionalProtoCreatorFails() {
+        Compilation compilation = compile(src("demo.Person", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoCreator;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class Person {
+              @ProtoField(number = 1) private final String d;
+              @ProtoField(number = 2) private final String b;
+              @ProtoField(number = 3) private final String c;
+              @ProtoField(number = 4) private final String a;
+              @ProtoCreator
+              public Person(String w, String x, String y, String z) {
+                this.d = w; this.b = x; this.c = y; this.a = z;
+              }
+              public String getD() { return d; }
+              public String getB() { return b; }
+              public String getC() { return c; }
+              public String getA() { return a; }
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("ambiguous positional match");
+    }
+
+    @Test
+    void ambiguousPositionalFactoryFails() {
+        Compilation compilation = compile(src("demo.Pair", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class Pair {
+              @ProtoField(number = 1) private final String first;
+              @ProtoField(number = 2) private final String second;
+              private Pair(String first, String second) { this.first = first; this.second = second; }
+              public String getFirst() { return first; }
+              public String getSecond() { return second; }
+              public static Pair of(String x, String y) { return new Pair(x, y); }
+            }
+            """));
+        assertThat(compilation).hadErrorContaining("ambiguous positional match");
+    }
+
+    @Test
+    void unambiguousPositionalConstructorPreservesDeclarationOrder() throws Exception {
+        Compilation compilation = compile(src("demo.RecordLike", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class RecordLike {
+              @ProtoField(number = 3) private final String zebra;
+              @ProtoField(number = 1) private final int middle;
+              @ProtoField(number = 2) private final boolean alpha;
+              public RecordLike(String p0, int p1, boolean p2) {
+                this.zebra = p0; this.middle = p1; this.alpha = p2;
+              }
+              public String getZebra() { return zebra; }
+              public int getMiddle() { return middle; }
+              public boolean isAlpha() { return alpha; }
+            }
+            """));
+        assertThat(compilation).succeeded();
+        assertTrue(generated(compilation, "demo.internal.RecordLikeProtoCodec")
+            .contains("return new RecordLike(zebra, middle, alpha)"));
+    }
+
+    @Test
+    void namedConstructorPreferredOverAmbiguousOverload() throws Exception {
+        Compilation compilation = compile(src("demo.Pair", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class Pair {
+              @ProtoField(number = 1) private final String first;
+              @ProtoField(number = 2) private final String second;
+              public Pair(CharSequence x, CharSequence y) { this(x.toString(), y.toString()); }
+              public Pair(String second, String first) { this.first = first; this.second = second; }
+              public String getFirst() { return first; }
+              public String getSecond() { return second; }
+            }
+            """));
+        assertThat(compilation).succeeded();
+        assertTrue(generated(compilation, "demo.internal.PairProtoCodec")
+            .contains("return new Pair(second, first)"));
+    }
+
+    @Test
+    void unannotatedOverloadDoesNotReorderAnnotatedGetterDeclarationOrder() throws Exception {
+        Compilation compilation = compile(src("demo.Holder", """
+            package demo;
+            import io.github.rawvoid.protovia.annotation.ProtoField;
+            import io.github.rawvoid.protovia.annotation.ProtoMessage;
+            @ProtoMessage
+            public class Holder {
+              private final String a;
+              private final int b;
+              public Holder(String p0, int p1) { this.a = p0; this.b = p1; }
+              public int getB(int index) { return b + index; }
+              @ProtoField(number = 1) public String getA() { return a; }
+              @ProtoField(number = 2) public int getB() { return b; }
+            }
+            """));
+        assertThat(compilation).succeeded();
+        assertTrue(generated(compilation, "demo.internal.HolderProtoCodec")
+            .contains("return new Holder(a, b)"));
+    }
+
     private static Compilation compile(JavaFileObject... files) {
         return javac().withProcessors(new ProtoviaProcessor()).compile(files);
     }

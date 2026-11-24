@@ -26,5 +26,5 @@ import java.util.Map;
  *
  * @author Rawvoid
  */
-record ScanResult(List<Member> members, Map<String, ExecutableElement> methods) {
+record ScanResult(List<Member> members, Map<String, List<ExecutableElement>> methods) {
 }
