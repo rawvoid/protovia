@@ -72,6 +72,18 @@ public interface ProtoCodec<T> {
     }
 
     /**
+     * Whether top-level serialization should allocate a {@link SizeCache} when encoding this type.
+     * Generated codecs for flat messages (no nested messages, maps, packed repeated fields, or
+     * non-empty-message oneofs) and flat well-known codecs return {@code false} so
+     * {@code Protovia.toBytes} skips allocating a {@link SizeCache} and passes {@link SizeCache#NOOP}.
+     *
+     * @return {@code true} if top-level encoding should allocate a {@link SizeCache}
+     */
+    default boolean needsSizeCache() {
+        return true;
+    }
+
+    /**
      * Writes {@code value} at the current writer position (no outer length prefix).
      *
      * @param writer destination

@@ -19,17 +19,19 @@ package io.github.rawvoid.protovia;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
 import io.github.rawvoid.protovia.runtime.CodecLookup;
 import io.github.rawvoid.protovia.wire.ProtoReader;
-import io.github.rawvoid.protovia.wire.ProtoWriter;
-import io.github.rawvoid.protovia.wire.SizeCache;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Objects;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Entry point for Protobuf serialization of {@code @ProtoMessage} entities.
  * Looks up the generated {@link ProtoCodec} by convention and encodes or decodes proto3 bytes.
+ *
+ * <p>For isolated per-call or per-tenant limits, obtain an immutable {@link ProtoConfig} via
+ * {@link #withLimits(int, int)} or {@link ProtoConfig#of(int, int)}.
  *
  * @author Rawvoid
  */
@@ -38,15 +40,15 @@ public final class Protovia {
     public static final int DEFAULT_MAX_MESSAGE_SIZE = ProtoReader.DEFAULT_MAX_MESSAGE_SIZE;
     public static final int DEFAULT_MAX_DEPTH = ProtoReader.DEFAULT_MAX_DEPTH;
 
-    private static volatile int maxMessageSize = DEFAULT_MAX_MESSAGE_SIZE;
-    private static volatile int maxDepth = DEFAULT_MAX_DEPTH;
+    private static final AtomicReference<ProtoConfig> DEFAULT_CONFIG =
+        new AtomicReference<>(ProtoConfig.DEFAULT);
 
     private Protovia() {
     }
 
     /**
-     * Caps encoded size and {@link #fromBytes} input length. Default is
-     * {@link #DEFAULT_MAX_MESSAGE_SIZE}.
+     * Caps encoded size and {@link #fromBytes} input length for the global default config.
+     * Default is {@link #DEFAULT_MAX_MESSAGE_SIZE}.
      *
      * @param maxMessageSize positive byte limit
      */
@@ -54,11 +56,12 @@ public final class Protovia {
         if (maxMessageSize <= 0) {
             throw new IllegalArgumentException("maxMessageSize must be positive");
         }
-        Protovia.maxMessageSize = maxMessageSize;
+        DEFAULT_CONFIG.updateAndGet(config -> config.withMaxMessageSize(maxMessageSize));
     }
 
     /**
-     * Caps nested-message depth while parsing. Default is {@link #DEFAULT_MAX_DEPTH}.
+     * Caps nested-message depth while parsing for the global default config.
+     * Default is {@link #DEFAULT_MAX_DEPTH}.
      *
      * @param maxDepth positive nesting limit
      */
@@ -66,15 +69,33 @@ public final class Protovia {
         if (maxDepth <= 0) {
             throw new IllegalArgumentException("maxDepth must be positive");
         }
-        Protovia.maxDepth = maxDepth;
+        DEFAULT_CONFIG.updateAndGet(config -> config.withMaxDepth(maxDepth));
     }
 
     public static int maxMessageSize() {
-        return maxMessageSize;
+        return DEFAULT_CONFIG.get().maxMessageSize();
     }
 
     public static int maxDepth() {
-        return maxDepth;
+        return DEFAULT_CONFIG.get().maxDepth();
+    }
+
+    /**
+     * @return immutable snapshot of the current global {@link ProtoConfig}
+     */
+    public static ProtoConfig config() {
+        return DEFAULT_CONFIG.get();
+    }
+
+    /**
+     * Creates an isolated {@link ProtoConfig} with the given limits without mutating global defaults.
+     *
+     * @param maxMessageSize positive byte limit
+     * @param maxDepth       positive nesting limit
+     * @return immutable config instance
+     */
+    public static ProtoConfig withLimits(int maxMessageSize, int maxDepth) {
+        return ProtoConfig.of(maxMessageSize, maxDepth);
     }
 
     /**
@@ -99,11 +120,8 @@ public final class Protovia {
      * @param message entity to measure
      * @return encoded size in bytes
      */
-    @SuppressWarnings("unchecked")
     public static int sizeOf(Object message) {
-        Objects.requireNonNull(message, "message");
-        ProtoCodec<Object> codec = codec((Class<Object>) message.getClass());
-        return codec.computeSize(message);
+        return DEFAULT_CONFIG.get().sizeOf(message);
     }
 
     /**
@@ -112,18 +130,18 @@ public final class Protovia {
      * @param message entity to encode
      * @return wire bytes
      */
-    @SuppressWarnings("unchecked")
     public static byte[] toBytes(Object message) {
-        Objects.requireNonNull(message, "message");
-        ProtoCodec<Object> codec = codec((Class<Object>) message.getClass());
-        SizeCache sizes = new SizeCache();
-        int size = codec.computeSize(message, sizes);
-        if (size > maxMessageSize) {
-            throw new ProtoException("serialized size " + size + " exceeds max " + maxMessageSize);
-        }
-        ProtoWriter writer = new ProtoWriter(size, sizes);
-        codec.writeTo(writer, message);
-        return writer.finish();
+        return DEFAULT_CONFIG.get().toBytes(message);
+    }
+
+    /**
+     * Encodes {@code message} to a heap {@link ByteBuffer} wrapping {@link #toBytes(Object)}.
+     *
+     * @param message entity to encode
+     * @return read-ready byte buffer positioned at {@code 0}
+     */
+    public static ByteBuffer toByteBuffer(Object message) {
+        return DEFAULT_CONFIG.get().toByteBuffer(message);
     }
 
     /**
@@ -132,8 +150,7 @@ public final class Protovia {
      * @return decoded instance
      */
     public static <T> T fromBytes(byte[] data, Class<T> type) {
-        Objects.requireNonNull(data, "data");
-        return fromBytes(data, 0, data.length, type);
+        return DEFAULT_CONFIG.get().fromBytes(data, type);
     }
 
     /**
@@ -144,49 +161,92 @@ public final class Protovia {
      * @return decoded instance
      */
     public static <T> T fromBytes(byte[] data, int offset, int length, Class<T> type) {
-        Objects.requireNonNull(type, "type");
-        Objects.requireNonNull(data, "data");
-        ProtoCodec<T> codec = codec(type);
-        ProtoReader reader = new ProtoReader(data, offset, length, maxMessageSize, maxDepth);
-        return codec.readFrom(reader);
+        return DEFAULT_CONFIG.get().fromBytes(data, offset, length, type);
+    }
+
+    /**
+     * Decodes one message from {@code [buffer.position(), buffer.limit())} without mutating
+     * {@code buffer}'s position or limit.
+     *
+     * @param buffer source byte buffer
+     * @param type   entity class
+     * @return decoded instance
+     */
+    public static <T> T fromByteBuffer(ByteBuffer buffer, Class<T> type) {
+        return DEFAULT_CONFIG.get().fromByteBuffer(buffer, type);
+    }
+
+    /**
+     * Merges wire bytes into {@code existing} according to proto3 merge semantics
+     * (scalars overwrite, repeated fields append, nested messages merge).
+     *
+     * @param data     complete message bytes to merge
+     * @param existing existing entity instance to merge into
+     * @return merged instance (may be {@code existing} or a new object)
+     */
+    public static <T> T mergeFrom(byte[] data, T existing) {
+        return DEFAULT_CONFIG.get().mergeFrom(data, existing);
+    }
+
+    /**
+     * Merges a byte slice into {@code existing} according to proto3 merge semantics.
+     *
+     * @param data     buffer holding the message
+     * @param offset   start index in {@code data}
+     * @param length   number of bytes to parse
+     * @param existing existing entity instance to merge into
+     * @return merged instance (may be {@code existing} or a new object)
+     */
+    public static <T> T mergeFrom(byte[] data, int offset, int length, T existing) {
+        return DEFAULT_CONFIG.get().mergeFrom(data, offset, length, existing);
     }
 
     /**
      * Writes one message as {@link #toBytes(Object)} to {@code out}.
      * There is no length prefix — this matches official {@code toByteArray}
-     * followed by a stream write, not {@code writeDelimitedTo}.
+     * followed by a stream write; see {@link #writeDelimited(OutputStream, Object)} for framed output.
      *
      * @param out     destination
      * @param message entity to encode
      */
     public static void write(OutputStream out, Object message) {
-        Objects.requireNonNull(out, "out");
-        byte[] bytes = toBytes(message);
-        try {
-            out.write(bytes);
-        } catch (IOException e) {
-            throw new ProtoException("failed to write protobuf message", e);
-        }
+        DEFAULT_CONFIG.get().write(out, message);
     }
 
     /**
      * Reads the remainder of {@code in} (capped at {@link #maxMessageSize()}) as
      * one message. Same boundary as official {@code parseFrom(InputStream)};
-     * there is no delimited / multi-message variant.
+     * see {@link #readDelimited(InputStream, Class)} for framed multi-message streams.
      *
      * @param in   source
      * @param type entity class
      * @return decoded instance
      */
     public static <T> T read(InputStream in, Class<T> type) {
-        Objects.requireNonNull(type, "type");
-        Objects.requireNonNull(in, "in");
-        try {
-            byte[] data = readBounded(in, maxMessageSize);
-            return fromBytes(data, type);
-        } catch (IOException e) {
-            throw new ProtoException("failed to read protobuf message", e);
-        }
+        return DEFAULT_CONFIG.get().read(in, type);
+    }
+
+    /**
+     * Writes a varint32 byte length prefix followed by the encoded message bytes to {@code out},
+     * matching official protobuf {@code writeDelimitedTo}.
+     *
+     * @param out     destination
+     * @param message entity to encode
+     */
+    public static void writeDelimited(OutputStream out, Object message) {
+        DEFAULT_CONFIG.get().writeDelimited(out, message);
+    }
+
+    /**
+     * Reads one varint32 length-delimited message from {@code in}, matching official protobuf
+     * {@code parseDelimitedFrom}. Returns {@code null} on clean EOF before any header byte is read.
+     *
+     * @param in   source
+     * @param type entity class
+     * @return decoded instance, or {@code null} on clean EOF
+     */
+    public static <T> T readDelimited(InputStream in, Class<T> type) {
+        return DEFAULT_CONFIG.get().readDelimited(in, type);
     }
 
     /**
@@ -197,7 +257,7 @@ public final class Protovia {
      * @return Any envelope
      */
     public static ProtoAny pack(Object message) {
-        return pack(message, ProtoAny.TYPE_URL_PREFIX);
+        return DEFAULT_CONFIG.get().pack(message);
     }
 
     /**
@@ -205,12 +265,8 @@ public final class Protovia {
      * @param typeUrlPrefix prefix such as {@code type.googleapis.com}; a trailing {@code /} is optional
      * @return Any envelope
      */
-    @SuppressWarnings("unchecked")
     public static ProtoAny pack(Object message, String typeUrlPrefix) {
-        Objects.requireNonNull(message, "message");
-        Objects.requireNonNull(typeUrlPrefix, "typeUrlPrefix");
-        ProtoCodec<Object> codec = codec((Class<Object>) message.getClass());
-        return new ProtoAny(ProtoAny.typeUrl(typeUrlPrefix, codec.protoFullName()), toBytes(message));
+        return DEFAULT_CONFIG.get().pack(message, typeUrlPrefix);
     }
 
     /**
@@ -220,8 +276,7 @@ public final class Protovia {
      * @throws ProtoException if {@code any} is not {@code type}
      */
     public static <T> T unpack(ProtoAny any, Class<T> type) {
-        Objects.requireNonNull(any, "any");
-        return any.unpack(codec(type));
+        return DEFAULT_CONFIG.get().unpack(any, type);
     }
 
     /**
@@ -230,8 +285,7 @@ public final class Protovia {
      * @return {@code true} if {@code any}'s type URL names {@code type}
      */
     public static boolean is(ProtoAny any, Class<?> type) {
-        Objects.requireNonNull(any, "any");
-        return any.is(codec(type));
+        return DEFAULT_CONFIG.get().is(any, type);
     }
 
     static byte[] readBounded(InputStream in, int max) throws IOException {

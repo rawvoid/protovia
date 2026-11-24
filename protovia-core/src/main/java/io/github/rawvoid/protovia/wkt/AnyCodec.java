@@ -64,6 +64,11 @@ public final class AnyCodec implements ProtoCodec<ProtoAny> {
     }
 
     @Override
+    public boolean needsSizeCache() {
+        return false;
+    }
+
+    @Override
     public void writeTo(ProtoWriter writer, ProtoAny value) {
         if (!value.typeUrl().isEmpty()) {
             writer.writeString(1, value.typeUrl());

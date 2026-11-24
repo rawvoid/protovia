@@ -71,6 +71,11 @@ public final class DurationCodec implements ProtoCodec<Duration> {
     }
 
     @Override
+    public boolean needsSizeCache() {
+        return false;
+    }
+
+    @Override
     public void writeTo(ProtoWriter writer, Duration value) {
         long seconds = value.getSeconds();
         int nanos = value.getNano();

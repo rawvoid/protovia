@@ -67,6 +67,11 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
     }
 
     @Override
+    public boolean needsSizeCache() {
+        return false;
+    }
+
+    @Override
     public void writeTo(ProtoWriter writer, Instant value) {
         long seconds = value.getEpochSecond();
         int nanos = value.getNano();

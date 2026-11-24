@@ -20,6 +20,7 @@ import io.github.rawvoid.protovia.codec.ProtoCodec;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * {@code google.protobuf.Any}: a type URL plus the serialized payload.
@@ -72,14 +73,48 @@ public final class ProtoAny {
     }
 
     /**
+     * Unpacks the payload using {@code codec} and the current global limits
+     * ({@link Protovia#maxMessageSize()} and {@link Protovia#maxDepth()}).
+     *
      * @param codec codec whose {@link ProtoCodec#protoFullName()} must match this Any
      * @return decoded payload
      */
     public <T> T unpack(ProtoCodec<T> codec) {
+        return unpack(codec, Protovia.config());
+    }
+
+    /**
+     * Unpacks the payload using {@code codec} and the limits from {@code config}.
+     *
+     * @param codec  codec whose {@link ProtoCodec#protoFullName()} must match this Any
+     * @param config limits configuration
+     * @return decoded payload
+     */
+    public <T> T unpack(ProtoCodec<T> codec, ProtoConfig config) {
+        Objects.requireNonNull(config, "config");
+        return unpack(codec, config.maxMessageSize(), config.maxDepth());
+    }
+
+    /**
+     * Unpacks the payload using {@code codec} and explicit message size and nesting depth limits.
+     *
+     * @param codec          codec whose {@link ProtoCodec#protoFullName()} must match this Any
+     * @param maxMessageSize positive byte limit
+     * @param maxDepth       positive nesting limit
+     * @return decoded payload
+     */
+    public <T> T unpack(ProtoCodec<T> codec, int maxMessageSize, int maxDepth) {
+        Objects.requireNonNull(codec, "codec");
+        if (maxMessageSize <= 0) {
+            throw new IllegalArgumentException("maxMessageSize must be positive: " + maxMessageSize);
+        }
+        if (maxDepth <= 0) {
+            throw new IllegalArgumentException("maxDepth must be positive: " + maxDepth);
+        }
         if (!is(codec)) {
             throw new ProtoException("Any type mismatch: " + typeUrl + " is not " + codec.protoFullName());
         }
-        return codec.readFrom(new ProtoReader(value));
+        return codec.readFrom(new ProtoReader(value, 0, value.length, maxMessageSize, maxDepth));
     }
 
     @Override
