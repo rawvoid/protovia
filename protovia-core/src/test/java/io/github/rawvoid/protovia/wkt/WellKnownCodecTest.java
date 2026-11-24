@@ -17,11 +17,15 @@
 package io.github.rawvoid.protovia.wkt;
 
 import io.github.rawvoid.protovia.ProtoAny;
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.codec.ProtoCodec;
+import io.github.rawvoid.protovia.wire.CodedSize;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 import org.junit.jupiter.api.Test;
 
+import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -72,6 +76,40 @@ class WellKnownCodecTest {
     }
 
     @Test
+    void timestampRejectsOutOfRangeSeconds() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> decode(TimestampCodec.INSTANCE, encodeSecondsAndNanos(Long.MAX_VALUE, 0)));
+        assertInstanceOf(DateTimeException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> decode(TimestampCodec.INSTANCE, encodeSecondsAndNanos(Long.MIN_VALUE, 0)));
+        assertInstanceOf(DateTimeException.class, low.getCause());
+    }
+
+    @Test
+    void durationRejectsOutOfRange() {
+        ProtoException overflow = assertThrows(ProtoException.class,
+            () -> decode(DurationCodec.INSTANCE, encodeSecondsAndNanos(Long.MIN_VALUE, -1)));
+        assertInstanceOf(ArithmeticException.class, overflow.getCause());
+
+        assertThrows(ProtoException.class,
+            () -> decode(DurationCodec.INSTANCE, encodeSecondsAndNanos(1L, -1)));
+        assertThrows(ProtoException.class,
+            () -> decode(DurationCodec.INSTANCE, encodeSecondsAndNanos(0L, 1_000_000_000)));
+        assertThrows(ProtoException.class,
+            () -> decode(DurationCodec.INSTANCE, encodeSecondsAndNanos(0L, -1_000_000_000)));
+    }
+
+    @Test
+    void durationNegativeRoundTrip() {
+        Duration d = Duration.ofSeconds(-2, 750_000_000); // -1.25s -> wire (-1, -250_000_000)
+        assertEquals(d, decode(DurationCodec.INSTANCE, encode(DurationCodec.INSTANCE, d)));
+
+        Duration minSec = Duration.ofSeconds(Long.MIN_VALUE, 0);
+        assertEquals(minSec, decode(DurationCodec.INSTANCE, encode(DurationCodec.INSTANCE, minSec)));
+    }
+
+    @Test
     void wrapperFullNames() {
         assertEquals("google.protobuf.Int32Value", Int32Value.INSTANCE.protoFullName());
         assertEquals("google.protobuf.Any", AnyCodec.INSTANCE.protoFullName());
@@ -88,5 +126,23 @@ class WellKnownCodecTest {
 
     private static <T> T decode(ProtoCodec<T> codec, byte[] bytes) {
         return codec.readFrom(new ProtoReader(bytes));
+    }
+
+    private static byte[] encodeSecondsAndNanos(long seconds, int nanos) {
+        int size = 0;
+        if (seconds != 0L) {
+            size += CodedSize.int64(1, seconds);
+        }
+        if (nanos != 0) {
+            size += CodedSize.int32(2, nanos);
+        }
+        ProtoWriter writer = new ProtoWriter(size);
+        if (seconds != 0L) {
+            writer.writeInt64(1, seconds);
+        }
+        if (nanos != 0) {
+            writer.writeInt32(2, nanos);
+        }
+        return writer.finish();
     }
 }

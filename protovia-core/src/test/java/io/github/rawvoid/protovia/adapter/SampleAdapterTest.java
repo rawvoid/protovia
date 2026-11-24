@@ -107,10 +107,32 @@ class SampleAdapterTest {
     }
 
     @Test
+    void instantEpochMilliRejectsOverflow() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> InstantEpochMilliAdapter.INSTANCE.toWire(Instant.MAX));
+        assertInstanceOf(ArithmeticException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> InstantEpochMilliAdapter.INSTANCE.toWire(Instant.MIN));
+        assertInstanceOf(ArithmeticException.class, low.getCause());
+    }
+
+    @Test
     void instantEpochSecondRoundTrip() {
         Instant at = Instant.ofEpochSecond(1700000000L);
         assertEquals(1700000000L, InstantEpochSecondAdapter.INSTANCE.toWire(at));
         assertEquals(at, InstantEpochSecondAdapter.INSTANCE.fromWire(1700000000L));
+    }
+
+    @Test
+    void instantEpochSecondRejectsOutOfRange() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> InstantEpochSecondAdapter.INSTANCE.fromWire(Long.MAX_VALUE));
+        assertInstanceOf(DateTimeException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> InstantEpochSecondAdapter.INSTANCE.fromWire(Long.MIN_VALUE));
+        assertInstanceOf(DateTimeException.class, low.getCause());
     }
 
     @Test
@@ -129,6 +151,17 @@ class SampleAdapterTest {
         Duration wait = Duration.ofMillis(-1500);
         assertEquals(-1500L, DurationMilliAdapter.INSTANCE.toWire(wait));
         assertEquals(wait, DurationMilliAdapter.INSTANCE.fromWire(-1500L));
+    }
+
+    @Test
+    void durationMilliRejectsOverflow() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> DurationMilliAdapter.INSTANCE.toWire(Duration.ofSeconds(Long.MAX_VALUE)));
+        assertInstanceOf(ArithmeticException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> DurationMilliAdapter.INSTANCE.toWire(Duration.ofSeconds(Long.MIN_VALUE)));
+        assertInstanceOf(ArithmeticException.class, low.getCause());
     }
 
     @Test
@@ -184,6 +217,17 @@ class SampleAdapterTest {
     }
 
     @Test
+    void localDateTimeEpochMilliRejectsOverflow() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> LocalDateTimeEpochMilliAdapter.INSTANCE.toWire(LocalDateTime.MAX));
+        assertInstanceOf(ArithmeticException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> LocalDateTimeEpochMilliAdapter.INSTANCE.toWire(LocalDateTime.MIN));
+        assertInstanceOf(ArithmeticException.class, low.getCause());
+    }
+
+    @Test
     void zonedDateTimeEpochMilliRoundTrip() {
         ZonedDateTime zdt = ZonedDateTime.of(2026, 8, 18, 15, 30, 0, 0, ZoneOffset.UTC);
         long wire = ZonedDateTimeEpochMilliAdapter.INSTANCE.toWire(zdt);
@@ -197,10 +241,34 @@ class SampleAdapterTest {
     }
 
     @Test
+    void zonedDateTimeEpochMilliRejectsOverflow() {
+        ZonedDateTime maxUtc = ZonedDateTime.of(LocalDateTime.MAX, ZoneOffset.UTC);
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> ZonedDateTimeEpochMilliAdapter.INSTANCE.toWire(maxUtc));
+        assertInstanceOf(ArithmeticException.class, high.getCause());
+
+        ZonedDateTime minUtc = ZonedDateTime.of(LocalDateTime.MIN, ZoneOffset.UTC);
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> ZonedDateTimeEpochMilliAdapter.INSTANCE.toWire(minUtc));
+        assertInstanceOf(ArithmeticException.class, low.getCause());
+    }
+
+    @Test
     void offsetDateTimeEpochMilliRoundTrip() {
         OffsetDateTime odt = OffsetDateTime.of(2026, 8, 18, 15, 30, 0, 0, ZoneOffset.UTC);
         long wire = OffsetDateTimeEpochMilliAdapter.INSTANCE.toWire(odt);
         assertEquals(odt, OffsetDateTimeEpochMilliAdapter.INSTANCE.fromWire(wire));
+    }
+
+    @Test
+    void offsetDateTimeEpochMilliRejectsOverflow() {
+        ProtoException high = assertThrows(ProtoException.class,
+            () -> OffsetDateTimeEpochMilliAdapter.INSTANCE.toWire(OffsetDateTime.MAX));
+        assertInstanceOf(ArithmeticException.class, high.getCause());
+
+        ProtoException low = assertThrows(ProtoException.class,
+            () -> OffsetDateTimeEpochMilliAdapter.INSTANCE.toWire(OffsetDateTime.MIN));
+        assertInstanceOf(ArithmeticException.class, low.getCause());
     }
 
     @Test
@@ -210,6 +278,8 @@ class SampleAdapterTest {
         assertEquals(zdt, ZonedDateTimeIsoStringAdapter.INSTANCE.fromWire(wire));
 
         assertThrows(ProtoException.class, () -> ZonedDateTimeIsoStringAdapter.INSTANCE.fromWire("invalid-zdt"));
+        assertThrows(ProtoException.class,
+            () -> ZonedDateTimeIsoStringAdapter.INSTANCE.fromWire("2026-08-18T15:30:00+08:00[Invalid/Zone]"));
     }
 
     @Test
@@ -253,6 +323,14 @@ class SampleAdapterTest {
         assertEquals(period, PeriodIsoStringAdapter.INSTANCE.fromWire(wire));
 
         assertThrows(ProtoException.class, () -> PeriodIsoStringAdapter.INSTANCE.fromWire("invalid-period"));
+
+        ProtoException weeksOverflow = assertThrows(ProtoException.class,
+            () -> PeriodIsoStringAdapter.INSTANCE.fromWire("P306783379W"));
+        assertInstanceOf(ArithmeticException.class, weeksOverflow.getCause());
+
+        ProtoException daysOverflow = assertThrows(ProtoException.class,
+            () -> PeriodIsoStringAdapter.INSTANCE.fromWire("P1W2147483647D"));
+        assertInstanceOf(ArithmeticException.class, daysOverflow.getCause());
     }
 
     @Test
@@ -320,12 +398,138 @@ class SampleAdapterTest {
 
     @Test
     void inetAddressStringRoundTrip() throws Exception {
-        InetAddress v4 = InetAddress.getByName("192.168.1.1");
+        InetAddress v4 = InetAddress.getByAddress(new byte[]{(byte) 192, (byte) 168, 1, 1});
         String wireV4 = InetAddressStringAdapter.INSTANCE.toWire(v4);
         assertEquals("192.168.1.1", wireV4);
         assertEquals(v4, InetAddressStringAdapter.INSTANCE.fromWire(wireV4));
 
+        InetAddress v6 = InetAddress.getByAddress(new byte[]{
+            0x20, 0x01, 0x0d, (byte) 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        });
+        String wireV6 = InetAddressStringAdapter.INSTANCE.toWire(v6);
+        assertEquals(v6, InetAddressStringAdapter.INSTANCE.fromWire(wireV6));
+
         assertThrows(ProtoException.class, () -> InetAddressStringAdapter.INSTANCE.fromWire("999.999.999.999"));
+    }
+
+    @Test
+    void inetAddressStringValidIpv4Literals() throws Exception {
+        assertArrayEquals(new byte[]{0, 0, 0, 0},
+            InetAddressStringAdapter.INSTANCE.fromWire("0.0.0.0").getAddress());
+        assertArrayEquals(new byte[]{127, 0, 0, 1},
+            InetAddressStringAdapter.INSTANCE.fromWire("127.0.0.1").getAddress());
+        assertArrayEquals(new byte[]{(byte) 192, (byte) 168, 1, 1},
+            InetAddressStringAdapter.INSTANCE.fromWire("192.168.1.1").getAddress());
+        assertArrayEquals(new byte[]{(byte) 255, (byte) 255, (byte) 255, (byte) 255},
+            InetAddressStringAdapter.INSTANCE.fromWire("255.255.255.255").getAddress());
+        assertArrayEquals(new byte[]{10, 0, 20, 100},
+            InetAddressStringAdapter.INSTANCE.fromWire("10.0.20.100").getAddress());
+    }
+
+    @Test
+    void inetAddressStringValidIpv6Literals() throws Exception {
+        assertArrayEquals(new byte[16],
+            InetAddressStringAdapter.INSTANCE.fromWire("::").getAddress());
+        assertArrayEquals(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            InetAddressStringAdapter.INSTANCE.fromWire("::1").getAddress());
+        assertArrayEquals(new byte[]{0x20, 0x01, 0x0d, (byte) 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            InetAddressStringAdapter.INSTANCE.fromWire("2001:db8::1").getAddress());
+        assertArrayEquals(new byte[]{
+                0x20, 0x01, 0x0d, (byte) 0xb8, (byte) 0x85, (byte) 0xa3, 0, 0,
+                0, 0, (byte) 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34
+            },
+            InetAddressStringAdapter.INSTANCE.fromWire("2001:0db8:85a3:0000:0000:8a2e:0370:7334").getAddress());
+        assertArrayEquals(new byte[]{(byte) 0xfe, (byte) 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            InetAddressStringAdapter.INSTANCE.fromWire("fe80::").getAddress());
+        assertArrayEquals(new byte[]{0x20, 0x01, 0x0d, (byte) 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 0xab, (byte) 0xcd},
+            InetAddressStringAdapter.INSTANCE.fromWire("2001:DB8::ABCD").getAddress());
+        assertEquals(InetAddressStringAdapter.INSTANCE.fromWire("2001:db8::abcd"),
+            InetAddressStringAdapter.INSTANCE.fromWire("2001:DB8::ABCD"));
+
+        // IPv4-mapped IPv6 (JDK InetAddress.getByAddress normalizes ::ffff:a.b.c.d to Inet4Address)
+        assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, 0, 2, 1}),
+            InetAddressStringAdapter.INSTANCE.fromWire("::ffff:192.0.2.1"));
+        assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, 0, 2, 1}),
+            InetAddressStringAdapter.INSTANCE.fromWire("0:0:0:0:0:ffff:192.0.2.1"));
+
+        // NAT64 / embedded IPv4 IPv6
+        assertArrayEquals(new byte[]{
+                0x00, 0x64, (byte) 0xff, (byte) 0x9b, 0, 0, 0, 0,
+                0, 0, 0, 0, (byte) 192, 0, 2, 33
+            },
+            InetAddressStringAdapter.INSTANCE.fromWire("64:ff9b::192.0.2.33").getAddress());
+        assertArrayEquals(new byte[]{
+                0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, (byte) 192, 0, 2, 1
+            },
+            InetAddressStringAdapter.INSTANCE.fromWire("1:2:3:4:5::192.0.2.1").getAddress());
+        assertArrayEquals(new byte[]{
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 192, 0, 2, 1
+            },
+            InetAddressStringAdapter.INSTANCE.fromWire("0:0:0:0:0:0:192.0.2.1").getAddress());
+
+        // Single-group compression boundaries
+        assertArrayEquals(new byte[]{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 0},
+            InetAddressStringAdapter.INSTANCE.fromWire("1:2:3:4:5:6:7::").getAddress());
+        assertArrayEquals(new byte[]{0, 0, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8},
+            InetAddressStringAdapter.INSTANCE.fromWire("::2:3:4:5:6:7:8").getAddress());
+    }
+
+    @Test
+    void inetAddressStringRejectsInvalidAndHostnames() {
+        String[] invalidInputs = {
+            null,
+            "",
+            "localhost",
+            "example.com",
+            "nonexistent.invalid",
+            "1.2.3",
+            "1.2.3.4.5",
+            "256.0.0.1",
+            "01.2.3.4",
+            "1.00.3.4",
+            "1..2.3",
+            ".1.2.3.4",
+            "1.2.3.4.",
+            "127.1",
+            "2130706433",
+            " 127.0.0.1",
+            "127.0.0.1 ",
+            "-1.2.3.4",
+            "\u0661.\u0662.\u0663.\u0664",
+            ":",
+            ":::",
+            "1:::2",
+            "1::2::3",
+            "::1::",
+            ":1",
+            "1:",
+            ":1:2",
+            "1:2:",
+            "1:2:3:4:5:6:7",
+            "2001:db8:1:2:3:4:5:6:7",
+            "1:2:3:4:5:6:7::8",
+            "1:2:3:4:5:6:7:8::",
+            "::1:2:3:4:5:6:7:8",
+            "1:2:3:4:5:6::192.0.2.1",
+            "1:2:3:4:5:6:7:192.0.2.1",
+            "1:2:3:4:5:192.0.2.1",
+            "12345::1",
+            "00001::1",
+            "2001:db8::gggg",
+            "[::1]",
+            "fe80::1%eth0",
+            "::ffff:999.0.0.1",
+            "::ffff:01.0.0.1",
+            "::ffff:1.2.3",
+            "::ffff:1.2.3.4.",
+            "192.0.2.1::1",
+            "::192.0.2.1:1"
+        };
+        for (String input : invalidInputs) {
+            assertThrows(ProtoException.class,
+                () -> InetAddressStringAdapter.INSTANCE.fromWire(input),
+                () -> "expected ProtoException for input: " + input);
+        }
     }
 
     @Test

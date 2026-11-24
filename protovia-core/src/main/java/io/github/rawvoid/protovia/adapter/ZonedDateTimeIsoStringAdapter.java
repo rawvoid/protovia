@@ -21,12 +21,13 @@ import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
 
+import java.time.DateTimeException;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
 
 /**
- * Opt-in {@link ZonedDateTime} as proto3 {@code string} formatted in standard ISO-8601
- * (e.g. {@code "2026-08-18T15:47:05.123+08:00[Asia/Shanghai]"}).
+ * Opt-in {@link ZonedDateTime} as proto3 {@code string} formatted in ISO-8601 extended with a
+ * bracketed time-zone identifier (RFC 9557 / Java {@link ZonedDateTime#toString()} format, e.g.
+ * {@code "2026-08-18T15:47:05.123+08:00[Asia/Shanghai]"}).
  * Unused unless named in {@code @ProtoField(adapter)} / {@code @ProtoAdapters}.
  *
  * @author Rawvoid
@@ -48,7 +49,7 @@ public final class ZonedDateTimeIsoStringAdapter implements ProtoAdapter<ZonedDa
     public ZonedDateTime fromWire(String wire) {
         try {
             return ZonedDateTime.parse(wire);
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeException e) {
             throw new ProtoException("invalid ZonedDateTime string: " + wire, e);
         }
     }

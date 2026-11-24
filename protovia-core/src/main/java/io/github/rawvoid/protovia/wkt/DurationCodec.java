@@ -22,6 +22,7 @@ import io.github.rawvoid.protovia.wire.CodedSize;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 
+import java.time.DateTimeException;
 import java.time.Duration;
 
 /**
@@ -116,6 +117,10 @@ public final class DurationCodec implements ProtoCodec<Duration> {
         if (seconds > 0 && nanos < 0 || seconds < 0 && nanos > 0) {
             throw new ProtoException("Duration seconds and nanos must have the same sign");
         }
-        return Duration.ofSeconds(seconds, nanos);
+        try {
+            return Duration.ofSeconds(seconds, nanos);
+        } catch (ArithmeticException | DateTimeException e) {
+            throw new ProtoException("Duration out of range: seconds=" + seconds + ", nanos=" + nanos, e);
+        }
     }
 }

@@ -16,6 +16,7 @@
 
 package io.github.rawvoid.protovia.adapter;
 
+import io.github.rawvoid.protovia.ProtoException;
 import io.github.rawvoid.protovia.ProtoType;
 import io.github.rawvoid.protovia.annotation.ProtoScalar;
 import io.github.rawvoid.protovia.codec.ProtoAdapter;
@@ -39,7 +40,11 @@ public final class DurationMilliAdapter implements ProtoAdapter<Duration, Long> 
 
     @Override
     public Long toWire(Duration value) {
-        return value.toMillis();
+        try {
+            return value.toMillis();
+        } catch (ArithmeticException e) {
+            throw new ProtoException("Duration out of int64 milliseconds range: " + value, e);
+        }
     }
 
     @Override

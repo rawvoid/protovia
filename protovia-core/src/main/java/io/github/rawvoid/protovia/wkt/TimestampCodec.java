@@ -22,6 +22,7 @@ import io.github.rawvoid.protovia.wire.CodedSize;
 import io.github.rawvoid.protovia.wire.ProtoReader;
 import io.github.rawvoid.protovia.wire.ProtoWriter;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 
 /**
@@ -97,6 +98,10 @@ public final class TimestampCodec implements ProtoCodec<Instant> {
         if (nanos < 0 || nanos > 999_999_999) {
             throw new ProtoException("Timestamp nanos out of range: " + nanos);
         }
-        return Instant.ofEpochSecond(seconds, nanos);
+        try {
+            return Instant.ofEpochSecond(seconds, nanos);
+        } catch (DateTimeException e) {
+            throw new ProtoException("Timestamp out of range: seconds=" + seconds + ", nanos=" + nanos, e);
+        }
     }
 }
