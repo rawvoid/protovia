@@ -425,9 +425,9 @@ class ProtoExportTest {
               reserved 4, 5, 10 to 12;
               reserved "legacy_tag";
               string name = 1;
-              google.protobuf.Any extra = 2;
-              google.protobuf.Int32Value count = 3;
-              google.protobuf.Timestamp at = 6;
+              .google.protobuf.Any extra = 2;
+              .google.protobuf.Int32Value count = 3;
+              .google.protobuf.Timestamp at = 6;
               int32 born = 7;
             }
             """, proto(compilation, "example/v1/carrier.proto"));
@@ -555,7 +555,7 @@ class ProtoExportTest {
             import "other/v1/addr.proto";
 
             message Wrap {
-              other.v1.Addr addr = 1;
+              .other.v1.Addr addr = 1;
             }
             """, proto(compilation, "example/v1/wrap.proto"));
         assertEquals(
@@ -611,6 +611,171 @@ class ProtoExportTest {
         assertThat(compilation).succeeded();
         proto(compilation, "demo/foo_bar.proto");
         proto(compilation, "other/foo_bar.proto");
+    }
+
+    @Test
+    void emitsZeroEnumValueFirstPreservingRemainingOrder() {
+        Compilation compilation = compile(
+            src("demo.Status", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                import io.github.rawvoid.protovia.annotation.ProtoUnrecognized;
+                @ProtoEnum
+                public enum Status {
+                  @ProtoEnumValue(1) ACTIVE,
+                  @ProtoEnumValue(2) SUSPENDED,
+                  @ProtoEnumValue(0) UNKNOWN,
+                  @ProtoEnumValue(3) CLOSED,
+                  @ProtoUnrecognized UNRECOGNIZED
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            package demo;
+
+            enum Status {
+              STATUS_UNKNOWN = 0;
+              STATUS_ACTIVE = 1;
+              STATUS_SUSPENDED = 2;
+              STATUS_CLOSED = 3;
+            }
+            """, proto(compilation, "demo/status.proto"));
+    }
+
+    @Test
+    void prefixesLeadingDotOnWktAndCrossPackageRefsWhenPackageShadowsGoogle() {
+        Compilation compilation = compile(
+            src("other.pkg.Foo", """
+                package other.pkg;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record Foo(@ProtoField(number = 1) String id) {}
+                """),
+            src("other.pkg.State", """
+                package other.pkg;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum
+                public enum State {
+                  @ProtoEnumValue(0) UNKNOWN,
+                  @ProtoEnumValue(1) READY
+                }
+                """),
+            src("org.acme.google.api.Peer", """
+                package org.acme.google.api;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record Peer(@ProtoField(number = 1) String name) {}
+                """),
+            src("org.acme.google.api.Event", """
+                package org.acme.google.api;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                import io.github.rawvoid.protovia.annotation.ProtoOneof;
+                import other.pkg.Foo;
+                import other.pkg.State;
+                import java.time.Instant;
+                import java.util.List;
+                import java.util.Map;
+                @ProtoMessage
+                public class Event {
+                  @ProtoField(number = 1) public Instant at;
+                  @ProtoField(number = 2) public Foo foo;
+                  @ProtoField(number = 3) public State state;
+                  @ProtoField(number = 4) public List<Foo> foos;
+                  @ProtoField(number = 5) public Map<String, Foo> byKey;
+                  @ProtoField(number = 6) public Peer peer;
+                  @ProtoOneof({
+                    @ProtoOneof.Case(number = 7, of = Foo.class, name = "oneof_foo"),
+                    @ProtoOneof.Case(number = 8, of = Instant.class, name = "ts")
+                  })
+                  public Object detail;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            package org.acme.google.api;
+
+            import "google/protobuf/timestamp.proto";
+            import "org/acme/google/api/peer.proto";
+            import "other/pkg/foo.proto";
+            import "other/pkg/state.proto";
+
+            message Event {
+              .google.protobuf.Timestamp at = 1;
+              .other.pkg.Foo foo = 2;
+              .other.pkg.State state = 3;
+              repeated .other.pkg.Foo foos = 4;
+              map<string, .other.pkg.Foo> byKey = 5;
+              Peer peer = 6;
+              oneof detail {
+                .other.pkg.Foo oneof_foo = 7;
+                .google.protobuf.Timestamp ts = 8;
+              }
+            }
+            """, proto(compilation, "org/acme/google/api/event.proto"));
+    }
+
+    @Test
+    void omitsRedundantOptionalOnMessageFieldsButKeepsOnScalarAndEnum() {
+        Compilation compilation = compile(
+            src("demo.Address", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                @ProtoMessage
+                public record Address(@ProtoField(number = 1) String city) {}
+                """),
+            src("demo.Status", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoEnum;
+                import io.github.rawvoid.protovia.annotation.ProtoEnumValue;
+                @ProtoEnum
+                public enum Status {
+                  @ProtoEnumValue(0) UNKNOWN,
+                  @ProtoEnumValue(1) ACTIVE
+                }
+                """),
+            src("demo.Holder", """
+                package demo;
+                import io.github.rawvoid.protovia.annotation.ProtoField;
+                import io.github.rawvoid.protovia.annotation.ProtoMessage;
+                import java.time.Instant;
+                import java.util.Optional;
+                @ProtoMessage
+                public class Holder {
+                  @ProtoField(number = 1, optional = true) public Address addr;
+                  @ProtoField(number = 2, optional = true) public Instant at;
+                  @ProtoField(number = 3, optional = true) public Integer count;
+                  @ProtoField(number = 4, optional = true) public Status status;
+                  @ProtoField(number = 5) public Optional<String> note;
+                }
+                """));
+        assertThat(compilation).succeeded();
+        assertEquals("""
+            syntax = "proto3";
+
+            package demo;
+
+            import "demo/address.proto";
+            import "demo/status.proto";
+            import "google/protobuf/timestamp.proto";
+
+            message Holder {
+              Address addr = 1;
+              .google.protobuf.Timestamp at = 2;
+              optional int32 count = 3;
+              optional Status status = 4;
+              optional string note = 5;
+            }
+            """, proto(compilation, "demo/holder.proto"));
     }
 
     private static String proto(Compilation compilation, String path) {

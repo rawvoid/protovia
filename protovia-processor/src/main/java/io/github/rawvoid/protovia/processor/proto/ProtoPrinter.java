@@ -71,11 +71,22 @@ public final class ProtoPrinter {
             ? model.type.getSimpleName().toString()
             : model.protoEnumName;
         for (EnumModel.Constant constant : model.constants) {
-            String protoName = ProtoIdent.enumConstantName(enumTypeName, constant.name());
-            out.append("  ").append(protoName).append(" = ").append(constant.number()).append(";\n");
+            if (constant.number() == 0) {
+                printEnumConstant(out, enumTypeName, constant);
+            }
+        }
+        for (EnumModel.Constant constant : model.constants) {
+            if (constant.number() != 0) {
+                printEnumConstant(out, enumTypeName, constant);
+            }
         }
         out.append("}\n");
         return out.toString();
+    }
+
+    private static void printEnumConstant(StringBuilder out, String enumTypeName, EnumModel.Constant constant) {
+        String protoName = ProtoIdent.enumConstantName(enumTypeName, constant.name());
+        out.append("  ").append(protoName).append(" = ").append(constant.number()).append(";\n");
     }
 
     private static void header(StringBuilder out, String pkg, Set<String> imports) {
@@ -176,7 +187,7 @@ public final class ProtoPrinter {
                 .append(typeRef(field.mapValue, currentPackage)).append("> ")
                 .append(field.exportName()).append(" = ").append(field.number);
             default -> {
-                if (field.optional || field.javaOptional) {
+                if (field.kind != FieldKind.MESSAGE && (field.optional || field.javaOptional)) {
                     out.append("optional ");
                 }
                 out.append(typeRef(field, currentPackage)).append(' ')
