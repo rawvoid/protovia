@@ -19,11 +19,14 @@ package io.github.rawvoid.protovia.wire;
 import io.github.rawvoid.protovia.ProtoException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
- * UTF-8 encode/decode matching protobuf-java 4.35.1 {@code Utf8.SafeProcessor}:
- * ASCII fast paths, direct writes into the output buffer, and unpaired surrogates
- * replaced the same way as {@link String#getBytes(java.nio.charset.Charset)}.
+ * UTF-8 encode/decode matching official {@code protobuf-java}:
+ * encoding uses ASCII fast paths and direct writes into the output buffer (replacing unpaired
+ * surrogates with ASCII {@code '?'}, matching {@link String#getBytes(java.nio.charset.Charset)});
+ * decoding uses the {@code protobuf-java} 4.36 {@code ServerProcessor} pattern via JDK UTF-8
+ * decoding plus {@code U+FFFD} round-trip validation.
  *
  * @author Rawvoid
  */
@@ -38,8 +41,9 @@ public final class Utf8 {
     }
 
     /**
-     * Byte length of {@code value} encoded as UTF-8. Unpaired surrogates become the UTF-8
-     * replacement character, matching {@code String.getBytes(UTF_8).length}.
+     * Byte length of {@code value} encoded as UTF-8. Unpaired surrogates are replaced with ASCII
+     * {@code '?'} ({@code 0x3F}, 1 byte), matching {@code String.getBytes(StandardCharsets.UTF_8)}
+     * and official {@code protobuf-java} (not {@code U+FFFD}).
      */
     public static int encodedLength(String value) {
         int utf16Length = value.length();
@@ -116,59 +120,23 @@ public final class Utf8 {
     }
 
     public static String decode(byte[] bytes, int offset, int length) {
-        if ((offset | length | bytes.length - offset - length) < 0) {
+        int end = offset + length;
+        if ((offset | length | end | (bytes.length - end)) < 0) {
             throw new ProtoException(
                 "invalid UTF-8 slice offset=" + offset + " length=" + length + " buffer=" + bytes.length);
         }
         if (length == 0) {
             return "";
         }
-
-        char[] result = new char[length];
-        int resultPos = 0;
-        int pos = offset;
-        int limit = offset + length;
-
-        while (pos < limit) {
-            byte b = bytes[pos];
-            if (b < 0) {
-                break;
-            }
-            pos++;
-            result[resultPos++] = (char) b;
+        String s = new String(bytes, offset, length, StandardCharsets.UTF_8);
+        if (s.indexOf('\uFFFD') < 0) {
+            return s;
         }
-
-        while (pos < limit) {
-            byte byte1 = bytes[pos++];
-            if (byte1 >= 0) {
-                result[resultPos++] = (char) byte1;
-                while (pos < limit) {
-                    byte b = bytes[pos];
-                    if (b < 0) {
-                        break;
-                    }
-                    pos++;
-                    result[resultPos++] = (char) b;
-                }
-            } else if (byte1 < (byte) 0xE0) {
-                if (pos >= limit) {
-                    throw invalidUtf8();
-                }
-                handleTwoBytes(byte1, bytes[pos++], result, resultPos++);
-            } else if (byte1 < (byte) 0xF0) {
-                if (pos >= limit - 1) {
-                    throw invalidUtf8();
-                }
-                handleThreeBytes(byte1, bytes[pos++], bytes[pos++], result, resultPos++);
-            } else {
-                if (pos >= limit - 2) {
-                    throw invalidUtf8();
-                }
-                handleFourBytes(byte1, bytes[pos++], bytes[pos++], bytes[pos++], result, resultPos);
-                resultPos += 2;
-            }
+        byte[] reencoded = s.getBytes(StandardCharsets.UTF_8);
+        if (Arrays.equals(reencoded, 0, reencoded.length, bytes, offset, end)) {
+            return s;
         }
-        return new String(result, 0, resultPos);
+        throw invalidUtf8();
     }
 
     private static int encodedLengthGeneral(String string, int start) {
@@ -199,43 +167,6 @@ public final class Utf8 {
         }
         System.arraycopy(bytes, 0, out, offset, bytes.length);
         return offset + bytes.length;
-    }
-
-    private static void handleTwoBytes(byte byte1, byte byte2, char[] result, int resultPos) {
-        if (byte1 < (byte) 0xC2 || isNotTrailingByte(byte2)) {
-            throw invalidUtf8();
-        }
-        result[resultPos] = (char) (((byte1 & 0x1F) << 6) | (byte2 & 0x3F));
-    }
-
-    private static void handleThreeBytes(byte byte1, byte byte2, byte byte3, char[] result, int resultPos) {
-        if (isNotTrailingByte(byte2)
-            || (byte1 == (byte) 0xE0 && byte2 < (byte) 0xA0)
-            || (byte1 == (byte) 0xED && byte2 >= (byte) 0xA0)
-            || isNotTrailingByte(byte3)) {
-            throw invalidUtf8();
-        }
-        result[resultPos] = (char) (((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F));
-    }
-
-    private static void handleFourBytes(
-        byte byte1, byte byte2, byte byte3, byte byte4, char[] result, int resultPos) {
-        if (isNotTrailingByte(byte2)
-            || (((byte1 << 28) + (byte2 - (byte) 0x90)) >> 30) != 0
-            || isNotTrailingByte(byte3)
-            || isNotTrailingByte(byte4)) {
-            throw invalidUtf8();
-        }
-        int codePoint = ((byte1 & 0x07) << 18)
-            | ((byte2 & 0x3F) << 12)
-            | ((byte3 & 0x3F) << 6)
-            | (byte4 & 0x3F);
-        result[resultPos] = Character.highSurrogate(codePoint);
-        result[resultPos + 1] = Character.lowSurrogate(codePoint);
-    }
-
-    private static boolean isNotTrailingByte(byte b) {
-        return b > (byte) 0xBF;
     }
 
     private static ProtoException invalidUtf8() {
