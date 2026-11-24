@@ -25,7 +25,7 @@ import java.lang.annotation.Target;
 /**
  * Marks the constructor or static factory used to instantiate an immutable
  * {@link ProtoMessage} during decode. Parameters bind to proto properties by
- * name, or by type sequence when names are unavailable.
+ * name, or by unambiguous positional type sequence when names are unavailable.
  *
  * <p>At most one {@code @ProtoCreator} per type. The executable must be public;
  * a factory must be {@code static} and return the message type.

@@ -157,7 +157,7 @@ final class WireCodegen {
     }
 
     /**
-     * Begins a loop over map entries in write order: sorted by wire key (cached in {@link SizeCache})
+     * Begins a loop over map entries in write order: sorted by wire key (cached in {@code SizeCache})
      * when {@link FieldModel#deterministic} is set, otherwise {@code entrySet()}.
      * Size and write use the exact same order so {@code SizeCache} slots and objects stay aligned.
      */

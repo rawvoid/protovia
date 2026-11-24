@@ -67,7 +67,7 @@ public @interface ProtoField {
 
     /**
      * proto3 explicit presence: a present default value is written to the wire.
-     * Requires a boxed / {@link java.util.Optional} Java type, not a primitive.
+     * Requires a reference (non-primitive) or {@link java.util.Optional} Java type, not a primitive.
      */
     boolean optional() default false;
 

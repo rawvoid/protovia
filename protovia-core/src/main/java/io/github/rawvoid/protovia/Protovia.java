@@ -107,7 +107,11 @@ public final class Protovia {
     }
 
     /**
-     * Overrides codec lookup for {@code type}. Used by tests and hand-written codecs.
+     * Overrides top-level codec lookup for {@code type} (used by {@code Protovia.*} and
+     * {@link ProtoConfig}, including {@link #unpack(ProtoAny, Class)} and
+     * {@link ProtoConfig#unpack(ProtoAny, Class)}). Generated codecs invoke child
+     * {@code XxxProtoCodec.INSTANCE} directly for static dispatch, so registering a child
+     * type does not intercept parent-generated codecs.
      *
      * @param type  entity class
      * @param codec codec to use
