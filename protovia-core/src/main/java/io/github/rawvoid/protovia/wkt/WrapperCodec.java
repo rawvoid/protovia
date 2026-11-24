@@ -82,6 +82,11 @@ final class WrapperCodec<T> implements ProtoCodec<T> {
     }
 
     @Override
+    public boolean needsSizeCache() {
+        return false;
+    }
+
+    @Override
     public void writeTo(ProtoWriter writer, T value) {
         if (!unset.test(value)) {
             write.write(writer, value);

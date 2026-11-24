@@ -24,24 +24,47 @@ import io.github.rawvoid.protovia.wkt.*;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Resolves a {@link ProtoCodec} by convention {@code package + ".internal." + TypeName + "ProtoCodec.INSTANCE"},
  * with an optional manual {@link #register(Class, ProtoCodec) override}.
- * Well-known types ({@code Instant}, {@code Duration}, {@link ProtoAny}, wrappers)
- * are registered up front.
+ * Generated and well-known codecs are cached per-class via {@link ClassValue} so dynamically loaded
+ * classes can be unloaded cleanly, while well-known builtins ({@code Instant}, {@code Duration},
+ * {@link ProtoAny}, wrappers) live in an immutable table that is never cleared.
  *
  * @author Rawvoid
  */
 public final class CodecLookup {
 
-    private static final ConcurrentHashMap<Class<?>, ProtoCodec<?>> CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, ProtoCodec<?>> BUILTINS = Map.ofEntries(
+        Map.entry(Instant.class, TimestampCodec.INSTANCE),
+        Map.entry(Duration.class, DurationCodec.INSTANCE),
+        Map.entry(ProtoAny.class, AnyCodec.INSTANCE),
+        Map.entry(DoubleValue.class, DoubleValue.INSTANCE),
+        Map.entry(FloatValue.class, FloatValue.INSTANCE),
+        Map.entry(Int64Value.class, Int64Value.INSTANCE),
+        Map.entry(UInt64Value.class, UInt64Value.INSTANCE),
+        Map.entry(Int32Value.class, Int32Value.INSTANCE),
+        Map.entry(UInt32Value.class, UInt32Value.INSTANCE),
+        Map.entry(BoolValue.class, BoolValue.INSTANCE),
+        Map.entry(StringValue.class, StringValue.INSTANCE),
+        Map.entry(BytesValue.class, BytesValue.INSTANCE)
+    );
 
-    static {
-        registerBuiltins();
-    }
+    private static final ClassValue<ProtoCodec<?>> GENERATED = new ClassValue<>() {
+        @Override
+        protected ProtoCodec<?> computeValue(Class<?> type) {
+            ProtoCodec<?> builtin = BUILTINS.get(type);
+            return builtin != null ? builtin : loadGenerated(type);
+        }
+    };
+
+    private static final ConcurrentHashMap<Class<?>, ProtoCodec<?>> OVERRIDES = new ConcurrentHashMap<>();
+    private static final Object OVERRIDE_LOCK = new Object();
+    private static volatile boolean hasOverrides;
 
     private CodecLookup() {
     }
@@ -53,13 +76,13 @@ public final class CodecLookup {
     @SuppressWarnings("unchecked")
     public static <T> ProtoCodec<T> get(Class<T> type) {
         Objects.requireNonNull(type, "type");
-        ProtoCodec<?> cached = CACHE.get(type);
-        if (cached != null) {
-            return (ProtoCodec<T>) cached;
+        if (hasOverrides) {
+            ProtoCodec<?> override = OVERRIDES.get(type);
+            if (override != null) {
+                return (ProtoCodec<T>) override;
+            }
         }
-        ProtoCodec<T> loaded = loadGenerated(type);
-        ProtoCodec<?> existing = CACHE.putIfAbsent(type, loaded);
-        return (ProtoCodec<T>) (existing != null ? existing : loaded);
+        return (ProtoCodec<T>) GENERATED.get(type);
     }
 
     /**
@@ -71,30 +94,20 @@ public final class CodecLookup {
     public static <T> void register(Class<T> type, ProtoCodec<T> codec) {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(codec, "codec");
-        CACHE.put(type, codec);
+        synchronized (OVERRIDE_LOCK) {
+            OVERRIDES.put(type, codec);
+            hasOverrides = true;
+        }
     }
 
     /**
-     * Drops manual registrations and reloads well-known builtins.
+     * Drops manual registrations while keeping immutable well-known builtins intact.
      */
     public static void clear() {
-        CACHE.clear();
-        registerBuiltins();
-    }
-
-    private static void registerBuiltins() {
-        CACHE.put(Instant.class, TimestampCodec.INSTANCE);
-        CACHE.put(Duration.class, DurationCodec.INSTANCE);
-        CACHE.put(ProtoAny.class, AnyCodec.INSTANCE);
-        CACHE.put(DoubleValue.class, DoubleValue.INSTANCE);
-        CACHE.put(FloatValue.class, FloatValue.INSTANCE);
-        CACHE.put(Int64Value.class, Int64Value.INSTANCE);
-        CACHE.put(UInt64Value.class, UInt64Value.INSTANCE);
-        CACHE.put(Int32Value.class, Int32Value.INSTANCE);
-        CACHE.put(UInt32Value.class, UInt32Value.INSTANCE);
-        CACHE.put(BoolValue.class, BoolValue.INSTANCE);
-        CACHE.put(StringValue.class, StringValue.INSTANCE);
-        CACHE.put(BytesValue.class, BytesValue.INSTANCE);
+        synchronized (OVERRIDE_LOCK) {
+            OVERRIDES.clear();
+            hasOverrides = false;
+        }
     }
 
     @SuppressWarnings("unchecked")
